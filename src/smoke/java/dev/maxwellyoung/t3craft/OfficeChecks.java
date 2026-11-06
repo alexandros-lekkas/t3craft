@@ -151,6 +151,18 @@ public final class OfficeChecks {
 		blocks.put(sign, net.minecraft.world.level.block.Blocks.BIRCH_WALL_SIGN.defaultBlockState());
 		var signEntity = new net.minecraft.world.level.block.entity.SignBlockEntity(sign, blocks.get(sign));
 		check(!OfficeSite.occupied(bounds, origin, blueprint, read, pos -> pos.equals(sign) ? signEntity : null), "daytime lamps and office whiteboards are rebuildable");
+		// Use the blueprint coordinate so this protects the office's own container exemption.
+		String shulkerCommand = blueprint.stream().filter(command -> command.contains("white_shulker_box")).findFirst().orElseThrow();
+		String[] coordinates = shulkerCommand.split(" ");
+		var shulkerPos = origin.offset(Integer.parseInt(coordinates[1]), Integer.parseInt(coordinates[2]), Integer.parseInt(coordinates[3]));
+		var shulkerState = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace("white_shulker_box")).defaultBlockState();
+		var shulker = new net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity(shulkerPos, shulkerState);
+		blocks.put(shulkerPos, shulkerState);
+		check(!OfficeSite.occupied(bounds, origin, blueprint, read, pos -> pos.equals(shulkerPos) ? shulker : null), "empty office shulker permits rebuild");
+		shulker.setItem(0, new net.minecraft.world.item.ItemStack(net.minecraft.core.Holder.direct(net.minecraft.world.item.Items.DIAMOND, net.minecraft.core.component.DataComponentMap.EMPTY)));
+		check(OfficeSite.occupied(bounds, origin, blueprint, read, pos -> pos.equals(shulkerPos) ? shulker : null), "non-empty office shulker requires confirmation");
+		shulker.clearContent();
+		check(OfficeSite.occupied(bounds, null, List.of(), read, pos -> pos.equals(shulkerPos) ? shulker : null), "unowned empty shulker remains protected");
 	}
 
 	private static T3State.ThreadRow row(String owner, int index, T3State.Status status) {

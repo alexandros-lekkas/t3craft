@@ -78,7 +78,8 @@ final class OfficeSite {
 			var entity = entities.apply(pos);
 			boolean officeBlock = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString().equals(existing.get(pos));
 			if (entity instanceof net.minecraft.world.level.block.entity.LecternBlockEntity lectern && lectern.hasBook()) return true;
-			if (entity instanceof net.minecraft.world.Container || entity != null && !officeBlock) return true;
+			if (entity instanceof net.minecraft.world.Container container && (!officeBlock || !container.isEmpty())) return true;
+			if (entity != null && !officeBlock) return true;
 			if (pos.getY() == bounds.min().getY() || state.canBeReplaced() || state.isAir()
 				|| state.getBlock() instanceof net.minecraft.world.level.block.FlowerBlock
 				|| state.is(net.minecraft.tags.BlockTags.FLOWERS)) continue;
