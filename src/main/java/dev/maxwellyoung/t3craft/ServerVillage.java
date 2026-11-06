@@ -76,8 +76,8 @@ final class ServerVillage {
 		for (int slot = 0; slot < rows.size(); slot++) {
 			T3State.ThreadRow row = rows.get(slot);
 			BlockPos column = VillageLayout.column(anchor, slot);
-			if (!level.isLoaded(column)) continue;
 			keep.add(row.id());
+			if (!level.isLoaded(column)) continue;
 			int y = VillageLayout.standY(level, column);
 			Villager villager = villagers.get(row.id());
 			if (villager == null || villager.isRemoved()) {

@@ -44,17 +44,8 @@ public final class T3CraftServer implements DedicatedServerModInitializer {
 		CommandRegistrationCallback.EVENT.register((dispatcher, registry, environment) -> dispatcher.register(
 			Commands.literal("t3office")
 				.requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
-				.then(Commands.literal("build").executes(ctx -> {
-					var source = ctx.getSource();
-					if (!config.paired()) {
-						source.sendFailure(Component.literal("Pair the server first: /t3village pair <link>"));
-						return 0;
-					}
-					office.build(source.getServer(), BlockPos.containing(source.getPosition()));
-					source.sendSuccess(() -> Component.literal("Suite 408 is up (" + office.floors().size()
-						+ " floor(s)); the agents are walking in."), true);
-					return 1;
-				}))
+				.then(Commands.literal("build").executes(ctx -> office.build(ctx.getSource(), false))
+					.then(Commands.literal("confirm").executes(ctx -> office.build(ctx.getSource(), true))))
 				.then(Commands.literal("pin").then(Commands.argument("thread", StringArgumentType.word()).executes(ctx -> {
 					boolean ok = office.pin(StringArgumentType.getString(ctx, "thread"), false);
 					if (ok) ctx.getSource().sendSuccess(() -> Component.literal("Thread pinned to the shared office."), false);

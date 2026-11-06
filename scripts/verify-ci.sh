@@ -23,9 +23,11 @@ for port in 25680 25681 25682 25683; do
   done
   if [ "$ready" != true ]; then echo "Fixture $port did not become ready" >&2; exit 1; fi
 done
-./gradlew build officeCheck connectionCheck featureCheck reliabilityCheck "$@"
+./gradlew verifyAll "$@"
 ./gradlew connectionCheck featureCheck reliabilityCheck -PfixturePort=25682 "$@"
 # MCP scenarios mutate fixture state; keep each leg in a separate invocation.
 ./gradlew mcpCheck "$@"
 ./gradlew mcpCheck -PfixturePort=25682 "$@"
 python3 scripts/check-launcher.py
+python3 scripts/check-installer.py
+python3 scripts/check-jar.py

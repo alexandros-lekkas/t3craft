@@ -13,7 +13,7 @@ public final class ConnectionChecks {
 		try {
 			T3Config config = new T3Config(); config.upsert(new T3Config.Environment("Synthetic", "http://localhost:1234", "fixture-only"));
 			var file = dir.resolve("private.json"); check(config.save(file), "pairing persisted");
-			check(java.nio.file.Files.getPosixFilePermissions(file).equals(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")), "replacement file stays owner-only");
+			if (file.getFileSystem().supportedFileAttributeViews().contains("posix")) check(java.nio.file.Files.getPosixFilePermissions(file).equals(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")), "replacement file stays owner-only");
 			check(config.save(file) && T3Config.load(file).paired(), "atomic replacement reloads");
 			check(!config.save(file.resolve("unwritable.json")) && T3Config.load(file).paired(), "failed replacement reports failure and leaves the existing pairing intact");
 			try (var files = java.nio.file.Files.list(dir)) { check(files.noneMatch(p -> p.getFileName().toString().endsWith(".tmp")), "no temporary credential copies remain"); }

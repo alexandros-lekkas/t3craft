@@ -70,6 +70,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 java {
+	toolchain.languageVersion = JavaLanguageVersion.of(25)
 	sourceCompatibility = JavaVersion.VERSION_25
 	targetCompatibility = JavaVersion.VERSION_25
 }
@@ -123,8 +124,27 @@ tasks.register('connectionCheck', JavaExec) {
 	args = [project.findProperty('fixturePort') ?: '25680']
 }
 
+// Fixture-backed checks share one entry point in PR and tag builds.
+tasks.register('verifyAll') {
+	dependsOn 'build', 'officeCheck', 'connectionCheck', 'featureCheck', 'reliabilityCheck'
+}
+
+dependencyLocking {
+	lockAllConfigurations()
+	// macOS-only Minecraft library; resolving it on Linux CI would violate the lock state.
+	ignoredDependencies.add("ca.weblite:java-objc-bridge")
+}
+
+// Exercise smoke checks on the invoking JDK while compiling the mod with Java 25.
+tasks.withType(JavaExec).configureEach {
+	javaLauncher = javaToolchains.launcherFor {
+		languageVersion = JavaLanguageVersion.of(JavaVersion.current().majorVersion)
+	}
+}
+
+// MCP checks mutate fixture state and run separately from verifyAll.
 tasks.register('mcpCheck', JavaExec) {
-	description = 'Public MCP transport, OAuth PKCE, polling and legacy gap checks against loopback fixtures.'
+	description = 'Public MCP transport, OAuth, incremental history, visibility and per-leg fallback checks.'
 	classpath = sourceSets.smoke.runtimeClasspath
 	mainClass = 'dev.maxwellyoung.t3craft.McpChecks'
 	args = [project.findProperty('fixturePort') ?: '25680']

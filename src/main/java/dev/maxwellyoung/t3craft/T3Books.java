@@ -23,7 +23,10 @@ final class T3Books {
 	}
 
 	static void deliver(T3State state, T3State.ThreadRow thread) {
-		var player = Minecraft.getInstance().player;
+		var minecraft = Minecraft.getInstance();
+		var player = minecraft.player;
+		var level = minecraft.level;
+		var connection = minecraft.getConnection();
 		if (player == null || !player.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER)) return;
 		T3Backend api = state.apiFor(thread.id());
 		if (api == null) return;
@@ -31,10 +34,11 @@ final class T3Books {
 			JsonObject detail = api.thread(thread.id(), 2);
 			String command = command(thread.title(), reply(detail), files(detail));
 			Minecraft.getInstance().execute(() -> {
-				if (Minecraft.getInstance().player == null) return;
+				if (minecraft.player != player || minecraft.level != level || minecraft.getConnection() != connection
+					|| !player.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER)) return;
 				expectedFeedback = "Gave 1 [" + shortTitle(thread.title()) + "]";
 				expectedUntil = System.currentTimeMillis() + 5_000;
-				Minecraft.getInstance().player.connection.sendCommand(command);
+				ClientCommands.send(command);
 			});
 		}, e -> T3Log.LOGGER.warn("Could not write the book for {}", thread.title(), e));
 	}
