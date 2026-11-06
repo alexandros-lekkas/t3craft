@@ -204,7 +204,7 @@ final class T3Mcp {
 				Minecraft minecraft = Minecraft.getInstance();
 				if (minecraft.player == null) return "error: the player is not in a world.";
 				agentChat(Component.literal("/" + command).withStyle(ChatFormatting.GRAY));
-				minecraft.player.connection.sendCommand(command);
+				ClientCommands.send(command);
 				return "sent";
 			});
 			if (!"sent".equals(sent)) return sent;

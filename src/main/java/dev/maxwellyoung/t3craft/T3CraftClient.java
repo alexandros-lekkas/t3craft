@@ -84,10 +84,11 @@ public final class T3CraftClient implements ClientModInitializer {
 		new T3Mcp(() -> config.agentCommands).start();
 		village = new T3Village(this);
 		ClientTickEvents.START_CLIENT_TICK.register(village::tick);
+		ClientTickEvents.START_CLIENT_TICK.register(ClientCommands::tick);
 		ClientTickEvents.START_CLIENT_TICK.register(office::tick);
 		ClientTickEvents.END_CLIENT_TICK.register(village::animate);
 		net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents.ALLOW_GAME.register(
-			(message, overlay) -> overlay || !(T3Books.isOwnFeedback(message.getString()) || office.hideFeedback(message.getString())));
+			(message, overlay) -> overlay || !(T3Books.isOwnFeedback(message.getString()) || office.hideFeedback(message)));
 		SelfTest selfTest = SelfTest.fromSystemProperty(this);
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			if (selfTest != null) selfTest.tick(client);
@@ -222,22 +223,36 @@ public final class T3CraftClient implements ClientModInitializer {
 			chat(Component.literal("This site contains existing blocks (including any containers). Run /t3 office confirm to replace them at these exact bounds.")); return;
 		}
 		pendingOffice = null;
-		office.build(origin, request.labels());
+		var oldVillage = config.villages.get(world);
+		boolean oldOffice = config.officeWorlds.contains(world);
+		var oldOwners = officePreferences().floorOwners;
 		config.villages.put(world, new int[] {origin.getX(), origin.getY(), origin.getZ()});
 		config.officeWorlds.add(world);
 		officePreferences().floorOwners = List.copyOf(request.owners());
-		config.save(configPath);
+		if (!config.save(configPath)) {
+			if (oldVillage == null) config.villages.remove(world); else config.villages.put(world, oldVillage);
+			if (!oldOffice) config.officeWorlds.remove(world);
+			officePreferences().floorOwners = oldOwners;
+			chat(Component.literal("Could not save office settings; no blocks were changed.")); return;
+		}
+		office.build(origin, request.labels());
 		village.clear();
 		chat(Component.literal("Office build accepted. Needs command permission (op). Rebuild to add floors for newly paired machines."));
 	}
 
 	private int officeOff() {
 		String world = worldKey();
+		var oldVillage = world == null ? null : config.villages.get(world);
+		boolean oldOffice = world != null && config.officeWorlds.contains(world);
 		if (world != null) { config.officeWorlds.remove(world); config.villages.remove(world); }
+		if (!config.save(configPath)) {
+			if (oldVillage != null) config.villages.put(world, oldVillage);
+			if (oldOffice) config.officeWorlds.add(world);
+			chat(Component.literal("Could not save office settings; office kept.")); return 0;
+		}
 		pendingOffice = null;
 		office.clear();
 		village.clear();
-		config.save(configPath);
 		chat(Component.literal("Office residents hidden; building blocks kept."));
 		return 1;
 	}
@@ -253,9 +268,14 @@ public final class T3CraftClient implements ClientModInitializer {
 		String world = worldKey();
 		if (world == null) return;
 		var ahead = player.blockPosition().relative(player.getDirection(), distance);
-		config.villages.put(world, new int[] {ahead.getX(), ahead.getY(), ahead.getZ()});
-		config.officeWorlds.remove(world);
-		config.save(configPath);
+		var previous = config.villages.put(world, new int[] {ahead.getX(), ahead.getY(), ahead.getZ()});
+		boolean wasOffice = config.officeWorlds.remove(world);
+		if (!config.save(configPath)) {
+			if (previous == null) config.villages.remove(world); else config.villages.put(world, previous);
+			if (wasOffice) config.officeWorlds.add(world);
+			chat(Component.literal("Could not save village settings; village kept.")); return;
+		}
+		office.clear();
 		village.clear();
 	}
 

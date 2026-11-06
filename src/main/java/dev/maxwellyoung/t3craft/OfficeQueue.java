@@ -2,50 +2,86 @@ package dev.maxwellyoung.t3craft;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-
+import net.minecraft.network.chat.Component;
 import java.util.List;
 
-/** Client side of the office: sends its build and update commands a few per tick, quietly. */
+/** Session-bound placement; local worlds execute on their integrated server. */
 final class OfficeQueue {
-	private final WorldBoundQueue<String> queue = new WorldBoundQueue<>();
+	private record Work(String command, Runnable completed) {}
+	private final WorldBoundQueue<Work> queue = new WorldBoundQueue<>();
 	private long quietUntil;
+	private boolean denied, inFlight;
+	private Object sessionLevel, sessionConnection;
+	private volatile int generation;
 
-	boolean building() {
-		return !queue.isEmpty();
-	}
-
-	/** Queues the whole building. Needs command permission (operator) on the server. */
+	boolean building() { return !queue.isEmpty() || inFlight; }
 	void build(BlockPos origin, List<String> floors) {
-		queue.clear();
+		clear(); denied = false;
 		send(origin, T3Office.blueprint(floors));
 	}
-
-	void clear() { queue.clear(); quietUntil = 0; }
-
-	void send(BlockPos origin, List<String> commands) {
-		Minecraft minecraft = Minecraft.getInstance();
-		queue.add(minecraft.level, minecraft.getConnection(), commands.stream()
-			.map(command -> T3Office.absolute(command, origin.getX(), origin.getY(), origin.getZ())).toList());
+	void clear() { queue.clear(); quietUntil = 0; inFlight = false; generation++; }
+	void send(BlockPos origin, List<String> commands) { send(origin, commands, () -> {}); }
+	boolean send(BlockPos origin, List<String> commands, Runnable completed) {
+		Minecraft mc = Minecraft.getInstance();
+		bind(mc);
+		if (denied || commands.isEmpty()) return false;
+		for (int i = 0; i < commands.size(); i++) queue.add(mc.level, mc.getConnection(), List.of(new Work(
+			T3Office.absolute(commands.get(i), origin.getX(), origin.getY(), origin.getZ()), i == commands.size() - 1 ? completed : () -> {})));
+		return true;
 	}
-
-	/**
-	 * While building, the server answers every fill with "Successfully filled…". Those lines are
-	 * noise; errors (no permission, unknown block) still come through. "Could not set the block"
-	 * is the whiteboard being wiped when it's already blank.
-	 */
-	boolean hideFeedback(String message) {
-		boolean quiet = !queue.isEmpty() || System.currentTimeMillis() < quietUntil;
+	boolean hideFeedback(Component component) {
+		String message = component.getString();
+		boolean quiet = building() || System.currentTimeMillis() < quietUntil;
+		if (quiet && (permissionFailure(component) || message.contains("permission") || message.startsWith("Unknown or incomplete command") || message.startsWith("Unknown command"))) {
+			clear(); denied = true;
+		}
 		return quiet && (message.startsWith("Successfully filled") || message.startsWith("Changed the block")
 			|| message.startsWith("Could not set the block") || message.startsWith("No blocks were filled"));
 	}
+	private static boolean permissionFailure(Component message) {
+		if (message.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents text
+			&& (text.getKey().equals("command.unknown.command") || text.getKey().equals("commands.generic.permission"))) return true;
+		return message.getSiblings().stream().anyMatch(OfficeQueue::permissionFailure);
+	}
 
-	void tick(Minecraft minecraft) {
-		if (!queue.validate(minecraft.level, minecraft.getConnection())) quietUntil = 0;
-		if (queue.isEmpty() || minecraft.player == null) return;
-		quietUntil = System.currentTimeMillis() + 3000;
-		for (int i = 0; i < 6 && !queue.isEmpty(); i++) {
-			if (!OfficeSite.loaded(minecraft.level, BlockPos.ZERO, List.of(queue.peek()))) return;
-			minecraft.player.connection.sendCommand(queue.poll());
+	private void bind(Minecraft mc) {
+		if (sessionLevel != mc.level || sessionConnection != mc.getConnection()) {
+			clear(); denied = false; sessionLevel = mc.level; sessionConnection = mc.getConnection();
 		}
+	}
+
+	void tick(Minecraft mc) {
+		bind(mc);
+		if (!queue.validate(mc.level, mc.getConnection())) clear();
+		if (inFlight || queue.isEmpty() || mc.player == null) return;
+		quietUntil = System.currentTimeMillis() + 5000;
+		Work work = queue.peek();
+		if (!queue.targetLoaded(OfficeSite.loaded(mc.level, BlockPos.ZERO, List.of(work.command())))) {
+			clear();
+			mc.gui.hud.getChat().addClientSystemMessage(Component.literal("Office placement cancelled: a target chunk unloaded. Run /t3 office again when the site is loaded."));
+			return;
+		}
+		var server = mc.getSingleplayerServer();
+		if (server == null) {
+			if (ClientCommands.trySend(mc, work.command())) { queue.poll(); work.completed().run(); }
+			return;
+		}
+		var clientLevel = mc.level;
+		var connection = mc.getConnection();
+		var dimension = clientLevel.dimension();
+		int token = generation;
+		inFlight = true;
+		server.execute(() -> {
+			var level = server.getLevel(dimension);
+			boolean valid = token == generation && level != null && OfficeSite.loaded(level, BlockPos.ZERO, List.of(work.command()));
+			if (valid) server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withLevel(level).withSuppressedOutput(), work.command());
+			mc.execute(() -> {
+				if (token != generation) return;
+				if (mc.level != clientLevel || mc.getConnection() != connection) { clear(); return; }
+				inFlight = false;
+				if (!valid) { clear(); return; }
+				queue.poll(); work.completed().run();
+			});
+		});
 	}
 }

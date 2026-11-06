@@ -38,7 +38,7 @@ final class T3Books {
 					|| !player.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER)) return;
 				expectedFeedback = "Gave 1 [" + shortTitle(thread.title()) + "]";
 				expectedUntil = System.currentTimeMillis() + 5_000;
-				Minecraft.getInstance().player.connection.sendCommand(command);
+				ClientCommands.send(command);
 			});
 		}, e -> T3Log.LOGGER.warn("Could not write the book for {}", thread.title(), e));
 	}

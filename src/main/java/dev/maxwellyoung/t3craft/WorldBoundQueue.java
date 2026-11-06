@@ -23,6 +23,12 @@ final class WorldBoundQueue<T> {
 		return sameSession;
 	}
 
+	/** Never retain placement commands across an unloaded target: later terrain may be new work. */
+	boolean targetLoaded(boolean loaded) {
+		if (!loaded) clear();
+		return loaded;
+	}
+
 	void clear() { items.clear(); level = null; connection = null; }
 	boolean isEmpty() { return items.isEmpty(); }
 	T peek() { return items.peek(); }

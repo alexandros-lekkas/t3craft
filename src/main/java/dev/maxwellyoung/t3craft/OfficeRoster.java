@@ -30,6 +30,7 @@ final class OfficeRoster {
 		void normalize() {
 			if (pins == null) pins = new ArrayList<>();
 			if (desks == null) desks = new LinkedHashMap<>();
+			desks.entrySet().removeIf(e -> e.getKey() == null || e.getKey().indexOf('\n') < 1 || e.getKey().endsWith("\n") || e.getValue() == null || e.getValue() < 0 || e.getValue() >= DESKS);
 			pins.removeIf(p -> p == null || p.owner() == null || p.threadId() == null);
 		}
 	}

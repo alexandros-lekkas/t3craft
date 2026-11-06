@@ -38,8 +38,14 @@ final class OfficeSite {
 		return true;
 	}
 
-	/** Existing office blocks must match the old blueprint at that position; containers always warn. */
+	/** Ignore terrain at the plaza layer and replaceable vegetation; protect player builds and containers. */
 	static boolean occupied(Level level, Bounds bounds, BlockPos oldOrigin, List<String> oldBlueprint) {
+		return occupied(bounds, oldOrigin, oldBlueprint, level::getBlockState, level::getBlockEntity);
+	}
+
+	static boolean occupied(Bounds bounds, BlockPos oldOrigin, List<String> oldBlueprint,
+		java.util.function.Function<BlockPos, net.minecraft.world.level.block.state.BlockState> blocks,
+		java.util.function.Function<BlockPos, net.minecraft.world.level.block.entity.BlockEntity> entities) {
 		Map<BlockPos, String> existing = new HashMap<>();
 		if (oldOrigin != null) for (String command : oldBlueprint) {
 			String[] parts = command.split(" ");
@@ -55,10 +61,28 @@ final class OfficeSite {
 				existing.put(pos.immutable(), inside ? "minecraft:air" : block);
 			}
 		}
+		// Dynamic office furnishings are still office blocks at these exact positions.
+		if (oldOrigin != null) {
+			int floors = Math.max(1, (bounds(oldOrigin, oldBlueprint).max().getY() - oldOrigin.getY()) / T3Office.FLOOR_HEIGHT);
+			for (String command : T3Office.lamps(floors, false)) {
+				String[] parts = command.split(" ");
+				BlockPos pos = oldOrigin.offset(Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+				String actual = BuiltInRegistries.BLOCK.getKey(blocks.apply(pos).getBlock()).toString();
+				if (actual.equals("minecraft:white_concrete") || actual.equals("minecraft:sea_lantern") || actual.equals("minecraft:light")) existing.put(pos, actual);
+			}
+			for (int floor = 0; floor < floors; floor++) for (int z : new int[] {27, 28})
+				existing.put(oldOrigin.offset(2, floor * T3Office.FLOOR_HEIGHT + 3, z), "minecraft:birch_wall_sign");
+		}
 		for (BlockPos pos : BlockPos.betweenClosed(bounds.min(), bounds.max())) {
-			var state = level.getBlockState(pos);
-			if (!state.isAir() && (level.getBlockEntity(pos) != null
-				|| !BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString().equals(existing.get(pos)))) return true;
+			var state = blocks.apply(pos);
+			var entity = entities.apply(pos);
+			boolean officeBlock = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString().equals(existing.get(pos));
+			if (entity instanceof net.minecraft.world.level.block.entity.LecternBlockEntity lectern && lectern.hasBook()) return true;
+			if (entity instanceof net.minecraft.world.Container || entity != null && !officeBlock) return true;
+			if (pos.getY() == bounds.min().getY() || state.canBeReplaced() || state.isAir()
+				|| state.getBlock() instanceof net.minecraft.world.level.block.FlowerBlock
+				|| state.is(net.minecraft.tags.BlockTags.FLOWERS)) continue;
+			if (!officeBlock) return true;
 		}
 		return false;
 	}
