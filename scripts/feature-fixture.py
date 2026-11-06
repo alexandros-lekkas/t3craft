@@ -353,6 +353,9 @@ class Handler(BaseHTTPRequestHandler):
     def dispatch(self, command):
         self.server.dispatches.append(command)
         target = self.server.threads[command['threadId']]
+        if command['type'] in ('thread.turn.start', 'message.dispatch'):
+            target['messages'][0]['text'] = 'Sent via legacy'
+            return
         target['activities'].append({'kind': 'approval.resolved' if command.get('decision') else 'user-input.resolved', 'payload': {'requestId': command['requestId']}})
         target['hasPendingApprovals'] = target['hasPendingUserInput'] = False
         for handler, ident in list(self.server.subscribers.items()):
@@ -401,7 +404,7 @@ class Handler(BaseHTTPRequestHandler):
                 elif tag == 'orchestration.subscribeThread': pass
                 elif tag == 'orchestration.dispatchCommand':
                     command = request['payload']
-                    if command['type'] != 'runtime-request.respond': raise ValueError('Unexpected command')
+                    if command['type'] not in ('runtime-request.respond', 'message.dispatch', 'thread.model-selection.set'): raise ValueError('Unexpected command')
                     with self.server.lock: self.dispatch(command)
                     self.frame({'_tag': 'Exit', 'requestId': ident, 'exit': {'_tag': 'Success', 'value': {'sequence': len(self.server.dispatches)}}})
                 else:

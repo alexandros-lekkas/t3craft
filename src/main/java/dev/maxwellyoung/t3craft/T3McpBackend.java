@@ -57,6 +57,7 @@ final class T3McpBackend implements T3Backend {
   }
  }
  private <T> T write(IoSupplier<T> primary, IoSupplier<T> fallback) throws IOException, InterruptedException {
+  if (mcpError != null && fallback != null) return viaLegacy(fallback);
   try { return mcp(primary); } catch (T3McpException e) {
    if (fallback == null || !e.notExecuted || e.kind == TOOL) throw e;
    return viaLegacy(fallback);
