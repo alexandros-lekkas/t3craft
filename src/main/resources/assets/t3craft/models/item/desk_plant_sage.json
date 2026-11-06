@@ -1,0 +1,7 @@
+{
+  "parent": "t3craft:item/desk_plant",
+  "textures": {
+    "body": "t3craft:item/desk_plant_sage",
+    "particle": "t3craft:item/desk_plant_sage"
+  }
+}

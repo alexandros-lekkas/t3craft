@@ -1,0 +1,7 @@
+{
+  "parent": "t3craft:item/desk_chair",
+  "textures": {
+    "body": "t3craft:item/desk_chair_oak",
+    "particle": "t3craft:item/desk_chair_oak"
+  }
+}

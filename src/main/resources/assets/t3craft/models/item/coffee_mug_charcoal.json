@@ -1,0 +1,7 @@
+{
+  "parent": "t3craft:item/coffee_mug",
+  "textures": {
+    "body": "t3craft:item/coffee_mug_charcoal",
+    "particle": "t3craft:item/coffee_mug_charcoal"
+  }
+}

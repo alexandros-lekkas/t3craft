@@ -8,7 +8,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityTypes;
-import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.decoration.Mannequin;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.HashMap;
@@ -27,7 +27,7 @@ final class ServerVillage {
 
 	private final T3State state;
 	private final T3Config config;
-	private final Map<String, Villager> villagers = new HashMap<>();
+	private final Map<String, Mannequin> villagers = new HashMap<>();
 	private int ticks;
 
 	ServerVillage(T3State state, T3Config config) {
@@ -41,14 +41,14 @@ final class ServerVillage {
 
 	/** Removes the village's villagers (the ones loaded now; stale ones go as their chunks load). */
 	void clear() {
-		for (Villager villager : villagers.values()) villager.discard();
+		for (Mannequin villager : villagers.values()) villager.discard();
 		villagers.clear();
 	}
 
 	/** A tagged villager loaded from disk (an earlier run) that this village doesn't own: remove it. */
 	void onLoad(Entity entity) {
-		if (entity instanceof Villager villager && villager.entityTags().contains(TAG) && !villagers.containsValue(villager)) {
-			villager.discard();
+		if (entity.entityTags().contains(TAG) && !villagers.containsValue(entity)) {
+			entity.discard();
 		}
 	}
 
@@ -62,10 +62,10 @@ final class ServerVillage {
 		ticks++;
 		if (ticks % 10 == 0) sync(level, anchor);
 		if (ticks % 4 == 0) {
-			for (Villager villager : villagers.values()) face(level, villager);
+			for (Mannequin villager : villagers.values()) face(level, villager);
 		}
 		if (ticks % 8 == 0) {
-			for (Map.Entry<String, Villager> entry : villagers.entrySet()) if (state.online(entry.getKey())) effects(level, entry.getValue(), row(entry.getKey()));
+			for (Map.Entry<String, Mannequin> entry : villagers.entrySet()) if (state.online(entry.getKey())) effects(level, entry.getValue(), row(entry.getKey()));
 		}
 	}
 
@@ -79,14 +79,12 @@ final class ServerVillage {
 			keep.add(row.id());
 			if (!level.isLoaded(column)) continue;
 			int y = VillageLayout.standY(level, column);
-			Villager villager = villagers.get(row.id());
+			Mannequin villager = villagers.get(row.id());
 			if (villager == null || villager.isRemoved()) {
-				villager = EntityTypes.VILLAGER.create(level, EntitySpawnReason.COMMAND);
+				villager = EntityTypes.MANNEQUIN.create(level, EntitySpawnReason.COMMAND);
 				if (villager == null) continue;
-				villager.setNoAi(true);
 				villager.setSilent(true);
 				villager.setPermanentlyInvulnerable(true);
-				villager.setPersistenceRequired();
 				villager.addTag(TAG);
 				villager.setCustomNameVisible(true);
 				villager.setUUID(VillageLayout.villagerUuid(row.id()));
@@ -95,14 +93,13 @@ final class ServerVillage {
 				if (!level.addFreshEntity(villager)) {
 					// A stale copy with this UUID is still loaded; drop it and spawn on the next sync.
 					villagers.remove(row.id());
-					if (level.getEntity(villager.getUUID()) instanceof Villager stale) stale.discard();
+					if (level.getEntity(villager.getUUID()) instanceof Mannequin stale) stale.discard();
 					continue;
 				}
 			} else if (villager.getX() != column.getX() + 0.5 || villager.getY() != y || villager.getZ() != column.getZ() + 0.5) {
 				villager.snapTo(column.getX() + 0.5, y, column.getZ() + 0.5, villager.getYRot(), 0);
 			}
-			villager.setVillagerData(villager.getVillagerData().withProfession(level.registryAccess(), VillageLayout.outfit(row)).withLevel(5));
-			villager.setCustomName(VillageLayout.label(row, state.waitingDetail(row.id()), state.online(row.id())));
+			AgentAppearance.update(villager, row, state.online(row.id()), state.driverFor(row));
 		}
 		villagers.entrySet().removeIf(entry -> {
 			if (keep.contains(entry.getKey())) return false;
@@ -112,7 +109,7 @@ final class ServerVillage {
 	}
 
 	/** Turn toward the nearest player, like the client village does. */
-	private static void face(ServerLevel level, Villager villager) {
+	private static void face(ServerLevel level, Mannequin villager) {
 		Player player = level.getNearestPlayer(villager, 24);
 		if (player == null) return;
 		float yaw = (float) (Math.toDegrees(Math.atan2(player.getZ() - villager.getZ(), player.getX() - villager.getX())) - 90);
@@ -121,7 +118,7 @@ final class ServerVillage {
 		villager.setYHeadRot(yaw);
 	}
 
-	private static void effects(ServerLevel level, Villager villager, T3State.ThreadRow row) {
+	private static void effects(ServerLevel level, Mannequin villager, T3State.ThreadRow row) {
 		if (row == null) return;
 		ParticleOptions particle = switch (row.status()) {
 			case WORKING -> ParticleTypes.ENCHANT;

@@ -132,7 +132,9 @@ public final class T3Api implements T3Backend {
 
 	public record Model(String slug, String name) {}
 
-	public record Provider(String instanceId, String name, boolean requiresNewThreadForModelChange, List<Model> models) {}
+	public record Provider(String instanceId, String name, boolean requiresNewThreadForModelChange, List<Model> models, String driver) {
+        public Provider(String instanceId,String name,boolean locked,List<Model> models){this(instanceId,name,locked,models,instanceId);}
+    }
 
 	/**
 	 * Ready providers and their models. Only exposed over the RPC socket (`server.getConfig`),
@@ -177,7 +179,7 @@ public final class T3Api implements T3Backend {
 			String instanceId = provider.get("instanceId").getAsString();
 			String name = provider.has("displayName") ? provider.get("displayName").getAsString() : providerName(provider.get("driver").getAsString());
 			boolean locked = provider.has("requiresNewThreadForModelChange") && provider.get("requiresNewThreadForModelChange").getAsBoolean();
-			providers.add(new Provider(instanceId, name, locked, List.copyOf(models)));
+			providers.add(new Provider(instanceId, name, locked, List.copyOf(models), T3Protocol.string(provider,"driver")));
 		}
 		return List.copyOf(providers);
 	}

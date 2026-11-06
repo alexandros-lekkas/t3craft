@@ -1,0 +1,74 @@
+{
+  "format": 1,
+  "credits": [
+    {
+      "id": "office-a",
+      "name": "Scandinavian studio design A",
+      "kind": "original-art",
+      "author": "T3 Craft art and office-design contributors",
+      "source": "https://github.com/alexandros-lekkas/t3craft",
+      "files": [
+        "scripts/office/scandi.cjs",
+        "src/main/resources/data/t3craft/office/scandi-*.json"
+      ],
+      "modifications": "Expanded to a 30 by 24 interior, minimum two floors, generated floor modules and anchors.",
+      "license": "MIT"
+    },
+    {
+      "id": "agent-skins",
+      "name": "Provider character skins",
+      "kind": "original-art",
+      "author": "T3 Craft art and office-design contributors",
+      "source": "https://github.com/alexandros-lekkas/t3craft",
+      "files": [
+        "src/main/resources/assets/t3craft/textures/entity/agent/*.png",
+        "src/main/resources/assets/t3craft/skins.json"
+      ],
+      "modifications": "Bundled original wide/slim pixel skins and stable per-thread alternates.",
+      "license": "MIT"
+    },
+    {
+      "id": "desk-laptop",
+      "name": "Desk laptop models and animated screens",
+      "kind": "original-art",
+      "author": "T3 Craft art and office-design contributors",
+      "source": "https://github.com/alexandros-lekkas/t3craft",
+      "files": [
+        "src/main/resources/assets/t3craft/models/item/laptop*.json",
+        "src/main/resources/assets/t3craft/textures/item/laptop*",
+        "src/main/resources/assets/t3craft/items/laptop.json"
+      ],
+      "modifications": "Original cuboid model with idle, working, needs-you and closed screen art.",
+      "license": "MIT"
+    },
+    {
+      "id": "office-props",
+      "name": "Office furniture and desk accessories",
+      "kind": "original-art",
+      "author": "T3 Craft art and office-design contributors",
+      "source": "https://github.com/alexandros-lekkas/t3craft",
+      "files": [
+        "scripts/office/props-source.json",
+        "src/main/resources/assets/t3craft/models/item/*.json",
+        "src/main/resources/assets/t3craft/textures/item/*",
+        "src/main/resources/assets/t3craft/items/*.json"
+      ],
+      "modifications": "All 17 original furniture and accessory types, including chair, mug, notebook, plants, espresso machine, monitor and lamps. Placement adapted to the larger studio.",
+      "license": "MIT"
+    },
+    {
+      "id": "provider-glyphs",
+      "name": "Provider icon pixel glyphs",
+      "kind": "original-art",
+      "author": "T3 Craft art and office-design contributors",
+      "source": "https://github.com/alexandros-lekkas/t3craft",
+      "files": [
+        "src/main/resources/assets/t3craft/font/provider_icons.json",
+        "src/main/resources/assets/t3craft/textures/font/provider_icons.png",
+        "src/main/resources/assets/t3craft/provider-icons.json"
+      ],
+      "modifications": "Original pixel renditions of provider marks supplied by the art workstream; provider marks retain their owners rights.",
+      "license": "Provider marks: respective owners; original rendering code: MIT"
+    }
+  ]
+}

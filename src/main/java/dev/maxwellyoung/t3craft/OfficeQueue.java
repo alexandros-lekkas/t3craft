@@ -18,7 +18,15 @@ final class OfficeQueue {
 	boolean building() { return !queue.isEmpty() || inFlight; }
 	void build(BlockPos origin, List<String> floors) {
 		clear(); denied = false;
-		send(origin, T3Office.blueprint(floors));
+		Minecraft mc = Minecraft.getInstance(); bind(mc);
+  var server = mc.getSingleplayerServer();
+  if(server == null) { send(origin, T3Office.blueprint(floors)); return; }
+  var level = mc.level; int token=generation; inFlight=true;
+  server.execute(() -> {
+   try { var target=server.getLevel(level.dimension());
+    if(token==generation && target!=null && OfficeSite.loaded(target,origin,T3Office.blueprint(floors))) OfficePlacement.place(target,origin,floors);
+   } finally { mc.execute(()->{if(token==generation)inFlight=false;}); }
+  });
 	}
 	void clear() { queue.clear(); quietUntil = 0; inFlight = false; generation++; failedCommands = 0; sentCommands = 0; }
 	void send(BlockPos origin, List<String> commands) { send(origin, commands, () -> {}); }
@@ -45,6 +53,21 @@ final class OfficeQueue {
 		return message.getSiblings().stream().anyMatch(OfficeQueue::permissionFailure);
 	}
 
+	/** Vanilla reports unchanged setblock commands as failures; matching lamps are already complete. */
+	private static boolean alreadyPlaced(net.minecraft.server.level.ServerLevel level, String command) {
+		String[] parts = command.split(" ");
+		if (parts.length != 5 || !parts[0].equals("setblock")) return false;
+		try {
+			var pos = new BlockPos(Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+			var state = net.minecraft.commands.arguments.blocks.BlockStateParser.parseForBlock(
+				level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.BLOCK),
+				new com.mojang.brigadier.StringReader(parts[4]), false).blockState();
+			return level.getBlockState(pos).equals(state);
+		} catch (NumberFormatException | com.mojang.brigadier.exceptions.CommandSyntaxException ignored) {
+			return false;
+		}
+	}
+
 	private static void report(Minecraft mc, String message) {
 		mc.gui.hud.getChat().addClientSystemMessage(Component.literal(message));
 	}
@@ -63,7 +86,7 @@ final class OfficeQueue {
 		Work work = queue.peek();
 		if (!queue.targetLoaded(OfficeSite.loaded(mc.level, BlockPos.ZERO, List.of(work.command())))) {
 			clear();
-			mc.gui.hud.getChat().addClientSystemMessage(Component.literal("Office placement cancelled: a target chunk unloaded. Run /t3 office again when the site is loaded."));
+			mc.gui.hud.getChat().addClientSystemMessage(Component.literal("Office placement cancelled: a target chunk unloaded. Run /t3 office build again when the site is loaded."));
 			return;
 		}
 		var server = mc.getSingleplayerServer();
@@ -83,8 +106,8 @@ final class OfficeQueue {
 		server.execute(() -> {
 			var level = server.getLevel(dimension);
 			boolean valid = token == generation && level != null && OfficeSite.loaded(level, BlockPos.ZERO, List.of(work.command()));
-			boolean[] succeeded = {false};
-			if (valid) server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withLevel(level)
+			boolean[] succeeded = {valid && alreadyPlaced(level, work.command())};
+			if (valid && !succeeded[0]) server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withLevel(level)
 				.withSuppressedOutput().withCallback((success, result) -> succeeded[0] = success), work.command());
 			mc.execute(() -> {
 				if (token != generation) return;

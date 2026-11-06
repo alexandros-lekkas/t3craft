@@ -205,7 +205,7 @@
       "files": [
         "src/main/resources/assets/t3craft/font/*.json"
       ],
-      "where_used": "Font provider JSON that wires Inter into Minecraft, with vanilla fallbacks."
+      "where_used": "Bitmap font provider for the 8 px provider icons (t3craft:provider_icons), used by the in-game panel."
     },
     {
       "id": "art-upstream-icon",
@@ -236,9 +236,10 @@
       "always": true,
       "status": "bundled",
       "files": [
-        "src/main/resources/assets/t3craft/textures/entity/agent/**"
+        "src/main/resources/assets/t3craft/textures/entity/agent/**",
+        "src/main/resources/assets/t3craft/skins.json"
       ],
-      "where_used": "The villager-style agents who sit at the desks, one look per AI provider.",
+      "where_used": "Player-shaped vanilla Mannequin agents at the desks, with bundled per-provider skins and stable alternates.",
       "inspired_by": "Each provider's public brand colours (see the provider trademark notice). Drawn texel by texel from a fixed palette; no logos copied."
     },
     {
@@ -271,9 +272,62 @@
         "src/main/resources/assets/t3craft/textures/block/**",
         "src/main/resources/assets/t3craft/models/block/**",
         "src/main/resources/assets/t3craft/blockstates/**",
-        "src/main/resources/assets/t3craft/textures/gui/usage_board*"
+        "src/main/resources/assets/t3craft/textures/gui/usage_board*",
+        "src/main/resources/assets/t3craft/items/coffee_mug*.json",
+        "src/main/resources/assets/t3craft/models/item/coffee_mug*.json",
+        "src/main/resources/assets/t3craft/textures/item/coffee_mug*",
+        "src/main/resources/assets/t3craft/items/desk_chair*.json",
+        "src/main/resources/assets/t3craft/models/item/desk_chair*.json",
+        "src/main/resources/assets/t3craft/textures/item/desk_chair*",
+        "src/main/resources/assets/t3craft/items/desk_lamp*.json",
+        "src/main/resources/assets/t3craft/models/item/desk_lamp*.json",
+        "src/main/resources/assets/t3craft/textures/item/desk_lamp*",
+        "src/main/resources/assets/t3craft/items/desk_plant*.json",
+        "src/main/resources/assets/t3craft/models/item/desk_plant*.json",
+        "src/main/resources/assets/t3craft/textures/item/desk_plant*",
+        "src/main/resources/assets/t3craft/items/espresso_machine*.json",
+        "src/main/resources/assets/t3craft/models/item/espresso_machine*.json",
+        "src/main/resources/assets/t3craft/textures/item/espresso_machine*",
+        "src/main/resources/assets/t3craft/items/filing_cabinet*.json",
+        "src/main/resources/assets/t3craft/models/item/filing_cabinet*.json",
+        "src/main/resources/assets/t3craft/textures/item/filing_cabinet*",
+        "src/main/resources/assets/t3craft/items/headphones_stand*.json",
+        "src/main/resources/assets/t3craft/models/item/headphones_stand*.json",
+        "src/main/resources/assets/t3craft/textures/item/headphones_stand*",
+        "src/main/resources/assets/t3craft/items/marker_tray*.json",
+        "src/main/resources/assets/t3craft/models/item/marker_tray*.json",
+        "src/main/resources/assets/t3craft/textures/item/marker_tray*",
+        "src/main/resources/assets/t3craft/items/monitor*.json",
+        "src/main/resources/assets/t3craft/models/item/monitor*.json",
+        "src/main/resources/assets/t3craft/textures/item/monitor*",
+        "src/main/resources/assets/t3craft/items/monstera*.json",
+        "src/main/resources/assets/t3craft/models/item/monstera*.json",
+        "src/main/resources/assets/t3craft/textures/item/monstera*",
+        "src/main/resources/assets/t3craft/items/nameplate*.json",
+        "src/main/resources/assets/t3craft/models/item/nameplate*.json",
+        "src/main/resources/assets/t3craft/textures/item/nameplate*",
+        "src/main/resources/assets/t3craft/items/notebook*.json",
+        "src/main/resources/assets/t3craft/models/item/notebook*.json",
+        "src/main/resources/assets/t3craft/textures/item/notebook*",
+        "src/main/resources/assets/t3craft/items/pinboard*.json",
+        "src/main/resources/assets/t3craft/models/item/pinboard*.json",
+        "src/main/resources/assets/t3craft/textures/item/pinboard*",
+        "src/main/resources/assets/t3craft/items/printer*.json",
+        "src/main/resources/assets/t3craft/models/item/printer*.json",
+        "src/main/resources/assets/t3craft/textures/item/printer*",
+        "src/main/resources/assets/t3craft/items/trash_bin*.json",
+        "src/main/resources/assets/t3craft/models/item/trash_bin*.json",
+        "src/main/resources/assets/t3craft/textures/item/trash_bin*",
+        "src/main/resources/assets/t3craft/items/wall_clock*.json",
+        "src/main/resources/assets/t3craft/models/item/wall_clock*.json",
+        "src/main/resources/assets/t3craft/textures/item/wall_clock*",
+        "src/main/resources/assets/t3craft/items/water_cooler*.json",
+        "src/main/resources/assets/t3craft/models/item/water_cooler*.json",
+        "src/main/resources/assets/t3craft/textures/item/water_cooler*",
+        "scripts/office/props-source.json",
+        "src/main/resources/assets/t3craft/textures/item/mug_steam*"
       ],
-      "where_used": "Desks, the usage board and other office furniture."
+      "where_used": "Seventeen original prop types: distinct desk kits, chairs, mugs, monitors, lamps, plants, kitchenette and shared office furniture. Adapted to the larger two-floor studio."
     },
     {
       "id": "art-provider-icons",
@@ -288,9 +342,12 @@
       "files": [
         "src/main/resources/assets/t3craft/textures/gui/provider/**",
         "src/main/resources/assets/t3craft/textures/gui/providers/**",
-        "art/provider-icons/**"
+        "art/provider-icons/**",
+        "src/main/resources/assets/t3craft/provider-icons.json",
+        "src/main/resources/assets/t3craft/textures/font/provider_icons.png",
+        "src/main/resources/assets/t3craft/font/provider_icons.json"
       ],
-      "where_used": "Small badges in the T3 panel that show which agent wrote a message.",
+      "where_used": "Provider glyphs on agent name tags and badges in the panel.",
       "notes": "Nominative trademark use: each icon only identifies the provider. See docs/legal/provider-icons-NOTICE.md and the trademarks section."
     },
     {
@@ -321,10 +378,14 @@
       "files": [
         "src/main/resources/data/t3craft/structure/office*",
         "src/main/resources/data/t3craft/structure/office/**",
-        "src/main/resources/data/t3craft/function/office/**"
+        "src/main/resources/data/t3craft/function/office/**",
+        "src/main/resources/data/t3craft/office/**",
+        "scripts/office/scandi.cjs",
+        "scripts/office/generate.cjs"
       ],
       "where_used": "The two-floor shared office your agents work in.",
-      "inspired_by": "Scandinavian interiors: birch, white walls, lots of light."
+      "inspired_by": "Scandinavian interiors: birch, white walls, lots of light.",
+      "modifications": "Expanded to a 30 by 24 interior, minimum two floors, repeated floor modules, generated anchors and prop placements."
     },
     {
       "id": "art-launch-kit",

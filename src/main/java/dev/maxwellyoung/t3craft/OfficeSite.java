@@ -63,15 +63,15 @@ final class OfficeSite {
 		}
 		// Dynamic office furnishings are still office blocks at these exact positions.
 		if (oldOrigin != null) {
-			int floors = Math.max(1, (bounds(oldOrigin, oldBlueprint).max().getY() - oldOrigin.getY()) / T3Office.FLOOR_HEIGHT);
-			for (String command : T3Office.lamps(floors, false)) {
-				String[] parts = command.split(" ");
-				BlockPos pos = oldOrigin.offset(Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
-				String actual = BuiltInRegistries.BLOCK.getKey(blocks.apply(pos).getBlock()).toString();
-				if (actual.equals("minecraft:white_concrete") || actual.equals("minecraft:sea_lantern") || actual.equals("minecraft:light")) existing.put(pos, actual);
-			}
-			for (int floor = 0; floor < floors; floor++) for (int z : new int[] {27, 28})
-				existing.put(oldOrigin.offset(2, floor * T3Office.FLOOR_HEIGHT + 3, z), "minecraft:birch_wall_sign");
+
+   int floors = Math.max(2, (bounds(oldOrigin, oldBlueprint).max().getY() - oldOrigin.getY() + 1) / T3Office.FLOOR_HEIGHT - 1);
+   for(boolean night:new boolean[]{false,true})for(String command:OfficeDesign.lamps(floors,night)){
+    String[] parts=command.split(" ");BlockPos pos=oldOrigin.offset(Integer.parseInt(parts[1]),Integer.parseInt(parts[2]),Integer.parseInt(parts[3]));
+    String expected="minecraft:"+parts[4].split("\\[")[0];String actual=BuiltInRegistries.BLOCK.getKey(blocks.apply(pos).getBlock()).toString();
+    if(actual.equals(expected))existing.put(pos,actual);
+   }
+   for(int floor=0;floor<floors;floor++)for(int z:new int[]{14,15,16})existing.put(oldOrigin.offset(1,floor*T3Office.FLOOR_HEIGHT+2,z),"minecraft:birch_wall_sign");
+
 		}
 		for (BlockPos pos : BlockPos.betweenClosed(bounds.min(), bounds.max())) {
 			var state = blocks.apply(pos);

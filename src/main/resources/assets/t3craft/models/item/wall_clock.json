@@ -1,0 +1,496 @@
+{
+  "credit": "T3 Craft office props. Birch wall clock. Wall prop: back plane z=8 and centre y=8 sit on the entity origin.",
+  "ambientocclusion": false,
+  "textures": {
+    "body": "t3craft:item/wall_clock",
+    "dial": "t3craft:item/wall_clock_dial_00",
+    "particle": "t3craft:item/wall_clock"
+  },
+  "elements": [
+    {
+      "from": [
+        1.5,
+        5,
+        8
+      ],
+      "to": [
+        2.5,
+        11,
+        9.2
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            14.0,
+            0.0,
+            14.5,
+            3.0
+          ],
+          "texture": "#body"
+        },
+        "south": {
+          "uv": [
+            14.5,
+            0.0,
+            15.0,
+            3.0
+          ],
+          "texture": "#body"
+        },
+        "east": {
+          "uv": [
+            15.0,
+            0.0,
+            15.5,
+            3.0
+          ],
+          "texture": "#body"
+        },
+        "west": {
+          "uv": [
+            15.5,
+            0.0,
+            16.0,
+            3.0
+          ],
+          "texture": "#body"
+        },
+        "up": {
+          "uv": [
+            13.0,
+            6.5,
+            13.5,
+            7.0
+          ],
+          "texture": "#body"
+        },
+        "down": {
+          "uv": [
+            13.5,
+            6.5,
+            14.0,
+            7.0
+          ],
+          "texture": "#body"
+        }
+      }
+    },
+    {
+      "from": [
+        2.5,
+        3.2,
+        8
+      ],
+      "to": [
+        4,
+        12.8,
+        9.2
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            9.0,
+            0.0,
+            9.75,
+            4.75
+          ],
+          "texture": "#body"
+        },
+        "south": {
+          "uv": [
+            9.75,
+            0.0,
+            10.5,
+            4.75
+          ],
+          "texture": "#body"
+        },
+        "east": {
+          "uv": [
+            12.0,
+            0.0,
+            12.5,
+            4.75
+          ],
+          "texture": "#body"
+        },
+        "west": {
+          "uv": [
+            12.5,
+            0.0,
+            13.0,
+            4.75
+          ],
+          "texture": "#body"
+        },
+        "up": {
+          "uv": [
+            10.0,
+            6.5,
+            10.75,
+            7.0
+          ],
+          "texture": "#body"
+        },
+        "down": {
+          "uv": [
+            10.75,
+            6.5,
+            11.5,
+            7.0
+          ],
+          "texture": "#body"
+        }
+      }
+    },
+    {
+      "from": [
+        4,
+        1.5,
+        8
+      ],
+      "to": [
+        12,
+        14.5,
+        9.2
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            0.0,
+            4.0,
+            6.5
+          ],
+          "texture": "#body"
+        },
+        "south": {
+          "uv": [
+            4.0,
+            0.0,
+            8.0,
+            6.5
+          ],
+          "texture": "#body"
+        },
+        "east": {
+          "uv": [
+            8.0,
+            0.0,
+            8.5,
+            6.5
+          ],
+          "texture": "#body"
+        },
+        "west": {
+          "uv": [
+            8.5,
+            0.0,
+            9.0,
+            6.5
+          ],
+          "texture": "#body"
+        },
+        "up": {
+          "uv": [
+            2.0,
+            6.5,
+            6.0,
+            7.0
+          ],
+          "texture": "#body"
+        },
+        "down": {
+          "uv": [
+            6.0,
+            6.5,
+            10.0,
+            7.0
+          ],
+          "texture": "#body"
+        }
+      }
+    },
+    {
+      "from": [
+        12,
+        3.2,
+        8
+      ],
+      "to": [
+        13.5,
+        12.8,
+        9.2
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            10.5,
+            0.0,
+            11.25,
+            4.75
+          ],
+          "texture": "#body"
+        },
+        "south": {
+          "uv": [
+            11.25,
+            0.0,
+            12.0,
+            4.75
+          ],
+          "texture": "#body"
+        },
+        "east": {
+          "uv": [
+            13.0,
+            0.0,
+            13.5,
+            4.75
+          ],
+          "texture": "#body"
+        },
+        "west": {
+          "uv": [
+            13.5,
+            0.0,
+            14.0,
+            4.75
+          ],
+          "texture": "#body"
+        },
+        "up": {
+          "uv": [
+            11.5,
+            6.5,
+            12.25,
+            7.0
+          ],
+          "texture": "#body"
+        },
+        "down": {
+          "uv": [
+            12.25,
+            6.5,
+            13.0,
+            7.0
+          ],
+          "texture": "#body"
+        }
+      }
+    },
+    {
+      "from": [
+        13.5,
+        5,
+        8
+      ],
+      "to": [
+        14.5,
+        11,
+        9.2
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            6.5,
+            0.5,
+            9.5
+          ],
+          "texture": "#body"
+        },
+        "south": {
+          "uv": [
+            0.5,
+            6.5,
+            1.0,
+            9.5
+          ],
+          "texture": "#body"
+        },
+        "east": {
+          "uv": [
+            1.0,
+            6.5,
+            1.5,
+            9.5
+          ],
+          "texture": "#body"
+        },
+        "west": {
+          "uv": [
+            1.5,
+            6.5,
+            2.0,
+            9.5
+          ],
+          "texture": "#body"
+        },
+        "up": {
+          "uv": [
+            14.0,
+            6.5,
+            14.5,
+            7.0
+          ],
+          "texture": "#body"
+        },
+        "down": {
+          "uv": [
+            14.5,
+            6.5,
+            15.0,
+            7.0
+          ],
+          "texture": "#body"
+        }
+      }
+    },
+    {
+      "name": "dial",
+      "from": [
+        2.5,
+        2.5,
+        9.25
+      ],
+      "to": [
+        13.5,
+        13.5,
+        9.25
+      ],
+      "faces": {
+        "south": {
+          "uv": [
+            0,
+            0,
+            11,
+            11
+          ],
+          "texture": "#dial"
+        }
+      }
+    }
+  ],
+  "display": {
+    "gui": {
+      "rotation": [
+        12,
+        20,
+        0
+      ],
+      "translation": [
+        -0.22,
+        0.12,
+        0
+      ],
+      "scale": [
+        1.065,
+        1.065,
+        1.065
+      ]
+    },
+    "fixed": {
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.75,
+        0.75,
+        0.75
+      ]
+    },
+    "ground": {
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        2,
+        0
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "thirdperson_righthand": {
+      "rotation": [
+        70,
+        180,
+        0
+      ],
+      "translation": [
+        0,
+        1.5,
+        -2.5
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "thirdperson_lefthand": {
+      "rotation": [
+        70,
+        180,
+        0
+      ],
+      "translation": [
+        0,
+        1.5,
+        -2.5
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "firstperson_righthand": {
+      "rotation": [
+        8,
+        -12,
+        0
+      ],
+      "translation": [
+        -1.5,
+        2.5,
+        -2
+      ],
+      "scale": [
+        0.6,
+        0.6,
+        0.6
+      ]
+    },
+    "firstperson_lefthand": {
+      "rotation": [
+        8,
+        -12,
+        0
+      ],
+      "translation": [
+        -1.5,
+        2.5,
+        -2
+      ],
+      "scale": [
+        0.6,
+        0.6,
+        0.6
+      ]
+    }
+  }
+}

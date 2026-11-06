@@ -189,19 +189,70 @@ public final class T3CraftClient implements ClientModInitializer {
 		if (row == null || !canPin()) return;
 		OfficeRoster.Preferences prefs = officePreferences();
 		if (prefs.pinned(row)) prefs.pins.removeIf(p -> p.key().equals(OfficeRoster.key(row)));
-		else if (!prefs.pin(row)) { chat(Component.literal("All eight desks on this machine are pinned. Unpin one in Pins first.")); return; }
+		else if (!prefs.pin(row)) { chat(Component.literal("All sixteen desks for this machine are pinned. Unpin one in Pins first.")); return; }
 		saveOfficePreferences();
 	}
 	void unpin(OfficeRoster.Pin pin) { officePreferences().unpin(pin); saveOfficePreferences(); }
 	String machineLabel(String owner) { return config.labelFor(owner); }
 
-	/** This world's village is the Silk office. */
+	/** This world's village is the Scandinavian office. */
 	boolean officeMode() {
 		String world = worldKey();
 		return world != null && config.officeWorlds.contains(world);
 	}
 
-	/** Builds the Silk office just south of the player (door facing them) and moves this world's village into it. */
+    private record OfficeDestination(net.minecraft.core.BlockPos origin, String dimension) {}
+    private OfficeDestination officeDestination() {
+        String current = worldKey();
+        if (current == null) return null;
+        String world = current.substring(0, current.lastIndexOf('|') + 1);
+        String key = config.officeWorlds.contains(current) ? current : config.officeWorlds.stream()
+            .filter(k -> k.startsWith(world)).sorted().findFirst().orElse(null);
+        if (key == null) return null;
+        int[] point = config.villages.get(key);
+        return point == null || point.length != 3 ? null : new OfficeDestination(
+            new net.minecraft.core.BlockPos(point[0], point[1], point[2]), key.substring(key.lastIndexOf('|') + 1));
+    }
+
+    /** Return to the entrance even from an unloaded area or another dimension of this world. */
+    int goToOffice() {
+        Minecraft mc = Minecraft.getInstance();
+        OfficeDestination destination = officeDestination();
+        if (mc.player == null || destination == null) {
+            chat(Component.literal("No office in this world yet. Use /t3 office build."));
+            return 0;
+        }
+        var origin = destination.origin();
+        double x = origin.getX() + 25.5, y = origin.getY(), z = origin.getZ() - 4.5;
+        var server = mc.getSingleplayerServer();
+        if (server == null) {
+            String command = "tp @s " + x + " " + y + " " + z + " 0 0";
+            if (!mc.level.dimension().identifier().toString().equals(destination.dimension()))
+                command = "execute in " + destination.dimension() + " run " + command;
+            ClientCommands.send(command);
+        } else {
+            var playerId = mc.player.getUUID();
+            var connection = mc.getConnection();
+            server.execute(() -> {
+                if (mc.getConnection() != connection || mc.getSingleplayerServer() != server) return;
+                var target = server.getLevel(net.minecraft.resources.ResourceKey.create(
+                    net.minecraft.core.registries.Registries.DIMENSION, net.minecraft.resources.Identifier.parse(destination.dimension())));
+                var player = server.getPlayerList().getPlayer(playerId);
+                if (target != null && player != null) {
+                    player.teleportTo(target, x, y, z, java.util.Set.of(), 0, 0, true);
+                    player.fallDistance = 0;
+                }
+            });
+        }
+        return 1;
+    }
+
+    private int officeAction() {
+        if (officeDestination() != null) return goToOffice();
+        buildOffice(); return 1;
+    }
+
+	/** Builds the Scandinavian office just south of the player (door facing them) and moves this world's village into it. */
 	void buildOffice() { buildOffice(false); }
 
 	private void buildOffice(boolean confirm) {
@@ -363,6 +414,7 @@ public final class T3CraftClient implements ClientModInitializer {
 			return;
 		}
 		lastPingThread = null;
+        village.faceThread(state.focusedThreadId());
 		minecraft.gui.setScreen(new T3Screen(this));
 	}
 
@@ -555,7 +607,10 @@ public final class T3CraftClient implements ClientModInitializer {
 				.then(literal("off").executes(ctx -> setBooks(false))))
 			.then(literal("pin").executes(ctx -> { togglePin(state.snapshot().focusedRow()); return 1; }))
 			.then(literal("pins").executes(ctx -> { Minecraft.getInstance().gui.setScreen(new T3PinsScreen(this)); return 1; }))
-			.then(literal("office").executes(ctx -> { buildOffice(); return 1; })
+			.then(literal("office").executes(ctx -> officeAction())
+                .then(literal("go").executes(ctx -> goToOffice()))
+                .then(literal("build").executes(ctx -> { buildOffice(); return 1; })
+                    .then(literal("confirm").executes(ctx -> { buildOffice(true); return 1; })))
 				.then(literal("confirm").executes(ctx -> { buildOffice(true); return 1; }))
 				.then(literal("off").executes(ctx -> officeOff())))
 			.then(literal("village")

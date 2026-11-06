@@ -49,7 +49,7 @@ public final class T3CraftServer implements DedicatedServerModInitializer {
 				.then(Commands.literal("pin").then(Commands.argument("thread", StringArgumentType.word()).executes(ctx -> {
 					boolean ok = office.pin(StringArgumentType.getString(ctx, "thread"), false);
 					if (ok) ctx.getSource().sendSuccess(() -> Component.literal("Thread pinned to the shared office."), false);
-					else ctx.getSource().sendFailure(Component.literal("Thread unavailable or all eight desks on its machine are pinned."));
+					else ctx.getSource().sendFailure(Component.literal("Thread unavailable or all sixteen desks on its machine are pinned."));
 					return ok ? 1 : 0;
 				})))
 				.then(Commands.literal("unpin").then(Commands.argument("thread", StringArgumentType.word()).executes(ctx -> {

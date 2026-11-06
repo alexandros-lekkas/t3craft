@@ -1,0 +1,694 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:time",
+    "source": "daytime",
+    "wobble": false,
+    "scale": 1.0,
+    "entries": [
+      {
+        "threshold": 0.0,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock"
+        }
+      },
+      {
+        "threshold": 0.00349,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_01"
+        }
+      },
+      {
+        "threshold": 0.010609,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_02"
+        }
+      },
+      {
+        "threshold": 0.017911,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_03"
+        }
+      },
+      {
+        "threshold": 0.025394,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_04"
+        }
+      },
+      {
+        "threshold": 0.033058,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_05"
+        }
+      },
+      {
+        "threshold": 0.0409,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_06"
+        }
+      },
+      {
+        "threshold": 0.04892,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_07"
+        }
+      },
+      {
+        "threshold": 0.057115,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_08"
+        }
+      },
+      {
+        "threshold": 0.065484,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_09"
+        }
+      },
+      {
+        "threshold": 0.074025,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_10"
+        }
+      },
+      {
+        "threshold": 0.082736,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_11"
+        }
+      },
+      {
+        "threshold": 0.091614,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_12"
+        }
+      },
+      {
+        "threshold": 0.100657,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_13"
+        }
+      },
+      {
+        "threshold": 0.109864,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_14"
+        }
+      },
+      {
+        "threshold": 0.11923,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_15"
+        }
+      },
+      {
+        "threshold": 0.128755,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_16"
+        }
+      },
+      {
+        "threshold": 0.138433,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_17"
+        }
+      },
+      {
+        "threshold": 0.148264,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_18"
+        }
+      },
+      {
+        "threshold": 0.158244,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_19"
+        }
+      },
+      {
+        "threshold": 0.168368,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_20"
+        }
+      },
+      {
+        "threshold": 0.178635,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_21"
+        }
+      },
+      {
+        "threshold": 0.189041,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_22"
+        }
+      },
+      {
+        "threshold": 0.199581,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_23"
+        }
+      },
+      {
+        "threshold": 0.210252,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_24"
+        }
+      },
+      {
+        "threshold": 0.221051,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_25"
+        }
+      },
+      {
+        "threshold": 0.231973,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_26"
+        }
+      },
+      {
+        "threshold": 0.243013,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_27"
+        }
+      },
+      {
+        "threshold": 0.254169,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_28"
+        }
+      },
+      {
+        "threshold": 0.265435,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_29"
+        }
+      },
+      {
+        "threshold": 0.276806,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_30"
+        }
+      },
+      {
+        "threshold": 0.288279,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_31"
+        }
+      },
+      {
+        "threshold": 0.299848,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_32"
+        }
+      },
+      {
+        "threshold": 0.311509,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_33"
+        }
+      },
+      {
+        "threshold": 0.323256,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_34"
+        }
+      },
+      {
+        "threshold": 0.335084,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_35"
+        }
+      },
+      {
+        "threshold": 0.346989,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_36"
+        }
+      },
+      {
+        "threshold": 0.358965,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_37"
+        }
+      },
+      {
+        "threshold": 0.371006,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_38"
+        }
+      },
+      {
+        "threshold": 0.383108,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_39"
+        }
+      },
+      {
+        "threshold": 0.395264,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_40"
+        }
+      },
+      {
+        "threshold": 0.407469,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_41"
+        }
+      },
+      {
+        "threshold": 0.419718,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_42"
+        }
+      },
+      {
+        "threshold": 0.432005,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_43"
+        }
+      },
+      {
+        "threshold": 0.444324,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_44"
+        }
+      },
+      {
+        "threshold": 0.456669,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_45"
+        }
+      },
+      {
+        "threshold": 0.469035,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_46"
+        }
+      },
+      {
+        "threshold": 0.481415,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_47"
+        }
+      },
+      {
+        "threshold": 0.493804,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock"
+        }
+      },
+      {
+        "threshold": 0.506196,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_01"
+        }
+      },
+      {
+        "threshold": 0.518585,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_02"
+        }
+      },
+      {
+        "threshold": 0.530965,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_03"
+        }
+      },
+      {
+        "threshold": 0.543331,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_04"
+        }
+      },
+      {
+        "threshold": 0.555676,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_05"
+        }
+      },
+      {
+        "threshold": 0.567995,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_06"
+        }
+      },
+      {
+        "threshold": 0.580282,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_07"
+        }
+      },
+      {
+        "threshold": 0.592531,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_08"
+        }
+      },
+      {
+        "threshold": 0.604736,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_09"
+        }
+      },
+      {
+        "threshold": 0.616892,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_10"
+        }
+      },
+      {
+        "threshold": 0.628994,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_11"
+        }
+      },
+      {
+        "threshold": 0.641035,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_12"
+        }
+      },
+      {
+        "threshold": 0.653011,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_13"
+        }
+      },
+      {
+        "threshold": 0.664916,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_14"
+        }
+      },
+      {
+        "threshold": 0.676744,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_15"
+        }
+      },
+      {
+        "threshold": 0.688491,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_16"
+        }
+      },
+      {
+        "threshold": 0.700152,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_17"
+        }
+      },
+      {
+        "threshold": 0.711721,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_18"
+        }
+      },
+      {
+        "threshold": 0.723194,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_19"
+        }
+      },
+      {
+        "threshold": 0.734565,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_20"
+        }
+      },
+      {
+        "threshold": 0.745831,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_21"
+        }
+      },
+      {
+        "threshold": 0.756987,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_22"
+        }
+      },
+      {
+        "threshold": 0.768027,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_23"
+        }
+      },
+      {
+        "threshold": 0.778949,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_24"
+        }
+      },
+      {
+        "threshold": 0.789748,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_25"
+        }
+      },
+      {
+        "threshold": 0.800419,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_26"
+        }
+      },
+      {
+        "threshold": 0.810959,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_27"
+        }
+      },
+      {
+        "threshold": 0.821365,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_28"
+        }
+      },
+      {
+        "threshold": 0.831632,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_29"
+        }
+      },
+      {
+        "threshold": 0.841756,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_30"
+        }
+      },
+      {
+        "threshold": 0.851736,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_31"
+        }
+      },
+      {
+        "threshold": 0.861567,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_32"
+        }
+      },
+      {
+        "threshold": 0.871245,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_33"
+        }
+      },
+      {
+        "threshold": 0.88077,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_34"
+        }
+      },
+      {
+        "threshold": 0.890136,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_35"
+        }
+      },
+      {
+        "threshold": 0.899343,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_36"
+        }
+      },
+      {
+        "threshold": 0.908386,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_37"
+        }
+      },
+      {
+        "threshold": 0.917264,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_38"
+        }
+      },
+      {
+        "threshold": 0.925975,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_39"
+        }
+      },
+      {
+        "threshold": 0.934516,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_40"
+        }
+      },
+      {
+        "threshold": 0.942885,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_41"
+        }
+      },
+      {
+        "threshold": 0.95108,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_42"
+        }
+      },
+      {
+        "threshold": 0.9591,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_43"
+        }
+      },
+      {
+        "threshold": 0.966942,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_44"
+        }
+      },
+      {
+        "threshold": 0.974606,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_45"
+        }
+      },
+      {
+        "threshold": 0.982089,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_46"
+        }
+      },
+      {
+        "threshold": 0.989391,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock_47"
+        }
+      },
+      {
+        "threshold": 0.99651,
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/wall_clock"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "t3craft:item/wall_clock"
+    }
+  }
+}

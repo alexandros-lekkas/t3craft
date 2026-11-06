@@ -1,0 +1,283 @@
+{
+  "format": "t3craft-provider-icons/1",
+  "note": "Look up icons by T3 driver id via `drivers`; any id not listed uses `fallback`. Mono icons are pure white so they tint with text colour.",
+  "textureRoot": "assets/t3craft/textures/gui/provider/",
+  "font": {
+    "id": "t3craft:provider_icons",
+    "json": "font/provider_icons.json",
+    "texture": "font/provider_icons.png",
+    "colorRange": "U+E000-U+E00B",
+    "monoRange": "U+E010-U+E01B"
+  },
+  "fallback": "fallback",
+  "drivers": {
+    "codex": "codex",
+    "claudeAgent": "claude",
+    "antigravity": "antigravity",
+    "muse": "muse",
+    "grok": "grok",
+    "cursor": "cursor",
+    "opencode": "opencode",
+    "pi": "pi",
+    "kiro": "kiro",
+    "fx": "fx",
+    "acpRegistry": "acp_registry",
+    "unknown": "fallback",
+    "unconfigured": "fallback",
+    "remote": "fallback"
+  },
+  "icons": {
+    "codex": {
+      "label": "Codex",
+      "accent": "#12A08A",
+      "accentSource": "skins.json:codex",
+      "files": {
+        "16": "codex_16.png",
+        "32": "codex_32.png",
+        "64": "codex_64.png",
+        "mono16": "codex_mono_16.png"
+      },
+      "textures": {
+        "16": "t3craft:gui/provider/codex_16",
+        "32": "t3craft:gui/provider/codex_32",
+        "64": "t3craft:gui/provider/codex_64",
+        "mono16": "t3craft:gui/provider/codex_mono_16"
+      },
+      "glyph": {
+        "color": "U+E000",
+        "mono": "U+E010"
+      }
+    },
+    "claude": {
+      "label": "Claude",
+      "accent": "#C96442",
+      "accentSource": "skins.json:claude",
+      "files": {
+        "16": "claude_16.png",
+        "32": "claude_32.png",
+        "64": "claude_64.png",
+        "mono16": "claude_mono_16.png"
+      },
+      "textures": {
+        "16": "t3craft:gui/provider/claude_16",
+        "32": "t3craft:gui/provider/claude_32",
+        "64": "t3craft:gui/provider/claude_64",
+        "mono16": "t3craft:gui/provider/claude_mono_16"
+      },
+      "glyph": {
+        "color": "U+E001",
+        "mono": "U+E011"
+      }
+    },
+    "antigravity": {
+      "label": "Antigravity",
+      "accent": "#4285F4",
+      "accentSource": "skins.json:antigravity",
+      "files": {
+        "16": "antigravity_16.png",
+        "32": "antigravity_32.png",
+        "64": "antigravity_64.png",
+        "mono16": "antigravity_mono_16.png"
+      },
+      "textures": {
+        "16": "t3craft:gui/provider/antigravity_16",
+        "32": "t3craft:gui/provider/antigravity_32",
+        "64": "t3craft:gui/provider/antigravity_64",
+        "mono16": "t3craft:gui/provider/antigravity_mono_16"
+      },
+      "glyph": {
+        "color": "U+E002",
+        "mono": "U+E012"
+      }
+    },
+    "muse": {
+      "label": "Muse Code",
+      "accent": "#1F6FEA",
+      "accentSource": "skins.json:muse",
+      "files": {
+        "16": "muse_16.png",
+        "32": "muse_32.png",
+        "64": "muse_64.png",
+        "mono16": "muse_mono_16.png"
+      },
+      "textures": {
+        "16": "t3craft:gui/provider/muse_16",
+        "32": "t3craft:gui/provider/muse_32",
+        "64": "t3craft:gui/provider/muse_64",
+        "mono16": "t3craft:gui/provider/muse_mono_16"
+      },
+      "glyph": {
+        "color": "U+E003",
+        "mono": "U+E013"
+      }
+    },
+    "grok": {
+      "label": "Grok",
+      "accent": "#BEBEC2",
+      "accentSource": "skins.json:grok",
+      "files": {
+        "16": "grok_16.png",
+        "32": "grok_32.png",
+        "64": "grok_64.png",
+        "mono16": "grok_mono_16.png"
+      },
+      "textures": {
+        "16": "t3craft:gui/provider/grok_16",
+        "32": "t3craft:gui/provider/grok_32",
+        "64": "t3craft:gui/provider/grok_64",
+        "mono16": "t3craft:gui/provider/grok_mono_16"
+      },
+      "glyph": {
+        "color": "U+E004",
+        "mono": "U+E014"
+      }
+    },
+    "cursor": {
+      "label": "Cursor",
+      "accent": "#9AA0A8",
+      "accentSource": "skins.json:cursor",
+      "files": {
+        "16": "cursor_16.png",
+        "32": "cursor_32.png",
+        "64": "cursor_64.png",
+        "mono16": "cursor_mono_16.png"
+      },
+      "textures": {
+        "16": "t3craft:gui/provider/cursor_16",
+        "32": "t3craft:gui/provider/cursor_32",
+        "64": "t3craft:gui/provider/cursor_64",
+        "mono16": "t3craft:gui/provider/cursor_mono_16"
+      },
+      "glyph": {
+        "color": "U+E005",
+        "mono": "U+E015"
+      }
+    },
+    "opencode": {
+      "label": "OpenCode",
+      "accent": "#4A443D",
+      "accentSource": "skins.json:opencode",
+      "files": {
+        "16": "opencode_16.png",
+        "32": "opencode_32.png",
+        "64": "opencode_64.png",
+        "mono16": "opencode_mono_16.png"
+      },
+      "textures": {
+        "16": "t3craft:gui/provider/opencode_16",
+        "32": "t3craft:gui/provider/opencode_32",
+        "64": "t3craft:gui/provider/opencode_64",
+        "mono16": "t3craft:gui/provider/opencode_mono_16"
+      },
+      "glyph": {
+        "color": "U+E006",
+        "mono": "U+E016"
+      }
+    },
+    "pi": {
+      "label": "Pi",
+      "accent": "#1E1C1A",
+      "accentSource": "skins.json:pi",
+      "files": {
+        "16": "pi_16.png",
+        "32": "pi_32.png",
+        "64": "pi_64.png",
+        "mono16": "pi_mono_16.png"
+      },
+      "textures": {
+        "16": "t3craft:gui/provider/pi_16",
+        "32": "t3craft:gui/provider/pi_32",
+        "64": "t3craft:gui/provider/pi_64",
+        "mono16": "t3craft:gui/provider/pi_mono_16"
+      },
+      "glyph": {
+        "color": "U+E007",
+        "mono": "U+E017"
+      }
+    },
+    "kiro": {
+      "label": "Kiro",
+      "accent": "#E6DCFF",
+      "accentSource": "skins.json:kiro",
+      "files": {
+        "16": "kiro_16.png",
+        "32": "kiro_32.png",
+        "64": "kiro_64.png",
+        "mono16": "kiro_mono_16.png"
+      },
+      "textures": {
+        "16": "t3craft:gui/provider/kiro_16",
+        "32": "t3craft:gui/provider/kiro_32",
+        "64": "t3craft:gui/provider/kiro_64",
+        "mono16": "t3craft:gui/provider/kiro_mono_16"
+      },
+      "glyph": {
+        "color": "U+E008",
+        "mono": "U+E018"
+      }
+    },
+    "fx": {
+      "label": "fx",
+      "accent": "#B8E04A",
+      "accentSource": "skins.json:fx",
+      "files": {
+        "16": "fx_16.png",
+        "32": "fx_32.png",
+        "64": "fx_64.png",
+        "mono16": "fx_mono_16.png"
+      },
+      "textures": {
+        "16": "t3craft:gui/provider/fx_16",
+        "32": "t3craft:gui/provider/fx_32",
+        "64": "t3craft:gui/provider/fx_64",
+        "mono16": "t3craft:gui/provider/fx_mono_16"
+      },
+      "glyph": {
+        "color": "U+E009",
+        "mono": "U+E019"
+      }
+    },
+    "acp_registry": {
+      "label": "ACP Registry",
+      "accent": "#6E8293",
+      "accentSource": "skins.json:default (no provider skin)",
+      "files": {
+        "16": "acp_registry_16.png",
+        "32": "acp_registry_32.png",
+        "64": "acp_registry_64.png",
+        "mono16": "acp_registry_mono_16.png"
+      },
+      "textures": {
+        "16": "t3craft:gui/provider/acp_registry_16",
+        "32": "t3craft:gui/provider/acp_registry_32",
+        "64": "t3craft:gui/provider/acp_registry_64",
+        "mono16": "t3craft:gui/provider/acp_registry_mono_16"
+      },
+      "glyph": {
+        "color": "U+E00A",
+        "mono": "U+E01A"
+      }
+    },
+    "fallback": {
+      "label": "Unknown provider",
+      "accent": "#6E8293",
+      "accentSource": "skins.json:default",
+      "files": {
+        "16": "fallback_16.png",
+        "32": "fallback_32.png",
+        "64": "fallback_64.png",
+        "mono16": "fallback_mono_16.png"
+      },
+      "textures": {
+        "16": "t3craft:gui/provider/fallback_16",
+        "32": "t3craft:gui/provider/fallback_32",
+        "64": "t3craft:gui/provider/fallback_64",
+        "mono16": "t3craft:gui/provider/fallback_mono_16"
+      },
+      "glyph": {
+        "color": "U+E00B",
+        "mono": "U+E01B"
+      }
+    }
+  }
+}

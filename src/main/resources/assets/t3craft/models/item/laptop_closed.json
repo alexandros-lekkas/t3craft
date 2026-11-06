@@ -1,0 +1,359 @@
+{
+  "credit": "T3 Craft laptop (closed lid).",
+  "ambientocclusion": false,
+  "texture_size": [
+    64,
+    64
+  ],
+  "textures": {
+    "body": "t3craft:item/laptop_body",
+    "particle": "t3craft:item/laptop_body"
+  },
+  "elements": [
+    {
+      "name": "base",
+      "from": [
+        2,
+        0,
+        4
+      ],
+      "to": [
+        14,
+        1,
+        12
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            0.0,
+            0.0,
+            6.0,
+            4.0
+          ],
+          "texture": "#body"
+        },
+        "down": {
+          "uv": [
+            0.0,
+            4.0,
+            6.0,
+            8.0
+          ],
+          "texture": "#body"
+        },
+        "north": {
+          "uv": [
+            0.0,
+            8.5,
+            6.0,
+            9.0
+          ],
+          "texture": "#body"
+        },
+        "south": {
+          "uv": [
+            0.0,
+            8.0,
+            6.0,
+            8.5
+          ],
+          "texture": "#body"
+        },
+        "east": {
+          "uv": [
+            6.0,
+            8.0,
+            10.0,
+            8.5
+          ],
+          "texture": "#body"
+        },
+        "west": {
+          "uv": [
+            6.0,
+            8.0,
+            10.0,
+            8.5
+          ],
+          "texture": "#body"
+        }
+      }
+    },
+    {
+      "name": "hinge",
+      "from": [
+        3,
+        0.5,
+        3.25
+      ],
+      "to": [
+        13,
+        1.5,
+        4.25
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            0.0,
+            10.0,
+            5.0,
+            10.5
+          ],
+          "texture": "#body"
+        },
+        "down": {
+          "uv": [
+            0.0,
+            10.0,
+            5.0,
+            10.5
+          ],
+          "texture": "#body"
+        },
+        "north": {
+          "uv": [
+            0.0,
+            10.5,
+            5.0,
+            11.0
+          ],
+          "texture": "#body"
+        },
+        "south": {
+          "uv": [
+            0.0,
+            10.5,
+            5.0,
+            11.0
+          ],
+          "texture": "#body"
+        },
+        "east": {
+          "uv": [
+            5.0,
+            10.0,
+            5.5,
+            10.5
+          ],
+          "texture": "#body"
+        },
+        "west": {
+          "uv": [
+            5.0,
+            10.0,
+            5.5,
+            10.5
+          ],
+          "texture": "#body"
+        }
+      }
+    },
+    {
+      "name": "lid_closed",
+      "from": [
+        2,
+        1,
+        4
+      ],
+      "to": [
+        14,
+        1.5,
+        12
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            6.0,
+            0.0,
+            12.0,
+            4.0
+          ],
+          "texture": "#body"
+        },
+        "down": {
+          "uv": [
+            0.0,
+            9.25,
+            6.0,
+            9.5
+          ],
+          "texture": "#body"
+        },
+        "north": {
+          "uv": [
+            0.0,
+            9.25,
+            6.0,
+            9.5
+          ],
+          "texture": "#body"
+        },
+        "south": {
+          "uv": [
+            0.0,
+            11.0,
+            6.0,
+            11.25
+          ],
+          "texture": "#body"
+        },
+        "east": {
+          "uv": [
+            0.0,
+            9.25,
+            6.0,
+            9.5
+          ],
+          "texture": "#body"
+        },
+        "west": {
+          "uv": [
+            0.0,
+            9.25,
+            6.0,
+            9.5
+          ],
+          "texture": "#body"
+        }
+      }
+    }
+  ],
+  "display": {
+    "gui": {
+      "rotation": [
+        30,
+        32,
+        0
+      ],
+      "translation": [
+        0,
+        6.59,
+        0
+      ],
+      "scale": [
+        1.05,
+        1.05,
+        1.05
+      ]
+    },
+    "ground": {
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        2,
+        0
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "fixed": {
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        6,
+        0
+      ],
+      "scale": [
+        0.75,
+        0.75,
+        0.75
+      ]
+    },
+    "thirdperson_righthand": {
+      "rotation": [
+        70,
+        180,
+        0
+      ],
+      "translation": [
+        0,
+        1.5,
+        -2.5
+      ],
+      "scale": [
+        0.45,
+        0.45,
+        0.45
+      ]
+    },
+    "thirdperson_lefthand": {
+      "rotation": [
+        70,
+        180,
+        0
+      ],
+      "translation": [
+        0,
+        1.5,
+        -2.5
+      ],
+      "scale": [
+        0.45,
+        0.45,
+        0.45
+      ]
+    },
+    "firstperson_righthand": {
+      "rotation": [
+        8,
+        -12,
+        0
+      ],
+      "translation": [
+        -1.5,
+        2.5,
+        -2
+      ],
+      "scale": [
+        0.55,
+        0.55,
+        0.55
+      ]
+    },
+    "firstperson_lefthand": {
+      "rotation": [
+        8,
+        -12,
+        0
+      ],
+      "translation": [
+        -1.5,
+        2.5,
+        -2
+      ],
+      "scale": [
+        0.55,
+        0.55,
+        0.55
+      ]
+    },
+    "head": {
+      "rotation": [
+        0,
+        180,
+        0
+      ],
+      "translation": [
+        0,
+        12.5,
+        0
+      ],
+      "scale": [
+        0.9,
+        0.9,
+        0.9
+      ]
+    }
+  }
+}

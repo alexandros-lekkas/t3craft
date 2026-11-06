@@ -3,7 +3,7 @@
 set -euo pipefail
 # Override both port pairs when another checkout is running fixtures locally.
 legacy_port="${T3CRAFT_FIXTURE_PORT:-25680}"
-v2_port="${T3CRAFT_FIXTURE_V2_PORT:-25682}"
+v2_port="${T3CRAFT_FIXTURE_V2_PORT:-$((legacy_port + 2))}"
 mkdir -p build/fixture-logs
 python3 scripts/feature-fixture.py --port "$legacy_port" >build/fixture-logs/legacy.log 2>&1 &
 legacy=$!

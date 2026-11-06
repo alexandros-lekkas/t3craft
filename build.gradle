@@ -35,7 +35,8 @@ loom {
 				if (project.hasProperty('config')) vmArg "-Dt3craft.config=${project.property('config')}"
 				if (project.hasProperty('expectedDesk')) vmArg "-Dt3craft.expectedDesk=${project.property('expectedDesk')}"
 				if (project.hasProperty('focus')) vmArg "-Dt3craft.focus=${project.property('focus')}"
-				programArgs "--quickPlayMultiplayer", (project.findProperty('join') ?: 'localhost:25565')
+				if(project.hasProperty("world")) programArgs "--quickPlaySingleplayer", project.property("world")
+				else programArgs "--quickPlayMultiplayer", (project.findProperty('join') ?: 'localhost:25565')
 			}
 		}
 	}

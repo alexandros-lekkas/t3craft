@@ -1,0 +1,429 @@
+{
+  "credit": "T3 Craft office props. External monitor on a stand; screen faces +Z (yaw = the seated agent's yaw).",
+  "ambientocclusion": false,
+  "textures": {
+    "body": "t3craft:item/monitor_body",
+    "screen": "t3craft:item/monitor_screen_on",
+    "particle": "t3craft:item/monitor_body"
+  },
+  "elements": [
+    {
+      "from": [
+        4.5,
+        0,
+        5
+      ],
+      "to": [
+        11.5,
+        0.6,
+        11
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            1.0,
+            14.0,
+            4.5,
+            14.25
+          ],
+          "texture": "#body"
+        },
+        "south": {
+          "uv": [
+            4.5,
+            14.0,
+            8.0,
+            14.25
+          ],
+          "texture": "#body"
+        },
+        "east": {
+          "uv": [
+            8.0,
+            14.0,
+            11.0,
+            14.25
+          ],
+          "texture": "#body"
+        },
+        "west": {
+          "uv": [
+            11.0,
+            14.0,
+            14.0,
+            14.25
+          ],
+          "texture": "#body"
+        },
+        "up": {
+          "uv": [
+            8.5,
+            6.5,
+            12.0,
+            9.5
+          ],
+          "texture": "#body"
+        },
+        "down": {
+          "uv": [
+            12.0,
+            6.5,
+            15.5,
+            9.5
+          ],
+          "texture": "#body"
+        }
+      }
+    },
+    {
+      "from": [
+        7,
+        0.6,
+        6.2
+      ],
+      "to": [
+        9,
+        13.5,
+        7.4
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            0.0,
+            1.0,
+            6.5
+          ],
+          "texture": "#body"
+        },
+        "south": {
+          "uv": [
+            1.0,
+            0.0,
+            2.0,
+            6.5
+          ],
+          "texture": "#body"
+        },
+        "east": {
+          "uv": [
+            2.0,
+            0.0,
+            2.5,
+            6.5
+          ],
+          "texture": "#body"
+        },
+        "west": {
+          "uv": [
+            2.5,
+            0.0,
+            3.0,
+            6.5
+          ],
+          "texture": "#body"
+        },
+        "up": {
+          "uv": [
+            14.5,
+            13.5,
+            15.5,
+            14.0
+          ],
+          "texture": "#body"
+        },
+        "down": {
+          "uv": [
+            0.0,
+            14.0,
+            1.0,
+            14.5
+          ],
+          "texture": "#body"
+        }
+      }
+    },
+    {
+      "from": [
+        4.5,
+        11,
+        6.6
+      ],
+      "to": [
+        11.5,
+        16,
+        7.4
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.0,
+            11.0,
+            3.5,
+            13.5
+          ],
+          "texture": "#body"
+        },
+        "south": {
+          "uv": [
+            3.5,
+            11.0,
+            7.0,
+            13.5
+          ],
+          "texture": "#body"
+        },
+        "east": {
+          "uv": [
+            7.0,
+            11.0,
+            7.5,
+            13.5
+          ],
+          "texture": "#body"
+        },
+        "west": {
+          "uv": [
+            7.5,
+            11.0,
+            8.0,
+            13.5
+          ],
+          "texture": "#body"
+        },
+        "up": {
+          "uv": [
+            7.5,
+            13.5,
+            11.0,
+            14.0
+          ],
+          "texture": "#body"
+        },
+        "down": {
+          "uv": [
+            11.0,
+            13.5,
+            14.5,
+            14.0
+          ],
+          "texture": "#body"
+        }
+      }
+    },
+    {
+      "from": [
+        0.5,
+        9,
+        7.4
+      ],
+      "to": [
+        15.5,
+        18,
+        8.4
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            3.0,
+            0.0,
+            10.5,
+            4.5
+          ],
+          "texture": "#body"
+        },
+        "south": {
+          "uv": [
+            0.0,
+            6.5,
+            7.5,
+            11.0
+          ],
+          "texture": "#body"
+        },
+        "east": {
+          "uv": [
+            7.5,
+            6.5,
+            8.0,
+            11.0
+          ],
+          "texture": "#body"
+        },
+        "west": {
+          "uv": [
+            8.0,
+            6.5,
+            8.5,
+            11.0
+          ],
+          "texture": "#body"
+        },
+        "up": {
+          "uv": [
+            8.0,
+            11.0,
+            15.5,
+            11.5
+          ],
+          "texture": "#body"
+        },
+        "down": {
+          "uv": [
+            0.0,
+            13.5,
+            7.5,
+            14.0
+          ],
+          "texture": "#body"
+        }
+      }
+    },
+    {
+      "name": "screen",
+      "from": [
+        1,
+        9.5,
+        8.42
+      ],
+      "to": [
+        15,
+        17.5,
+        8.42
+      ],
+      "faces": {
+        "south": {
+          "uv": [
+            0,
+            0,
+            14,
+            16
+          ],
+          "texture": "#screen"
+        }
+      },
+      "light_emission": 12
+    }
+  ],
+  "display": {
+    "gui": {
+      "rotation": [
+        26,
+        32,
+        0
+      ],
+      "translation": [
+        0.04,
+        -0.66,
+        0
+      ],
+      "scale": [
+        0.717,
+        0.717,
+        0.717
+      ]
+    },
+    "fixed": {
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        6,
+        0
+      ],
+      "scale": [
+        0.75,
+        0.75,
+        0.75
+      ]
+    },
+    "ground": {
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        2,
+        0
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "thirdperson_righthand": {
+      "rotation": [
+        70,
+        180,
+        0
+      ],
+      "translation": [
+        0,
+        1.5,
+        -2.5
+      ],
+      "scale": [
+        0.417,
+        0.417,
+        0.417
+      ]
+    },
+    "thirdperson_lefthand": {
+      "rotation": [
+        70,
+        180,
+        0
+      ],
+      "translation": [
+        0,
+        1.5,
+        -2.5
+      ],
+      "scale": [
+        0.417,
+        0.417,
+        0.417
+      ]
+    },
+    "firstperson_righthand": {
+      "rotation": [
+        8,
+        -12,
+        0
+      ],
+      "translation": [
+        -1.5,
+        2.5,
+        -2
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "firstperson_lefthand": {
+      "rotation": [
+        8,
+        -12,
+        0
+      ],
+      "translation": [
+        -1.5,
+        2.5,
+        -2
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    }
+  }
+}

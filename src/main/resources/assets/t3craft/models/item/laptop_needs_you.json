@@ -1,0 +1,6 @@
+{
+  "parent": "t3craft:item/laptop",
+  "textures": {
+    "screen": "t3craft:item/laptop_screen_needs_you"
+  }
+}

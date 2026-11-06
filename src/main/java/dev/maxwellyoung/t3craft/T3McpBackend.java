@@ -274,7 +274,7 @@ final class T3McpBackend implements T3Backend {
 			for (var m : T3Protocol.array(p, "models")) { JsonObject model = m.getAsJsonObject(); String id = T3Protocol.string(model, "id"); models.add(new T3Api.Model(id, Optional.ofNullable(T3Protocol.string(model, "label")).orElse(id))); }
 			String label = Optional.ofNullable(T3Protocol.string(p, "displayName")).orElse(T3Protocol.string(p, "driverKind"));
             if (p.has("omittedModels") && !p.get("omittedModels").isJsonNull() && p.get("omittedModels").getAsInt() > 0) label += " (" + p.get("omittedModels").getAsInt() + " more models in T3 Code)";
-            result.add(new T3Api.Provider(T3Protocol.string(p, "providerInstanceId"), label, false, List.copyOf(models)));
+            result.add(new T3Api.Provider(T3Protocol.string(p, "providerInstanceId"), label, false, List.copyOf(models), T3Protocol.string(p,"driverKind")));
 		}
 		return List.copyOf(result);
 	}

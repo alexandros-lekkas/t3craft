@@ -2,7 +2,7 @@ package dev.maxwellyoung.t3craft;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
-import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.decoration.Mannequin;
 
 /**
  * Dev-only end-to-end check, enabled with {@code -Dt3craft.selftest=<prompt>}. The prompt
@@ -49,6 +49,101 @@ final class SelfTest {
 		return prompt == null || prompt.isBlank() ? null : new SelfTest(mod, prompt);
 	}
 
+ private int visualTick;
+ private void officeVisual(Minecraft mc) {
+  if(mc.player==null||mc.level==null||!mod.state().snapshot().connected()){if(ticks>600){T3CraftClient.LOGGER.error("OFFICE_VISUAL failed to load world/fixture; closing test client");mc.stop();}return;}
+  mc.options.pauseOnLostFocus=false;
+  visualTick++;
+  if(visualTick<1250 && mc.gui.screen()!=null)mc.gui.setScreen(null);
+  if(visualTick==40){mc.gui.setScreen(null);mod.buildOffice();}
+  var o=mod.villageAnchor(); if(o==null)return;
+  if(visualTick==100){visualCommand(mc,"difficulty peaceful");visualCommand(mc,"time set day");}
+  if(visualTick==700)visualCamera(mc,o,42,18,40,14,7,11);
+  if(visualTick==750)shot(mc,"office-exterior");
+  if(visualTick==800)visualCamera(mc,o,12,.8,9,6,1.1,3);
+  if(visualTick==850)shot(mc,"office-interior");
+  if(visualTick==860)visualCamera(mc,o,21,.7,6,21,1.3,0);
+  if(visualTick==890)shot(mc,"office-kitchenette");
+  if(visualTick==900){var a=mod.village().brainForTest().agents().values().stream().filter(v->v.status==T3State.Status.NEEDS_YOU).findFirst().orElseThrow();visualCamera(mc,o,a.x-1.5,a.y()+.5,a.z-2,a.x,a.y()+1.5,a.z);}
+  if(visualTick==940){
+   var a=mod.village().brainForTest().agents().values().stream().filter(v->v.status==T3State.Status.NEEDS_YOU).findFirst().orElseThrow();
+   mc.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES,new net.minecraft.world.phys.Vec3(o.getX()+a.x,o.getY()+a.y()+1.5,o.getZ()+a.z));
+   if(mc.gui.hud.isHidden())mc.gui.hud.toggle();
+  }
+  if(visualTick==950){
+   var a=mod.village().brainForTest().agents().values().stream().filter(v->v.status==T3State.Status.NEEDS_YOU).findFirst().orElseThrow();
+   for(var entry:mod.village().threadsByEntity().entrySet())if(entry.getValue().equals(a.threadId)&&mc.level.getEntity(entry.getKey()) instanceof Mannequin m){float angle=Math.abs(net.minecraft.util.Mth.wrapDegrees(m.getYHeadRot()-m.getYRot()));if(angle>50.1||angle<5)throw new IllegalStateException("Head turn outside hold/clamp "+angle);T3CraftClient.LOGGER.info("OFFICE_VISUAL PASS needs-you head turn {} degrees",angle);}
+   shot(mc,"office-needs-you");
+  }
+  if(visualTick==1000){visualCommand(mc,"time set midnight");var server=mc.getSingleplayerServer();server.execute(()->{for(String command:T3Office.lamps(1,true))server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(),T3Office.absolute(command,o.getX(),o.getY(),o.getZ()));});visualCamera(mc,o,12,.8,9,6,1.1,3);}
+  if(visualTick==1050)shot(mc,"office-night");
+  if(visualTick==1100)visualCamera(mc,o,12,6.8,9,6,7.1,3);
+  if(visualTick==1150)shot(mc,"office-upper-floor");
+  if(visualTick==1200){
+   var agents=mod.village().brainForTest().agents();long lower=agents.values().stream().filter(a->a.floor==0).count(),upper=agents.values().stream().filter(a->a.floor==1).count();
+   long laptops=0;java.util.Set<java.util.UUID> ids=new java.util.HashSet<>();for(var entity:mc.level.entitiesForRendering())if(entity.entityTags().contains("t3craft_laptop")){laptops++;if(!ids.add(entity.getUUID()))throw new IllegalStateException("Duplicate desk UUID");}
+   if(lower!=8||upper!=4||laptops!=24)throw new IllegalStateException("Office roster/pairs "+lower+"/"+upper+"/"+laptops);
+   if(!mc.level.getBlockState(o.offset(15,5,10)).is(net.minecraft.world.level.block.Blocks.BIRCH_PLANKS))throw new IllegalStateException("Upper floor was not placed");
+   long litter=mc.level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,OfficePlacement.bounds(o,2)).size();
+   if(litter!=0)throw new IllegalStateException("Office build dropped "+litter+" items");
+   T3CraftClient.LOGGER.info("OFFICE_VISUAL PASS structure, eight lower/four upper agents, twelve unique laptop pairs");
+   var a=agents.values().stream().filter(v->v.status==T3State.Status.NEEDS_YOU).findFirst().orElseThrow();targetThread=a.threadId;
+   var desk=OfficeDesign.floor().getAsJsonArray("work").get(a.desk).getAsJsonObject().getAsJsonArray("desk");double x=desk.get(0).getAsDouble()+.5,z=desk.get(1).getAsDouble()+.5;
+   visualCamera(mc,o,x,a.floor*6+.6,z-2.5,x,a.floor*6+1.25,z);
+  }
+  if(visualTick==1250){
+   if(!(mc.hitResult instanceof net.minecraft.world.phys.EntityHitResult hit)||!hit.getEntity().getUUID().equals(DeskLaptops.uuid(targetThread,true)))throw new IllegalStateException("Crosshair missed laptop interaction");
+   net.minecraft.client.KeyMapping.click(mc.options.keyUse.getDefaultKey());
+  }
+  if(visualTick==1280){
+   if(!(mc.gui.screen() instanceof T3Screen)||!targetThread.equals(mod.state().focusedThreadId()))throw new IllegalStateException("Laptop route: screen="+mc.gui.screen()+" focused="+mod.state().focusedThreadId()+" expected="+targetThread);
+   T3CraftClient.LOGGER.info("OFFICE_VISUAL PASS actual laptop use-key opens its own thread");shot(mc,"office-laptop-thread");
+  }
+  if(visualTick==1320){mc.gui.setScreen(null);visualCamera(mc,o,180,5,180,190,5,190);}
+  if(visualTick==1360)mc.player.connection.sendCommand("t3 office go");
+  if(visualTick==1400){
+   if(mc.player.distanceToSqr(o.getX()+25.5,o.getY(),o.getZ()-4.5)>.3||Math.abs(net.minecraft.util.Mth.wrapDegrees(mc.player.getYRot()))>1)throw new IllegalStateException("Office go missed entrance or door direction");
+   T3CraftClient.LOGGER.info("OFFICE_VISUAL PASS /t3 office go from distant unloaded area");shot(mc,"office-arrival");
+   visualCamera(mc,o,160,4,160,170,4,170);
+  }
+  if(visualTick==1440)mc.player.connection.sendCommand("t3 office");
+  if(visualTick==1480){if(mc.player.distanceToSqr(o.getX()+25.5,o.getY(),o.getZ()-4.5)>.3)throw new IllegalStateException("Bare office command did not return");T3CraftClient.LOGGER.info("OFFICE_VISUAL PASS bare /t3 office returns without rebuilding");mc.stop();}
+
+
+ }
+ private static void visualCommand(Minecraft mc,String command){var server=mc.getSingleplayerServer();if(server!=null)server.execute(()->server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(),command));}
+ private static void visualCamera(Minecraft mc,net.minecraft.core.BlockPos o,double x,double y,double z,double tx,double ty,double tz){
+  mc.gui.setScreen(null);if(!mc.gui.hud.isHidden())mc.gui.hud.toggle();
+  double dx=tx-x,dy=ty-(y+1.62),dz=tz-z;
+  double yaw=Math.toDegrees(Math.atan2(dz,dx))-90,pitch=-Math.toDegrees(Math.atan2(dy,Math.sqrt(dx*dx+dz*dz)));
+  visualCommand(mc,"tp Player "+(o.getX()+x)+" "+(o.getY()+y)+" "+(o.getZ()+z)+" "+yaw+" "+pitch);
+
+  mc.player.getAbilities().flying=true;mc.player.onUpdateAbilities();
+ }
+
+ private void skinSpike(Minecraft mc) {
+  if (mc.player == null || mc.level == null) return;
+  if (!built) {
+   built = true;
+   mc.gui.setScreen(null);
+   for (int i=0;i<2;i++) {
+    var mannequin = net.minecraft.world.entity.EntityTypes.MANNEQUIN.create(mc.level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+    var json = new com.google.gson.JsonObject();
+    json.addProperty("texture", "t3craft:entity/agent/claude");
+    json.addProperty("model", "wide");
+    if(i==1) { json.add("id", net.minecraft.core.UUIDUtil.CODEC.encodeStart(com.mojang.serialization.JsonOps.INSTANCE, java.util.UUID.fromString("8667ba71-b85a-4004-af54-457a9734eed7")).getOrThrow()); json.addProperty("name", "Steve"); }
+    mannequin.setComponent(net.minecraft.core.component.DataComponents.PROFILE, net.minecraft.world.item.component.ResolvableProfile.CODEC.parse(com.mojang.serialization.JsonOps.INSTANCE,json).getOrThrow());
+    mannequin.setId(-7800000-i); mannequin.setNoGravity(true);
+    mannequin.setCustomName(net.minecraft.network.chat.Component.literal(i==0?"Texture only":"UUID and texture")); mannequin.setCustomNameVisible(true);
+    mannequin.snapTo(mc.player.getX()+(i==0?-1.2:1.2),mc.player.getY(),mc.player.getZ()+4,180,0);
+    mc.level.addEntity(mannequin);
+   }
+   mc.player.setYRot(0); mc.player.setXRot(0);
+   ticks=0;
+  }
+  if(ticks==200) shot(mc,"skin-spike");
+ }
+
 	private static void press(net.minecraft.client.gui.screens.Screen screen, String label) {
 		var button = screen.children().stream().filter(c -> c instanceof net.minecraft.client.gui.components.Button b && b.getMessage().getString().equals(label))
 			.map(c -> (net.minecraft.client.gui.components.Button) c).findFirst().orElseThrow();
@@ -72,6 +167,8 @@ final class SelfTest {
 
 	void tick(Minecraft minecraft) {
 		ticks++;
+		if (prompt.equals("office-a")) { officeVisual(minecraft); return; }
+		if (prompt.equals("skin-spike")) { skinSpike(minecraft); return; }
 		if (step == Step.DONE) return;
 		if (--deadline == 0) finish(minecraft, "FAIL timed out at " + step);
 		T3State.Snapshot snapshot = mod.state().snapshot();
@@ -210,7 +307,7 @@ final class SelfTest {
 			}
 			case STABLE_OFFLINE -> {
 				if (ticks < 60 || mod.state().online("A-done-0")) return;
-				Villager pin = villagerFor(minecraft, "A-done-0");
+				Mannequin pin = villagerFor(minecraft, "A-done-0");
 				if (pin == null || pin.getId() != targetEntity || pin.getCustomName() == null || !pin.getCustomName().getString().startsWith("Offline")) {
 					finish(minecraft, "FAIL offline pinned resident identity/label"); return;
 				}
@@ -250,14 +347,14 @@ final class SelfTest {
 			}
 			case SHARED_STABLE -> {
 				if (ticks < 500) return;
-				Villager pin = sharedVillager(minecraft, "A-done-0");
+				Mannequin pin = sharedMannequin(minecraft, "A-done-0");
 				if (pin == null) { finish(minecraft, "FAIL shared pin missing"); return; }
 				sharedPosition = pin.position(); fixtureControl(minecraft, "churn");
 				advance(Step.SHARED_CHURN, "operator-owned resident settled; churning threads");
 			}
 			case SHARED_CHURN -> {
 				if (ticks < 160 || snapshot.threads().size() != 32) return;
-				Villager pin = sharedVillager(minecraft, "A-done-0");
+				Mannequin pin = sharedMannequin(minecraft, "A-done-0");
 				if (pin == null || pin.position().distanceToSqr(sharedPosition) > 0.001 || !mod.officePreferences().pins.isEmpty()) {
 					finish(minecraft, "FAIL shared pin moved or leaked into client preferences"); return;
 				}
@@ -267,7 +364,7 @@ final class SelfTest {
 			}
 			case SHARED_TARGET -> {
 				if (ticks < 20) return;
-				Villager pin = sharedVillager(minecraft, "A-done-0");
+				Mannequin pin = sharedMannequin(minecraft, "A-done-0");
 				if (pin == null) { finish(minecraft, "FAIL shared resident vanished"); return; }
 				minecraft.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, pin.getEyePosition());
 				if (!(minecraft.hitResult instanceof net.minecraft.world.phys.EntityHitResult hit) || !hit.getEntity().getUUID().equals(pin.getUUID())) {
@@ -285,7 +382,7 @@ final class SelfTest {
 			}
 			case SHARED_UNPIN -> {
 				if (ticks < 60) return;
-				if (sharedVillager(minecraft, "A-done-0") != null) { finish(minecraft, "FAIL shared unpin did not release old resident"); return; }
+				if (sharedMannequin(minecraft, "A-done-0") != null) { finish(minecraft, "FAIL shared unpin did not release old resident"); return; }
 				finish(minecraft, "PASS shared office: operator pin survives newer threads, client preferences independent, physical resident opens its owned thread without local village; operator unpin removes displaced resident");
 			}
 			case AUTH_ERROR -> {
@@ -741,9 +838,9 @@ final class SelfTest {
 			case OFFICE_SHARED_CHECK -> {
 				if (ticks == 10) {
 					var names = new java.util.ArrayList<String>();
-					Villager target = null;
+					Mannequin target = null;
 					for (var entity : minecraft.level.entitiesForRendering()) {
-						if (entity instanceof Villager villager && villager.getId() > 0 && villager.getCustomName() != null) {
+						if (entity instanceof Mannequin villager && villager.getId() > 0 && villager.getCustomName() != null) {
 							names.add(villager.getCustomName().getString());
 							if (target == null || villager.distanceTo(minecraft.player) < target.distanceTo(minecraft.player)) target = villager;
 						}
@@ -758,15 +855,15 @@ final class SelfTest {
 					minecraft.player.getInventory().setSelectedSlot(8);
 					ClientCommands.send("tp @s " + (target.getX() + 1.5) + " " + target.getY() + " " + target.getZ());
 				}
-				if (ticks == 40 && minecraft.level.getEntity(targetEntity) instanceof Villager target) {
+				if (ticks == 40 && minecraft.level.getEntity(targetEntity) instanceof Mannequin target) {
 					minecraft.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, target.getEyePosition());
 				}
 				if (ticks == 45) net.minecraft.client.KeyMapping.click(minecraft.options.keyUse.getDefaultKey());
 				if (ticks == 70) {
-					String name = minecraft.level.getEntity(targetEntity) instanceof Villager target ? target.getCustomName().getString() : "?";
+					String name = minecraft.level.getEntity(targetEntity) instanceof Mannequin target ? target.getCustomName().getString() : "?";
 					var focused = snapshot.focusedRow();
 					boolean ok = minecraft.gui.screen() instanceof T3Screen && focused != null
-						&& minecraft.level.getEntity(targetEntity) instanceof Villager target && OfficeBrain.villagerUuid(focused.id()).equals(target.getUUID());
+						&& minecraft.level.getEntity(targetEntity) instanceof Mannequin target && OfficeBrain.villagerUuid(focused.id()).equals(target.getUUID());
 					shot(minecraft, "shared-panel");
 					T3CraftClient.LOGGER.info("SELFTEST shared click on '{}' opened panel for '{}'", name, focused == null ? null : focused.title());
 					if (!ok) finish(minecraft, "FAIL right-click on a server villager did not open its thread");
@@ -782,7 +879,7 @@ final class SelfTest {
 			case VFLOW_WAIT -> {
 				if (row == null || row.status() != T3State.Status.NEEDS_YOU || ticks % 10 != 0) return;
 				String detail = mod.state().waitingDetail(row.id());
-				Villager villager = villagerFor(minecraft, row.id());
+				Mannequin villager = villagerFor(minecraft, row.id());
 				if (detail == null || detail.isEmpty() || villager == null || villager.getCustomName() == null) return;
 				String name = villager.getCustomName().getString();
 				String expected = detail.strip().replaceAll("\\s+", " ");
@@ -794,7 +891,7 @@ final class SelfTest {
 				advance(Step.VFLOW_CLICK, "needs you: " + detail);
 			}
 			case VFLOW_CLICK -> {
-				if (!(minecraft.level.getEntity(targetEntity) instanceof Villager villager)) {
+				if (!(minecraft.level.getEntity(targetEntity) instanceof Mannequin villager)) {
 					finish(minecraft, "FAIL waiting villager disappeared");
 					return;
 				}
@@ -840,7 +937,7 @@ final class SelfTest {
 				if (ticks < 200) return;
 				var ids = new java.util.ArrayList<java.util.UUID>();
 				for (var entity : minecraft.level.entitiesForRendering()) {
-					if (entity instanceof Villager villager && villager.getId() > 0 && ours(snapshot, villager)) ids.add(villager.getUUID());
+					if (entity instanceof Mannequin villager && villager.getId() > 0 && ours(snapshot, villager)) ids.add(villager.getUUID());
 				}
 				long unique = ids.stream().distinct().count();
 				T3CraftClient.LOGGER.info("SELFTEST shared villagers after restart: {} ({} unique)", ids.size(), unique);
@@ -856,9 +953,9 @@ final class SelfTest {
 			case SHARED_CHECK -> {
 				if (ticks == 100) {
 					var names = new java.util.ArrayList<String>();
-					Villager target = null;
+					Mannequin target = null;
 					for (var entity : minecraft.level.entitiesForRendering()) {
-						if (entity instanceof Villager villager && villager.getId() > 0 && ours(snapshot, villager)) {
+						if (entity instanceof Mannequin villager && villager.getId() > 0 && ours(snapshot, villager)) {
 							names.add(villager.getCustomName() == null ? "?" : villager.getCustomName().getString());
 							if (target == null || villager.distanceTo(minecraft.player) < target.distanceTo(minecraft.player)) target = villager;
 						}
@@ -872,14 +969,14 @@ final class SelfTest {
 					targetEntity = target.getId();
 					ClientCommands.send("tp @s " + (target.getX() + 2.5) + " " + target.getY() + " " + target.getZ());
 				}
-				if (ticks == 120 && minecraft.level.getEntity(targetEntity) instanceof Villager target) {
+				if (ticks == 120 && minecraft.level.getEntity(targetEntity) instanceof Mannequin target) {
 					minecraft.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, target.position().add(0, 1.2, 0));
 				}
 				if (ticks == 125) net.minecraft.client.KeyMapping.click(minecraft.options.keyUse.getDefaultKey());
 				if (ticks == 150) {
 					var focused = snapshot.focusedRow();
 					boolean ok = minecraft.gui.screen() instanceof T3Screen && focused != null
-						&& minecraft.level.getEntity(targetEntity) instanceof Villager target && VillageLayout.villagerUuid(focused.id()).equals(target.getUUID());
+						&& minecraft.level.getEntity(targetEntity) instanceof Mannequin target && VillageLayout.villagerUuid(focused.id()).equals(target.getUUID());
 					shot(minecraft, "shared-panel");
 					T3CraftClient.LOGGER.info("SELFTEST shared click opened '{}'", focused == null ? null : focused.title());
 					if (!ok) {
@@ -896,7 +993,7 @@ final class SelfTest {
 				}
 				if (ticks == 200) {
 					long left = minecraft.level.getEntities((net.minecraft.world.entity.Entity) null, minecraft.player.getBoundingBox().inflate(40),
-						entity -> entity instanceof Villager villager && villager.getId() > 0 && ours(snapshot, villager)).size();
+						entity -> entity instanceof Mannequin villager && villager.getId() > 0 && ours(snapshot, villager)).size();
 					finish(minecraft, left == 0 ? "PASS (shared village)" : "FAIL " + left + " shared villagers left after /t3village off");
 				}
 			}
@@ -1328,14 +1425,14 @@ final class SelfTest {
 		screen.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(x, y,
 			new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 0)), false);
 	}
-	private static Villager sharedVillager(Minecraft minecraft, String thread) {
-		for (var entity : minecraft.level.entitiesForRendering()) if (entity instanceof Villager v && OfficeBrain.villagerUuid(thread).equals(v.getUUID())) return v;
+	private static Mannequin sharedMannequin(Minecraft minecraft, String thread) {
+		for (var entity : minecraft.level.entitiesForRendering()) if (entity instanceof Mannequin v && OfficeBrain.villagerUuid(thread).equals(v.getUUID())) return v;
 		return null;
 	}
 
-	private Villager villagerFor(Minecraft minecraft, String threadId) {
+	private Mannequin villagerFor(Minecraft minecraft, String threadId) {
 		for (var entry : mod.village().threadsByEntity().entrySet()) {
-			if (entry.getValue().equals(threadId) && minecraft.level.getEntity(entry.getKey()) instanceof Villager villager) return villager;
+			if (entry.getValue().equals(threadId) && minecraft.level.getEntity(entry.getKey()) instanceof Mannequin villager) return villager;
 		}
 		return null;
 	}
@@ -1352,7 +1449,7 @@ final class SelfTest {
 	}
 
 	/** A server villager standing for one of our threads (shared village). */
-	private static boolean ours(T3State.Snapshot snapshot, Villager villager) {
+	private static boolean ours(T3State.Snapshot snapshot, Mannequin villager) {
 		for (T3State.ThreadRow row : snapshot.threads()) if (VillageLayout.villagerUuid(row.id()).equals(villager.getUUID())) return true;
 		return false;
 	}

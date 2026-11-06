@@ -11,7 +11,7 @@ import java.util.Set;
 
 /** Saved spatial identity; names and activity order never identify a machine or a desk. */
 final class OfficeRoster {
-	static final int DESKS = 8;
+	static final int DESKS = 16;
 	record Pin(String owner, String threadId, String title) {
 		String key() { return OfficeRoster.key(owner, threadId); }
 	}

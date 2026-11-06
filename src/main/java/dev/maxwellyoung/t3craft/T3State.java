@@ -178,6 +178,12 @@ public final class T3State {
 		return env == null ? List.of() : env.providers;
 	}
 
+    String driverFor(ThreadRow row) {
+        Env env=envFor(row.id());
+        String raw=AgentAppearance.driver(row);
+        if(env!=null)for(var provider:env.providers)if(provider.instanceId().equals(raw))return provider.driver();
+        return raw;
+    }
 	/** The config payload is large (~700 KB), so reload at most every five minutes. */
 	private void loadProvidersIfStale(Env env) {
 		if ((!env.api.publicMcp() && (env.socket == null || !env.socket.isOpen())) || System.currentTimeMillis() - env.providersLoadedAt < 5 * 60_000) return;

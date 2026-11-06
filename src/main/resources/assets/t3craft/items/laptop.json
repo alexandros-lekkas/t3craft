@@ -1,0 +1,41 @@
+{
+  "model": {
+    "type": "minecraft:select",
+    "property": "minecraft:custom_model_data",
+    "index": 0,
+    "cases": [
+      {
+        "when": "idle",
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/laptop_idle"
+        }
+      },
+      {
+        "when": "working",
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/laptop_working"
+        }
+      },
+      {
+        "when": "needs_you",
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/laptop_needs_you"
+        }
+      },
+      {
+        "when": "closed",
+        "model": {
+          "type": "minecraft:model",
+          "model": "t3craft:item/laptop_closed"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "t3craft:item/laptop"
+    }
+  }
+}

@@ -12,10 +12,10 @@ import java.util.function.Function;
 /**
  * Where every agent is in the office and where it's going, with no Minecraft entities involved.
  * The client village and the shared server office each mirror these agents onto their own
- * villagers. Positions are relative to the office origin; each machine has its own floor.
+ * Mannequins. Positions are relative to the office origin; each machine has a two-floor suite.
  */
 final class OfficeBrain {
-	static final int PER_FLOOR = OfficeRoster.DESKS;
+	static final int PER_FLOOR = 8;
 	private static final double WALK_SPEED = 0.09;
 	private static final int FRIDGE_PAUSE = 50;
 
@@ -37,6 +37,7 @@ final class OfficeBrain {
 		Zone zone;
 		final ArrayDeque<double[]> path = new ArrayDeque<>();
 		int pause;
+		int faceHold;
 
 		Agent(String threadId) {
 			this.threadId = threadId;
@@ -48,7 +49,7 @@ final class OfficeBrain {
 		}
 
 		double y() {
-			return floor * T3Office.FLOOR_HEIGHT + sink;
+			return floor * T3Office.FLOOR_HEIGHT + (sink > 0 ? sink - 0.55 : 0);
 		}
 	}
 
@@ -58,7 +59,7 @@ final class OfficeBrain {
 		return agents;
 	}
 
-	/** Spatial slots survive activity reorder; each owner gets its own floor. */
+	/** Spatial slots survive activity reorder; each owner gets sixteen desks across two floors. */
 	List<Agent> sync(List<T3State.ThreadRow> rows, List<String> owners, OfficeRoster.Preferences prefs) {
 		return sync(rows, owners, prefs, Set.copyOf(owners));
 	}
@@ -67,7 +68,7 @@ final class OfficeBrain {
 		Set<String> keep = new HashSet<>();
 		for (OfficeRoster.Resident resident : OfficeRoster.sync(rows, owners, prefs, knownOwners)) {
 			T3State.ThreadRow row = resident.row();
-			int floor = owners.indexOf(row.ownerKey());
+			int floor = owners.indexOf(row.ownerKey()) * 2 + resident.desk() / PER_FLOOR;
 			keep.add(row.id());
 			Zone zone = switch (row.status()) {
 				case WORKING -> Zone.WORK;
@@ -79,19 +80,20 @@ final class OfficeBrain {
 				case NEEDS_YOU -> T3Office.NEEDS_YOU;
 				case LOUNGE -> T3Office.LOUNGE;
 			};
-			T3Office.Spot spot = spots[resident.desk()];
+			T3Office.Spot spot = spots[resident.desk() % PER_FLOOR];
 			Agent agent = agents.get(row.id());
 			if (agent == null) {
 				agent = new Agent(row.id());
 				agent.floor = floor;
-				// Ground-floor arrivals come in the door; upper floors, up the ladder.
+				// Ground-floor arrivals come in the door; upper floors, from the stair landing.
 				agent.x = floor == 0 ? T3Office.DOOR[0] + 0.5 : T3Office.LADDER[0] - 0.5;
 				agent.z = floor == 0 ? T3Office.DOOR[1] + 0.5 : T3Office.LADDER[1] + 0.5;
 				agents.put(row.id(), agent);
 			}
 			agent.title = row.title();
+			if(agent.status != row.status() && (row.status()==T3State.Status.NEEDS_YOU || row.status()==T3State.Status.DONE)) agent.faceHold=60;
 			agent.status = row.status();
-			agent.desk = resident.desk();
+			agent.desk = resident.desk() % PER_FLOOR;
 			agent.floor = floor;
 			if (!spot.equals(agent.goal)) {
 				Zone previous = agent.zone;
@@ -125,6 +127,7 @@ final class OfficeBrain {
 	/** One game tick: walk, pause at the fridge, or settle into the spot. */
 	void tick() {
 		for (Agent agent : agents.values()) {
+			if(agent.faceHold>0){agent.faceHold--;agent.walking=false;continue;}
 			if (agent.pause > 0) {
 				agent.pause--;
 				agent.walking = false;
@@ -165,6 +168,8 @@ final class OfficeBrain {
 		}
 		return notes;
 	}
+
+ void face(String thread) { var a=agents.get(thread);if(a!=null)a.faceHold=60; }
 
 	void clear() {
 		agents.clear();

@@ -48,6 +48,19 @@
       ]
     },
     {
+      "kind": "font",
+      "title": "Fonts",
+      "entries": [
+        {
+          "title": "T3 Craft font definitions",
+          "author": "T3 Craft project",
+          "license": "MIT",
+          "note": "Bitmap font provider for the 8 px provider icons (t3craft:provider_icons), used by the in-game panel.",
+          "original": true
+        }
+      ]
+    },
+    {
       "kind": "schematic",
       "title": "Builds & schematics",
       "entries": [
@@ -76,7 +89,7 @@
           "title": "Agent character skins",
           "author": "T3 Craft project",
           "license": "MIT",
-          "note": "The villager-style agents who sit at the desks, one look per AI provider.",
+          "note": "Player-shaped vanilla Mannequin agents at the desks, with bundled per-provider skins and stable alternates.",
           "original": true
         },
         {
@@ -90,7 +103,7 @@
           "title": "Office props and usage board",
           "author": "T3 Craft project",
           "license": "MIT",
-          "note": "Desks, the usage board and other office furniture.",
+          "note": "Seventeen original prop types: distinct desk kits, chairs, mugs, monitors, lamps, plants, kitchenette and shared office…",
           "original": true
         },
         {
@@ -98,7 +111,7 @@
           "author": "T3 Craft project (redrawn); marks belong to their owners",
           "license": "Nominative trademark use",
           "url": "https://github.com/alexandros-lekkas/t3craft/blob/main/docs/legal/provider-icons-NOTICE.md",
-          "note": "Small badges in the T3 panel that show which agent wrote a message."
+          "note": "Provider glyphs on agent name tags and badges in the panel."
         },
         {
           "title": "T3 panel redesign",

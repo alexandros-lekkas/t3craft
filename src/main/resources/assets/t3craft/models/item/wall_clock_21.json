@@ -1,0 +1,6 @@
+{
+  "parent": "t3craft:item/wall_clock",
+  "textures": {
+    "dial": "t3craft:item/wall_clock_dial_21"
+  }
+}

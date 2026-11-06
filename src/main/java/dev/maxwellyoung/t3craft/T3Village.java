@@ -7,7 +7,7 @@ import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityTypes;
-import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.decoration.Mannequin;
 import net.minecraft.world.phys.EntityHitResult;
 
 import java.time.Instant;
@@ -27,7 +27,7 @@ final class T3Village {
 	private static final int FIRST_ID = -7_300_000;
 
 	private final T3CraftClient mod;
-	private final Map<String, Villager> villagers = new HashMap<>();
+	private final Map<String, Mannequin> villagers = new HashMap<>();
 	private final Map<Integer, String> threadByEntity = new HashMap<>();
 	private ClientLevel level;
 	private int ticks;
@@ -37,6 +37,7 @@ final class T3Village {
 	private final OfficeBrain brain = new OfficeBrain();
 	private final Map<Integer, String> boards = new HashMap<>();
 	private Boolean night;
+ private final DeskLaptops laptops=new DeskLaptops();
 
 	T3Village(T3CraftClient mod) {
 		this.mod = mod;
@@ -53,11 +54,12 @@ final class T3Village {
 		if (minecraft.gui.screen() == null && minecraft.hitResult instanceof EntityHitResult hit) {
 			String threadId = threadByEntity.get(hit.getEntity().getId());
 			// A shared village's villagers are real entities whose UUID encodes the thread.
-			if (threadId == null && hit.getEntity() instanceof Villager other) threadId = threadForUuid(other.getUUID());
+			if (threadId == null) threadId = threadForUuid(hit.getEntity().getUUID());
 			if (threadId != null && minecraft.options.keyUse.consumeClick()) {
 				while (minecraft.options.keyUse.consumeClick()) {
 					// Drain queued clicks so vanilla never sends an interact for an entity the server doesn't have.
 				}
+				brain.face(threadId);
 				mod.focus(threadId);
 				mod.openPanel();
 				return;
@@ -72,9 +74,9 @@ final class T3Village {
 			BlockPos position = hit.getBlockPos();
 			int x = position.getX() - anchor.getX(), z = position.getZ() - anchor.getZ();
 			int floor = Math.floorDiv(position.getY() - anchor.getY(), T3Office.FLOOR_HEIGHT);
-			boolean board = x >= 1 && x <= 2 && z >= 27 && z <= 28;
-			boolean lectern = x == 12 && z == 19;
-			if (floor >= 0 && floor < Math.max(1, mod.floors().size()) && (board || lectern) && minecraft.options.keyUse.consumeClick()) {
+			boolean board = x >= 0 && x <= 1 && z >= 14 && z <= 16;
+			boolean lectern = x == 26 && z == 16;
+			if (floor >= 0 && floor < Math.max(2, mod.floors().size()*2) && (board || lectern) && minecraft.options.keyUse.consumeClick()) {
 				while (minecraft.options.keyUse.consumeClick()) {}
 				if (board) mod.openDecisions();
 				else mod.openReview(mod.state().focusedThreadId());
@@ -89,8 +91,8 @@ final class T3Village {
 			if (office) syncOffice(snapshot, anchor);
 			else sync(snapshot, anchor);
 		}
-		for (Map.Entry<String, Villager> entry : villagers.entrySet()) {
-			Villager villager = entry.getValue();
+		for (Map.Entry<String, Mannequin> entry : villagers.entrySet()) {
+			Mannequin villager = entry.getValue();
 			if (!office) face(villager, minecraft);
 			if (ticks % 8 == 0) effects(villager, row(snapshot, entry.getKey()));
 		}
@@ -99,7 +101,7 @@ final class T3Village {
 	/**
 	 * Office mode, after the world has ticked: advance the brain and mirror each agent onto its
 	 * villager. Moving here (not before the tick) lets the renderer interpolate from the old
-	 * position, and the walk animation is driven directly because these villagers have no AI.
+	 * position. Vanilla owns walk animation; only position, yaw and head yaw are set here.
 	 */
 	void animate(Minecraft minecraft) {
 		if (level == null || !mod.officeMode() || minecraft.player == null) return;
@@ -107,12 +109,13 @@ final class T3Village {
 		if (o == null) return;
 		brain.tick();
 		for (OfficeBrain.Agent agent : brain.agents().values()) {
-			Villager villager = villagers.get(agent.threadId);
+			Mannequin villager = villagers.get(agent.threadId);
 			if (villager == null) continue;
 			villager.setPos(o.getX() + agent.x, o.getY() + agent.y(), o.getZ() + agent.z);
-			if (agent.settled() && Float.isNaN(agent.goal.yaw())) face(villager, minecraft);
-			else turn(villager, agent.yaw);
-			if (agent.walking) villager.walkAnimation.update(1.0F, 0.4F, 1.0F);
+			turn(villager, agent.yaw);
+   if(minecraft.player.distanceToSqr(villager)<9)agent.faceHold=Math.max(agent.faceHold,8);
+   if(agent.faceHold>0) AgentPose.face(villager,minecraft.player);else AgentPose.rest(villager);
+   AgentPose.set(villager,agent.settled()&&agent.goal.seat());
 			// A drink from the fridge, carried to the sofa.
 			boolean holds = !villager.getMainHandItem().isEmpty();
 			if (agent.holding != holds) {
@@ -130,10 +133,10 @@ final class T3Village {
 		}
 	}
 
-	private static void turn(Villager villager, float yaw) {
+	private static void turn(Mannequin villager, float yaw) {
 		villager.setYRot(yaw);
 		villager.setYBodyRot(yaw);
-		villager.setYHeadRot(yaw);
+
 	}
 
 	/** Office mode: sync the brain with the thread list, then villagers, whiteboards and lamps. */
@@ -143,7 +146,7 @@ final class T3Village {
 		prefs.normalize();
 		Map<String, Integer> previousDesks = Map.copyOf(prefs.desks);
 		for (OfficeBrain.Agent gone : brain.sync(snapshot.threads(), mod.floorOwners(), prefs, snapshot.machines().stream().filter(T3State.MachineHealth::online).map(T3State.MachineHealth::owner).collect(java.util.stream.Collectors.toSet()))) {
-			Villager villager = villagers.remove(gone.threadId);
+			Mannequin villager = villagers.remove(gone.threadId);
 			if (villager != null) {
 				threadByEntity.remove(villager.getId());
 				level.removeEntity(villager.getId(), Entity.RemovalReason.DISCARDED);
@@ -152,12 +155,12 @@ final class T3Village {
 		if (!previousDesks.equals(prefs.desks)) mod.saveOfficePreferences();
 		for (OfficeBrain.Agent agent : brain.agents().values()) {
 			if (!level.isLoaded(o.offset((int) agent.x, (int) agent.y(), (int) agent.z))) continue;
-			Villager villager = villagers.get(agent.threadId);
+			Mannequin villager = villagers.get(agent.threadId);
 			if (villager == null || villager.isRemoved() || level.getEntity(villager.getId()) != villager) {
 				if (villager != null) threadByEntity.remove(villager.getId());
-				villager = new Villager(EntityTypes.VILLAGER, level);
+				villager = EntityTypes.MANNEQUIN.create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
 				villager.setId(nextId--);
-				villager.setNoAi(true);
+                villager.noPhysics=true;
 				villager.setSilent(true);
 				villager.setCustomNameVisible(true);
 				villager.snapTo(o.getX() + agent.x, o.getY() + agent.y(), o.getZ() + agent.z, 0, 0);
@@ -167,19 +170,16 @@ final class T3Village {
 			}
 			T3State.ThreadRow row = row(snapshot, agent.threadId);
 			if (row != null) {
-				villager.setVillagerData(villager.getVillagerData().withProfession(level.registryAccess(), VillageLayout.outfit(row)).withLevel(5));
-				villager.setCustomName(VillageLayout.label(row, mod.state().waitingDetail(row.id()), mod.state().online(row.id())));
+				AgentAppearance.update(villager, row, mod.state().online(row.id()), mod.state().driverFor(row));
 			}
 		}
+		laptops.sync(level,o,brain.agents().values(),Math.max(2,floors.size()*2));
 		if (mod.office().building() || ticks < nextDecorationAttempt) return;
 		nextDecorationAttempt = ticks + 100;
 		// Retry after chunk reloads; never resend unchanged content on a timer.
 		// Each floor's whiteboard: who needs you and what for.
-		for (int floor = 0; floor < Math.max(1, floors.size()); floor++) {
-			String machine = floor < mod.floorOwners().size() ? mod.floorOwners().get(floor) : null;
-			List<T3Office.Note> notes = snapshot.threads().stream().filter(row -> row.status() == T3State.Status.NEEDS_YOU)
-				.filter(row -> row.ownerKey().equals(machine))
-				.map(row -> new T3Office.Note(row.title(), mod.state().waitingDetail(row.id()))).toList();
+		for (int floor = 0; floor < Math.max(2, floors.size()*2); floor++) {
+			List<T3Office.Note> notes = brain.notes(floor, mod.state()::waitingDetail);
 			String key = notes.toString();
 			if (!OfficeSite.loaded(level, o, T3Office.whiteboard(floor, notes))) { boards.remove(floor); continue; }
 			if (!key.equals(boards.get(floor))) {
@@ -187,8 +187,8 @@ final class T3Village {
 				mod.office().send(o, T3Office.whiteboard(floor, notes), () -> boards.put(index, key));
 			}
 		}
-		// Lamps on after New York sunset, off in the morning.
-		boolean dark = NycSun.isNight(Instant.now());
+		// Lamps follow this world's day/night cycle.
+		boolean dark = OfficeProps.night(level);
 		if (!OfficeSite.loaded(level, o, T3Office.lamps(floors.size(), dark))) { night = null; return; }
 		if (night == null || night != dark) {
 			mod.office().send(o, T3Office.lamps(floors.size(), dark), () -> night = dark);
@@ -198,7 +198,7 @@ final class T3Village {
 	/** The thread a shared village or shared office villager stands for, if it is one of ours. */
 	private String threadForUuid(java.util.UUID uuid) {
 		for (T3State.ThreadRow row : mod.state().snapshot().threads()) {
-			if (VillageLayout.villagerUuid(row.id()).equals(uuid) || OfficeBrain.villagerUuid(row.id()).equals(uuid)) return row.id();
+			if (VillageLayout.villagerUuid(row.id()).equals(uuid) || OfficeBrain.villagerUuid(row.id()).equals(uuid) || DeskLaptops.uuid(row.id(),true).equals(uuid) || DeskLaptops.uuid(row.id(),false).equals(uuid)) return row.id();
 		}
 		return null;
 	}
@@ -213,11 +213,13 @@ final class T3Village {
 		return Map.copyOf(threadByEntity);
 	}
 
+ void faceThread(String thread){brain.face(thread);}
 	void clear() {
 		if (level != null) {
-			for (Villager villager : villagers.values()) level.removeEntity(villager.getId(), Entity.RemovalReason.DISCARDED);
+			for (Mannequin villager : villagers.values()) level.removeEntity(villager.getId(), Entity.RemovalReason.DISCARDED);
 		}
 		villagers.clear();
+  laptops.clear();
 		threadByEntity.clear();
 		brain.clear();
 		boards.clear();
@@ -234,12 +236,12 @@ final class T3Village {
 			if (!level.isLoaded(column)) continue;
 			int y = VillageLayout.standY(level, column);
 
-			Villager villager = villagers.get(row.id());
+			Mannequin villager = villagers.get(row.id());
 			if (villager == null || villager.isRemoved() || level.getEntity(villager.getId()) != villager) {
 				if (villager != null) threadByEntity.remove(villager.getId());
-				villager = new Villager(EntityTypes.VILLAGER, level);
+				villager = EntityTypes.MANNEQUIN.create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
 				villager.setId(nextId--);
-				villager.setNoAi(true);
+                villager.noPhysics=true;
 				villager.setSilent(true);
 				villager.setCustomNameVisible(true);
 				level.addEntity(villager);
@@ -247,8 +249,7 @@ final class T3Village {
 				threadByEntity.put(villager.getId(), row.id());
 			}
 			villager.snapTo(column.getX() + 0.5, y, column.getZ() + 0.5, villager.getYRot(), 0);
-			villager.setVillagerData(villager.getVillagerData().withProfession(level.registryAccess(), VillageLayout.outfit(row)).withLevel(5));
-			villager.setCustomName(VillageLayout.label(row, mod.state().waitingDetail(row.id()), mod.state().online(row.id())));
+			AgentAppearance.update(villager, row, mod.state().online(row.id()), mod.state().driverFor(row));
 		}
 		villagers.entrySet().removeIf(entry -> {
 			if (keep.contains(entry.getKey())) return false;
@@ -258,17 +259,17 @@ final class T3Village {
 		});
 	}
 
-	private static void face(Villager villager, Minecraft minecraft) {
+	private static void face(Mannequin villager, Minecraft minecraft) {
 		double dx = minecraft.player.getX() - villager.getX();
 		double dz = minecraft.player.getZ() - villager.getZ();
 		if (dx * dx + dz * dz > 24 * 24) return;
 		float yaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90);
 		villager.setYRot(yaw);
 		villager.setYBodyRot(yaw);
-		villager.setYHeadRot(yaw);
+
 	}
 
-	private void effects(Villager villager, T3State.ThreadRow row) {
+	private void effects(Mannequin villager, T3State.ThreadRow row) {
 		if (row == null || !mod.state().online(row.id())) return;
 		ParticleOptions particle = switch (row.status()) {
 			case WORKING -> ParticleTypes.ENCHANT;
@@ -277,7 +278,6 @@ final class T3Village {
 			case DONE -> VillageLayout.recentlyDone(row) ? ParticleTypes.HAPPY_VILLAGER : null;
 			case IDLE -> null;
 		};
-		if (row.status() == T3State.Status.NEEDS_YOU) villager.setUnhappyCounter(20);
 		if (particle == null) return;
 		for (int i = 0; i < (row.status() == T3State.Status.WORKING ? 3 : 1); i++) {
 			level.addParticle(particle, villager.getX() + (Math.random() - 0.5) * 0.8, villager.getY() + 2.2 + Math.random() * 0.3,

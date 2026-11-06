@@ -10,8 +10,28 @@ import java.util.Map;
 
 /** Spatial acceptance checks use synthetic rows and disposable owner-only configuration. */
 public final class OfficeChecks {
+ private static void checkScandi() {
+  check(T3Office.WORK.length==8 && T3Office.WORK[0].x()==3 && T3Office.WORK[0].z()==2,"designer desk anchors parsed");
+  check(OfficeSite.bounds(net.minecraft.core.BlockPos.ZERO,T3Office.blueprint(List.of("one machine"))).max().getY()>=17,"one machine always builds both floors and roof");
+  check(T3Office.WIDTH==30 && T3Office.LENGTH==24,"roomier design footprint");
+  check(T3Office.FLOOR_HEIGHT==6 && T3Office.NEEDS_YOU[0].z()==15,"floor and whiteboard anchors match design A");
+  for(int floors=1;floors<=6;floors++)check(OfficeDesign.template(floors).getAsJsonObject("anchors").getAsJsonArray("floors").size()==floors,"floor template count");
+  check(AgentAppearance.provider("claudeAgent").equals("claude"),"driver alias maps to bundled Claude art");
+  check(AgentAppearance.provider("unknown-new-driver").equals("default"),"unknown driver uses bundled fallback");
+  for(var e:AgentAppearance.SKINS.getAsJsonArray("skins")) {var skin=e.getAsJsonObject();check(OfficeChecks.class.getResource("/assets/t3craft/textures/entity/agent/"+skin.get("file").getAsString())!=null,"every manifest skin is bundled");}
+  check(AgentAppearance.skin("codex","thread-a").equals(AgentAppearance.skin("codex","thread-a")),"alternate selection stable");
+  check(OfficeProps.PROPS.size()==59,"complete original prop placements");
+  check(OfficeProps.state("coffee_mug","sage",T3State.Status.WORKING,false).equals("sage_steam"),"working mug steam");
+  check(OfficeProps.state("monitor","idle",T3State.Status.WORKING,false).equals("on")&&OfficeProps.state("monitor","idle",null,false).equals("off"),"monitor follows desk occupancy and status");
+  check(OfficeProps.state("desk_lamp","off",null,true).equals("on")&&OfficeProps.state("desk_lamp","off",T3State.Status.IDLE,false).equals("off"),"night desk lamps");
+  check(DeskLaptops.state(T3State.Status.NEEDS_YOU).equals("needs_you")&&DeskLaptops.state(T3State.Status.WORKING).equals("working")&&DeskLaptops.state(T3State.Status.DONE).equals("idle"),"laptop status mapping");
+  check(DeskLaptops.uuid("a",true).equals(DeskLaptops.uuid("a",true))&&!DeskLaptops.uuid("a",true).equals(DeskLaptops.uuid("a",false))&&!DeskLaptops.uuid("a",true).equals(DeskLaptops.uuid("b",true)),"laptop pair identity stable and distinct");
+  var brain=new OfficeBrain();var row=row("owner",0,T3State.Status.WORKING);brain.sync(List.of(row),List.of("owner"),new OfficeRoster.Preferences());brain.face(row.id());var a=brain.agents().get(row.id());double x=a.x,z=a.z;brain.tick();check(a.x==x&&a.z==z&&!a.walking,"head turn hold pauses the brain");
+ }
+
 	public static void main(String[] args) throws Exception {
 		checkPlacement();
+		checkScandi();
 		checkCommandDispatch();
 		check(!OfficeQueue.permissionFailure(net.minecraft.network.chat.Component.literal("Unknown command: permission")), "literal chat is not a permission denial");
 		for (String key : List.of("command.unknown.command", "commands.generic.permission"))
@@ -36,7 +56,7 @@ public final class OfficeChecks {
 		T3State.ThreadRow pin = rows.get(11);
 		check(prefs.pin(pin), "old thread can be pinned");
 		var selected = OfficeRoster.sync(rows, List.of(a, b), prefs);
-		check(selected.size() == 16, "each machine has eight residents despite duplicate names");
+		check(selected.size() == 24, "each machine has sixteen desk capacity despite duplicate names");
 		check(selected.stream().anyMatch(r -> r.row().equals(pin)), "old pin beats recent threads");
 		check(selected.stream().filter(r -> r.row().status() == T3State.Status.NEEDS_YOU).count() == 2, "old waiting work is included on both machines");
 		check(selected.stream().filter(r -> r.row().status() == T3State.Status.WORKING).count() == 2, "working rows beat recent done rows");
@@ -46,8 +66,8 @@ public final class OfficeChecks {
 		OfficeRoster.sync(reordered, List.of(a, b), prefs);
 		check(before.equals(prefs.desks), "recency reorder keeps every included desk");
 		OfficeBrain brain = new OfficeBrain(); brain.sync(reordered, List.of(a, b), prefs);
-		check(brain.agents().values().stream().filter(r -> r.floor == 1).count() == 8, "same display name still has a distinct second floor");
-		check(brain.agents().get(pin.id()).desk == before.get(OfficeRoster.key(pin)), "brain consumes the saved desk");
+		check(brain.agents().values().stream().filter(r -> r.floor == 2).count() == 8, "same display name still has a distinct second floor");
+		check(brain.agents().get(pin.id()).desk == before.get(OfficeRoster.key(pin)) % 8, "brain consumes the saved desk");
 		check(!OfficeRoster.projectKey(rows.get(0)).equals(OfficeRoster.projectKey(rows.get(12))), "same project title on two machines remains distinct");
 
 		// A transient unavailable snapshot must retain unpinned desks, including owners not in the roster.
@@ -97,7 +117,7 @@ public final class OfficeChecks {
 			var builtPrefs = restored.officePreferences.get("world-a");
 			restored.environments.removeFirst();
 			brain.sync(reordered.stream().filter(r -> r.ownerKey().equals(b)).toList(), builtPrefs.floorOwners, builtPrefs, java.util.Set.of(b));
-			check(brain.agents().values().stream().allMatch(agent -> agent.floor == 1), "removing a pairing does not shift the built second floor");
+			check(brain.agents().values().stream().allMatch(agent -> agent.floor == 2 || agent.floor == 3), "removing a pairing does not shift the built second machine suite");
 			restored.environments.addFirst(new T3Config.Environment("Same name", a, "fixture-only"));
 			check(restored.officePreferences.get("world-a").pinned(pin), "pin survives actual JSON save/load");
 			OfficeRoster.sync(reordered, List.of(a, b), restored.officePreferences.get("world-a"));
@@ -120,8 +140,8 @@ public final class OfficeChecks {
 		check(!prefs.desks.containsKey(OfficeRoster.key(pin)), "unpin frees unavailable assignment");
 
 		OfficeRoster.Preferences capacity = new OfficeRoster.Preferences();
-		for (int i = 0; i < 8; i++) check(capacity.pin(rows.get(i)), "eight pins accepted");
-		check(!capacity.pin(rows.get(8)) && capacity.pin(rows.get(12)), "limit applies per owner");
+		for (int i = 0; i < 16; i++) check(capacity.pin(row(a,i,T3State.Status.IDLE)), "sixteen pins accepted");
+		check(!capacity.pin(row(a,16,T3State.Status.IDLE)) && capacity.pin(rows.get(12)), "limit applies per owner");
 		List<T3State.ThreadRow> waiting = new ArrayList<>();
 		for (int i = 0; i < 8; i++) waiting.add(row(a, i, T3State.Status.NEEDS_YOU));
 		brain.clear(); brain.sync(waiting, List.of(a), new OfficeRoster.Preferences());
@@ -132,7 +152,8 @@ public final class OfficeChecks {
 		net.minecraft.SharedConstants.tryDetectVersion();
 		net.minecraft.server.Bootstrap.bootStrap();
 		var origin = new net.minecraft.core.BlockPos(0, 64, 0);
-		var blueprint = T3Office.blueprint(List.of("Machine"));
+		var blueprint = new ArrayList<>(T3Office.blueprint(List.of("Machine")));
+        blueprint.add("setblock 15 0 15 white_shulker_box"); // Synthetic container exercises rebuild protection independently of the furniture palette.
 		var bounds = OfficeSite.bounds(origin, blueprint);
 		var blocks = new java.util.HashMap<net.minecraft.core.BlockPos, net.minecraft.world.level.block.state.BlockState>();
 		java.util.function.Function<net.minecraft.core.BlockPos, net.minecraft.world.level.block.state.BlockState> read = pos -> blocks.getOrDefault(pos,
@@ -149,9 +170,9 @@ public final class OfficeChecks {
 		var chest = new net.minecraft.world.level.block.entity.ChestBlockEntity(bounds.min(), net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
 		check(OfficeSite.occupied(bounds, null, List.of(), read, pos -> pos.equals(bounds.min()) ? chest : null), "buried containers remain protected");
 		// Recognize both lamp states and the office's own sign block entities on rebuild.
-		var lamp = origin.offset(6, T3Office.HEIGHT - 3, 9);
-		var sign = origin.offset(2, 3, 27);
-		blocks.put(lamp, net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace("white_concrete")).defaultBlockState());
+		var lamp = origin.offset(16, 3, 20);
+		var sign = origin.offset(1, 2, 16);
+		blocks.put(lamp, net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace("white_wool")).defaultBlockState());
 		blocks.put(sign, net.minecraft.world.level.block.Blocks.BIRCH_WALL_SIGN.defaultBlockState());
 		var signEntity = new net.minecraft.world.level.block.entity.SignBlockEntity(sign, blocks.get(sign));
 		check(!OfficeSite.occupied(bounds, origin, blueprint, read, pos -> pos.equals(sign) ? signEntity : null), "daytime lamps and office whiteboards are rebuildable");

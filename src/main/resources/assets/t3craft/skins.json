@@ -1,0 +1,1197 @@
+{
+  "format": "minecraft-skin-64x64",
+  "texturePath": "assets/t3craft/textures/entity/agent/<id>.png",
+  "providers": {
+    "claude": {
+      "label": "Claude",
+      "maker": "Anthropic",
+      "swatches": [
+        "#C96442",
+        "#F1E9DA",
+        "#DCCDB2",
+        "#5E4334"
+      ],
+      "skins": [
+        "claude",
+        "claude_2",
+        "claude_3",
+        "claude_4",
+        "claude_5",
+        "claude_6",
+        "claude_7",
+        "claude_8"
+      ]
+    },
+    "codex": {
+      "label": "Codex",
+      "maker": "OpenAI",
+      "swatches": [
+        "#151617",
+        "#F3F2EE",
+        "#12A08A"
+      ],
+      "skins": [
+        "codex",
+        "codex_2",
+        "codex_3",
+        "codex_4",
+        "codex_5",
+        "codex_6",
+        "codex_7",
+        "codex_8"
+      ]
+    },
+    "muse": {
+      "label": "Muse",
+      "maker": "Meta",
+      "swatches": [
+        "#A9D3FF",
+        "#4D9BFF",
+        "#1F6FEA",
+        "#1B3FB0"
+      ],
+      "skins": [
+        "muse",
+        "muse_2",
+        "muse_3",
+        "muse_4",
+        "muse_5",
+        "muse_6",
+        "muse_7",
+        "muse_8"
+      ]
+    },
+    "grok": {
+      "label": "Grok",
+      "maker": "xAI",
+      "swatches": [
+        "#0F0F10",
+        "#2A2A2D",
+        "#6B6B70",
+        "#BEBEC2",
+        "#F2F2F2"
+      ],
+      "skins": [
+        "grok",
+        "grok_2",
+        "grok_3",
+        "grok_4",
+        "grok_5",
+        "grok_6",
+        "grok_7",
+        "grok_8"
+      ]
+    },
+    "cursor": {
+      "label": "Cursor",
+      "maker": "Anysphere",
+      "swatches": [
+        "#2D3036",
+        "#3D4149",
+        "#5A606A",
+        "#9AA0A8"
+      ],
+      "skins": [
+        "cursor",
+        "cursor_2",
+        "cursor_3",
+        "cursor_4",
+        "cursor_5",
+        "cursor_6",
+        "cursor_7",
+        "cursor_8"
+      ]
+    },
+    "opencode": {
+      "label": "OpenCode",
+      "maker": "open source",
+      "swatches": [
+        "#EDE7DB",
+        "#D6C9B0",
+        "#B3A68D",
+        "#8A7E6C",
+        "#4A443D"
+      ],
+      "skins": [
+        "opencode",
+        "opencode_2",
+        "opencode_3",
+        "opencode_4",
+        "opencode_5",
+        "opencode_6",
+        "opencode_7",
+        "opencode_8"
+      ]
+    },
+    "pi": {
+      "label": "Pi",
+      "maker": "open source",
+      "swatches": [
+        "#1E1C1A",
+        "#E2A73B",
+        "#F4E7C8",
+        "#8A5A1E"
+      ],
+      "skins": [
+        "pi",
+        "pi_2",
+        "pi_3"
+      ]
+    },
+    "kiro": {
+      "label": "Kiro",
+      "maker": "Amazon",
+      "swatches": [
+        "#2A1747",
+        "#5B2BB5",
+        "#9B6DFF",
+        "#E6DCFF"
+      ],
+      "skins": [
+        "kiro",
+        "kiro_2",
+        "kiro_3"
+      ]
+    },
+    "antigravity": {
+      "label": "Antigravity",
+      "maker": "Google",
+      "swatches": [
+        "#F7F8FA",
+        "#4285F4",
+        "#34A853",
+        "#FBBC05",
+        "#EA4335"
+      ],
+      "skins": [
+        "antigravity",
+        "antigravity_2",
+        "antigravity_3"
+      ]
+    },
+    "fx": {
+      "label": "fx",
+      "maker": "fx CLI",
+      "swatches": [
+        "#1F2421",
+        "#3A423C",
+        "#B8E04A",
+        "#E9F5C8"
+      ],
+      "skins": [
+        "fx",
+        "fx_2",
+        "fx_3"
+      ]
+    },
+    "default": {
+      "label": "Fallback",
+      "maker": "unknown provider",
+      "swatches": [
+        "#4F6273",
+        "#6E8293",
+        "#F4F5F6"
+      ],
+      "skins": [
+        "default",
+        "default_2",
+        "default_3",
+        "default_4",
+        "default_5",
+        "default_6"
+      ]
+    }
+  },
+  "skins": [
+    {
+      "id": "claude",
+      "provider": "claude",
+      "name": "Claude \u00b7 knit",
+      "file": "claude.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/claude",
+      "profile": {
+        "texture": "t3craft:entity/agent/claude",
+        "model": "wide"
+      },
+      "primary": true,
+      "accent": "#C96442",
+      "description": "Cream knit crew-neck, terracotta lanyard, espresso chinos, chestnut side-part."
+    },
+    {
+      "id": "claude_2",
+      "provider": "claude",
+      "name": "Claude \u00b7 cardigan",
+      "file": "claude_2.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/claude_2",
+      "profile": {
+        "texture": "t3craft:entity/agent/claude_2",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#F1E9DA",
+      "description": "Terracotta cardigan over a cream tee, auburn bob, tortoise round glasses, clip badge."
+    },
+    {
+      "id": "claude_3",
+      "provider": "claude",
+      "name": "Claude \u00b7 overshirt",
+      "file": "claude_3.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/claude_3",
+      "profile": {
+        "texture": "t3craft:entity/agent/claude_3",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#C96442",
+      "description": "Oatmeal overshirt, sleeves rolled, terracotta tee, curly hair and short beard."
+    },
+    {
+      "id": "claude_4",
+      "provider": "claude",
+      "name": "Claude \u00b7 apron",
+      "file": "claude_4.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/claude_4",
+      "profile": {
+        "texture": "t3craft:entity/agent/claude_4",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#A84E33",
+      "description": "Terracotta bib apron over a cream tee, afro, espresso trousers, clip badge on the bib."
+    },
+    {
+      "id": "claude_5",
+      "provider": "claude",
+      "name": "Claude \u00b7 sweater vest",
+      "file": "claude_5.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/claude_5",
+      "profile": {
+        "texture": "t3craft:entity/agent/claude_5",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#C96442",
+      "description": "Oatmeal sweater vest over a cream shirt, silver side-part and moustache, tortoise round glasses."
+    },
+    {
+      "id": "claude_6",
+      "provider": "claude",
+      "name": "Claude \u00b7 rain jacket",
+      "file": "claude_6.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/claude_6",
+      "profile": {
+        "texture": "t3craft:entity/agent/claude_6",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#F1E9DA",
+      "description": "Terracotta rain jacket with hood, oatmeal beanie, stubble, dark denim and boots."
+    },
+    {
+      "id": "claude_7",
+      "provider": "claude",
+      "name": "Claude \u00b7 denim jacket",
+      "file": "claude_7.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/claude_7",
+      "profile": {
+        "texture": "t3craft:entity/agent/claude_7",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#C96442",
+      "description": "Denim jacket over a terracotta tee, copper pixie cut, freckles, espresso skirt and boots."
+    },
+    {
+      "id": "claude_8",
+      "provider": "claude",
+      "name": "Claude \u00b7 headphones",
+      "file": "claude_8.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/claude_8",
+      "profile": {
+        "texture": "t3craft:entity/agent/claude_8",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#C96442",
+      "description": "Oatmeal hoodie, terracotta headphones round the neck, shaved head, full beard, broad build."
+    },
+    {
+      "id": "codex",
+      "provider": "codex",
+      "name": "Codex \u00b7 overshirt",
+      "file": "codex.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/codex",
+      "profile": {
+        "texture": "t3craft:entity/agent/codex",
+        "model": "wide"
+      },
+      "primary": true,
+      "accent": "#12A08A",
+      "description": "White overshirt over a black tee, black chinos, teal lanyard, black rectangular glasses."
+    },
+    {
+      "id": "codex_2",
+      "provider": "codex",
+      "name": "Codex \u00b7 blazer",
+      "file": "codex_2.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/codex_2",
+      "profile": {
+        "texture": "t3craft:entity/agent/codex_2",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#12A08A",
+      "description": "Black blazer over a white tee, long straight dark-brown hair, teal lanyard."
+    },
+    {
+      "id": "codex_3",
+      "provider": "codex",
+      "name": "Codex \u00b7 hoodie",
+      "file": "codex_3.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/codex_3",
+      "profile": {
+        "texture": "t3craft:entity/agent/codex_3",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#12A08A",
+      "description": "Charcoal hoodie with teal drawstrings and lanyard, buzz cut and full beard."
+    },
+    {
+      "id": "codex_4",
+      "provider": "codex",
+      "name": "Codex \u00b7 cap",
+      "file": "codex_4.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/codex_4",
+      "profile": {
+        "texture": "t3craft:entity/agent/codex_4",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#12A08A",
+      "description": "Black cap with a teal stitch, white tee, black chinos, teal watch and lanyard."
+    },
+    {
+      "id": "codex_5",
+      "provider": "codex",
+      "name": "Codex \u00b7 rain jacket",
+      "file": "codex_5.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/codex_5",
+      "profile": {
+        "texture": "t3craft:entity/agent/codex_5",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#F3F2EE",
+      "description": "Teal rain jacket with white zip, shoulder-length locs, black trousers and boots."
+    },
+    {
+      "id": "codex_6",
+      "provider": "codex",
+      "name": "Codex \u00b7 sweater vest",
+      "file": "codex_6.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/codex_6",
+      "profile": {
+        "texture": "t3craft:entity/agent/codex_6",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#12A08A",
+      "description": "Black sweater vest over a white shirt, ginger crop and stubble, rectangular glasses."
+    },
+    {
+      "id": "codex_7",
+      "provider": "codex",
+      "name": "Codex \u00b7 apron",
+      "file": "codex_7.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/codex_7",
+      "profile": {
+        "texture": "t3craft:entity/agent/codex_7",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#12A08A",
+      "description": "Teal headscarf, black apron over a white shirt with rolled sleeves, clip badge."
+    },
+    {
+      "id": "codex_8",
+      "provider": "codex",
+      "name": "Codex \u00b7 denim + headphones",
+      "file": "codex_8.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/codex_8",
+      "profile": {
+        "texture": "t3craft:entity/agent/codex_8",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#12A08A",
+      "description": "Black denim jacket over a white tee, teal headphones round the neck, moustache."
+    },
+    {
+      "id": "muse",
+      "provider": "muse",
+      "name": "Muse \u00b7 gradient knit",
+      "file": "muse.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/muse",
+      "profile": {
+        "texture": "t3craft:entity/agent/muse",
+        "model": "slim"
+      },
+      "primary": true,
+      "accent": "#1F6FEA",
+      "description": "Sky-to-deep-blue gradient knit, honey-blonde ponytail with blue tie, navy trousers."
+    },
+    {
+      "id": "muse_2",
+      "provider": "muse",
+      "name": "Muse \u00b7 chore jacket",
+      "file": "muse_2.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/muse_2",
+      "profile": {
+        "texture": "t3craft:entity/agent/muse_2",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#1F6FEA",
+      "description": "Blue gradient chore jacket over white tee, dark denim with cuffs, curly hair, sky sneakers."
+    },
+    {
+      "id": "muse_3",
+      "provider": "muse",
+      "name": "Muse \u00b7 turtleneck",
+      "file": "muse_3.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/muse_3",
+      "profile": {
+        "texture": "t3craft:entity/agent/muse_3",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#1F6FEA",
+      "description": "Blue-to-indigo gradient cardigan over a sky top, black bun, blue round glasses, light trousers."
+    },
+    {
+      "id": "muse_4",
+      "provider": "muse",
+      "name": "Muse \u00b7 beanie",
+      "file": "muse_4.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/muse_4",
+      "profile": {
+        "texture": "t3craft:entity/agent/muse_4",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#1F6FEA",
+      "description": "Blue gradient zip jacket, blue beanie, red beard, broad build, navy trousers."
+    },
+    {
+      "id": "muse_5",
+      "provider": "muse",
+      "name": "Muse \u00b7 denim jacket",
+      "file": "muse_5.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/muse_5",
+      "profile": {
+        "texture": "t3craft:entity/agent/muse_5",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#1F6FEA",
+      "description": "Cobalt denim jacket over a sky tee, long wavy hair, light trousers, cobalt sneakers."
+    },
+    {
+      "id": "muse_6",
+      "provider": "muse",
+      "name": "Muse \u00b7 apron",
+      "file": "muse_6.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/muse_6",
+      "profile": {
+        "texture": "t3craft:entity/agent/muse_6",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#1F6FEA",
+      "description": "Deep-blue apron over a white tee, buzz cut and goatee, sky sneakers."
+    },
+    {
+      "id": "muse_7",
+      "provider": "muse",
+      "name": "Muse \u00b7 rain jacket",
+      "file": "muse_7.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/muse_7",
+      "profile": {
+        "texture": "t3craft:entity/agent/muse_7",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#1F6FEA",
+      "description": "Sky-to-blue gradient rain jacket, platinum pixie cut, blue round glasses, navy boots."
+    },
+    {
+      "id": "muse_8",
+      "provider": "muse",
+      "name": "Muse \u00b7 sweater vest",
+      "file": "muse_8.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/muse_8",
+      "profile": {
+        "texture": "t3craft:entity/agent/muse_8",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#1F6FEA",
+      "description": "Blue gradient sweater vest over a white shirt, grey curls, cuffed dark denim."
+    },
+    {
+      "id": "grok",
+      "provider": "grok",
+      "name": "Grok \u00b7 turtleneck",
+      "file": "grok.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/grok",
+      "profile": {
+        "texture": "t3craft:entity/agent/grok",
+        "model": "wide"
+      },
+      "primary": true,
+      "accent": "#BEBEC2",
+      "description": "Black turtleneck, mid-grey trousers, silver hair and stubble, silver lanyard."
+    },
+    {
+      "id": "grok_2",
+      "provider": "grok",
+      "name": "Grok \u00b7 blazer",
+      "file": "grok_2.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/grok_2",
+      "profile": {
+        "texture": "t3craft:entity/agent/grok_2",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#0F0F10",
+      "description": "Charcoal blazer over a white tee, platinum bob, black lanyard."
+    },
+    {
+      "id": "grok_3",
+      "provider": "grok",
+      "name": "Grok \u00b7 hoodie",
+      "file": "grok_3.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/grok_3",
+      "profile": {
+        "texture": "t3craft:entity/agent/grok_3",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#0F0F10",
+      "description": "Heather-grey hoodie, black lanyard, charcoal joggers, white sneakers."
+    },
+    {
+      "id": "grok_4",
+      "provider": "grok",
+      "name": "Grok \u00b7 rain jacket",
+      "file": "grok_4.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/grok_4",
+      "profile": {
+        "texture": "t3craft:entity/agent/grok_4",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#BEBEC2",
+      "description": "Black rain jacket with silver zip, black crop and full beard, grey trousers, boots."
+    },
+    {
+      "id": "grok_5",
+      "provider": "grok",
+      "name": "Grok \u00b7 headphones",
+      "file": "grok_5.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/grok_5",
+      "profile": {
+        "texture": "t3craft:entity/agent/grok_5",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#0F0F10",
+      "description": "Light-grey knit, black headphones round the neck, black bun, black trousers."
+    },
+    {
+      "id": "grok_6",
+      "provider": "grok",
+      "name": "Grok \u00b7 denim jacket",
+      "file": "grok_6.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/grok_6",
+      "profile": {
+        "texture": "t3craft:entity/agent/grok_6",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#BEBEC2",
+      "description": "Black denim jacket over a white tee, silver beanie, black trousers, white sneakers."
+    },
+    {
+      "id": "grok_7",
+      "provider": "grok",
+      "name": "Grok \u00b7 sweater vest",
+      "file": "grok_7.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/grok_7",
+      "profile": {
+        "texture": "t3craft:entity/agent/grok_7",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#BEBEC2",
+      "description": "Charcoal sweater vest over a white shirt, locs, grey skirt and black boots."
+    },
+    {
+      "id": "grok_8",
+      "provider": "grok",
+      "name": "Grok \u00b7 apron",
+      "file": "grok_8.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/grok_8",
+      "profile": {
+        "texture": "t3craft:entity/agent/grok_8",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#F2F2F2",
+      "description": "Black apron over a light-grey knit, rolled sleeves, bald with a silver beard, broad build."
+    },
+    {
+      "id": "cursor",
+      "provider": "cursor",
+      "name": "Cursor \u00b7 zip jacket",
+      "file": "cursor.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/cursor",
+      "profile": {
+        "texture": "t3craft:entity/agent/cursor",
+        "model": "wide"
+      },
+      "primary": true,
+      "accent": "#9AA0A8",
+      "description": "Graphite zip jacket with light-grey sleeve stripes, dark-blonde crop, rectangular glasses."
+    },
+    {
+      "id": "cursor_2",
+      "provider": "cursor",
+      "name": "Cursor \u00b7 sweater",
+      "file": "cursor_2.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/cursor_2",
+      "profile": {
+        "texture": "t3craft:entity/agent/cursor_2",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#2D3036",
+      "description": "Graphite quarter-zip knit, long wavy brown hair, slate trousers."
+    },
+    {
+      "id": "cursor_3",
+      "provider": "cursor",
+      "name": "Cursor \u00b7 overshirt",
+      "file": "cursor_3.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/cursor_3",
+      "profile": {
+        "texture": "t3craft:entity/agent/cursor_3",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#2D3036",
+      "description": "Light-graphite overshirt over a dark tee, rolled sleeves, buzz cut with stubble."
+    },
+    {
+      "id": "cursor_4",
+      "provider": "cursor",
+      "name": "Cursor \u00b7 cap",
+      "file": "cursor_4.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/cursor_4",
+      "profile": {
+        "texture": "t3craft:entity/agent/cursor_4",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#9AA0A8",
+      "description": "Graphite cap, slate knit, brown ponytail, white sneakers."
+    },
+    {
+      "id": "cursor_5",
+      "provider": "cursor",
+      "name": "Cursor \u00b7 apron",
+      "file": "cursor_5.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/cursor_5",
+      "profile": {
+        "texture": "t3craft:entity/agent/cursor_5",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#5A606A",
+      "description": "Graphite apron over a light-grey knit, rolled sleeves, side-part and moustache."
+    },
+    {
+      "id": "cursor_6",
+      "provider": "cursor",
+      "name": "Cursor \u00b7 rain jacket",
+      "file": "cursor_6.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/cursor_6",
+      "profile": {
+        "texture": "t3craft:entity/agent/cursor_6",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#9AA0A8",
+      "description": "Graphite rain jacket, light-grey beanie, broad build, dark trousers and boots."
+    },
+    {
+      "id": "cursor_7",
+      "provider": "cursor",
+      "name": "Cursor \u00b7 sweater vest",
+      "file": "cursor_7.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/cursor_7",
+      "profile": {
+        "texture": "t3craft:entity/agent/cursor_7",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#9AA0A8",
+      "description": "Slate sweater vest over a white shirt, graphite headscarf, round glasses."
+    },
+    {
+      "id": "cursor_8",
+      "provider": "cursor",
+      "name": "Cursor \u00b7 denim + headphones",
+      "file": "cursor_8.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/cursor_8",
+      "profile": {
+        "texture": "t3craft:entity/agent/cursor_8",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#9AA0A8",
+      "description": "Grey-blue denim jacket over a graphite tee, black headphones, blond curls."
+    },
+    {
+      "id": "opencode",
+      "provider": "opencode",
+      "name": "OpenCode \u00b7 chore jacket",
+      "file": "opencode.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/opencode",
+      "profile": {
+        "texture": "t3craft:entity/agent/opencode",
+        "model": "wide"
+      },
+      "primary": true,
+      "accent": "#4A443D",
+      "description": "Sand chore jacket over off-white tee, taupe trousers, brown boots, copper hair, freckles."
+    },
+    {
+      "id": "opencode_2",
+      "provider": "opencode",
+      "name": "OpenCode \u00b7 turtleneck",
+      "file": "opencode_2.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/opencode_2",
+      "profile": {
+        "texture": "t3craft:entity/agent/opencode_2",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#8A7E6C",
+      "description": "Off-white knit turtleneck, stone trousers, long braids."
+    },
+    {
+      "id": "opencode_3",
+      "provider": "opencode",
+      "name": "OpenCode \u00b7 hoodie",
+      "file": "opencode_3.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/opencode_3",
+      "profile": {
+        "texture": "t3craft:entity/agent/opencode_3",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#D6C9B0",
+      "description": "Taupe hoodie, charcoal trousers, grey hair and beard, round glasses."
+    },
+    {
+      "id": "opencode_4",
+      "provider": "opencode",
+      "name": "OpenCode \u00b7 sweater vest",
+      "file": "opencode_4.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/opencode_4",
+      "profile": {
+        "texture": "t3craft:entity/agent/opencode_4",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#8A7E6C",
+      "description": "Stone sweater vest over an off-white shirt, afro, round glasses, charcoal trousers."
+    },
+    {
+      "id": "opencode_5",
+      "provider": "opencode",
+      "name": "OpenCode \u00b7 rain jacket",
+      "file": "opencode_5.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/opencode_5",
+      "profile": {
+        "texture": "t3craft:entity/agent/opencode_5",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#EDE7DB",
+      "description": "Taupe rain jacket, charcoal beanie, long auburn hair, brown boots."
+    },
+    {
+      "id": "opencode_6",
+      "provider": "opencode",
+      "name": "OpenCode \u00b7 apron",
+      "file": "opencode_6.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/opencode_6",
+      "profile": {
+        "texture": "t3craft:entity/agent/opencode_6",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#4A443D",
+      "description": "Stone apron over an off-white knit, rolled sleeves, short grey hair."
+    },
+    {
+      "id": "opencode_7",
+      "provider": "opencode",
+      "name": "OpenCode \u00b7 canvas jacket",
+      "file": "opencode_7.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/opencode_7",
+      "profile": {
+        "texture": "t3craft:entity/agent/opencode_7",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#D6C9B0",
+      "description": "Brown duck-canvas jacket over an off-white tee, charcoal cap, goatee."
+    },
+    {
+      "id": "opencode_8",
+      "provider": "opencode",
+      "name": "OpenCode \u00b7 headphones",
+      "file": "opencode_8.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/opencode_8",
+      "profile": {
+        "texture": "t3craft:entity/agent/opencode_8",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#8A7E6C",
+      "description": "Sand turtleneck, charcoal headphones, locs, taupe skirt and boots."
+    },
+    {
+      "id": "pi",
+      "provider": "pi",
+      "name": "Pi \u00b7 quarter-zip",
+      "file": "pi.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/pi",
+      "profile": {
+        "texture": "t3craft:entity/agent/pi",
+        "model": "wide"
+      },
+      "primary": true,
+      "accent": "#1E1C1A",
+      "description": "Ochre quarter-zip with ink collar, ink trousers, rectangular glasses."
+    },
+    {
+      "id": "pi_2",
+      "provider": "pi",
+      "name": "Pi \u00b7 denim jacket",
+      "file": "pi_2.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/pi_2",
+      "profile": {
+        "texture": "t3craft:entity/agent/pi_2",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#E2A73B",
+      "description": "Ink denim jacket with ochre stitching over an ochre tee, wavy hair, butter trousers."
+    },
+    {
+      "id": "pi_3",
+      "provider": "pi",
+      "name": "Pi \u00b7 beanie",
+      "file": "pi_3.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/pi_3",
+      "profile": {
+        "texture": "t3craft:entity/agent/pi_3",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#E2A73B",
+      "description": "Ink hoodie with ochre drawstrings, ochre beanie, sandy beard, tobacco trousers."
+    },
+    {
+      "id": "kiro",
+      "provider": "kiro",
+      "name": "Kiro \u00b7 zip jacket",
+      "file": "kiro.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/kiro",
+      "profile": {
+        "texture": "t3craft:entity/agent/kiro",
+        "model": "wide"
+      },
+      "primary": true,
+      "accent": "#E6DCFF",
+      "description": "Violet zip jacket with lavender sleeve stripes, curly hair, deep-plum trousers."
+    },
+    {
+      "id": "kiro_2",
+      "provider": "kiro",
+      "name": "Kiro \u00b7 turtleneck",
+      "file": "kiro_2.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/kiro_2",
+      "profile": {
+        "texture": "t3craft:entity/agent/kiro_2",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#5B2BB5",
+      "description": "Lavender turtleneck, violet headscarf, deep-plum trousers."
+    },
+    {
+      "id": "kiro_3",
+      "provider": "kiro",
+      "name": "Kiro \u00b7 headphones",
+      "file": "kiro_3.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/kiro_3",
+      "profile": {
+        "texture": "t3craft:entity/agent/kiro_3",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#2A1747",
+      "description": "Soft-violet knit, plum cap and headphones, stubble, broad build."
+    },
+    {
+      "id": "antigravity",
+      "provider": "antigravity",
+      "name": "Antigravity \u00b7 knit",
+      "file": "antigravity.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/antigravity",
+      "profile": {
+        "texture": "t3craft:entity/agent/antigravity",
+        "model": "slim"
+      },
+      "primary": true,
+      "accent": "#4285F4",
+      "description": "White knit, blue lanyard with a yellow badge, brown ponytail, navy trousers, blue sneakers."
+    },
+    {
+      "id": "antigravity_2",
+      "provider": "antigravity",
+      "name": "Antigravity \u00b7 rain jacket",
+      "file": "antigravity_2.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/antigravity_2",
+      "profile": {
+        "texture": "t3craft:entity/agent/antigravity_2",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#F7F8FA",
+      "description": "Blue rain jacket with a yellow zip, buzz cut and full beard, white sneakers."
+    },
+    {
+      "id": "antigravity_3",
+      "provider": "antigravity",
+      "name": "Antigravity \u00b7 sweater vest",
+      "file": "antigravity_3.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/antigravity_3",
+      "profile": {
+        "texture": "t3craft:entity/agent/antigravity_3",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#34A853",
+      "description": "Blue sweater vest over a white shirt, green lanyard, copper side-part, round glasses."
+    },
+    {
+      "id": "fx",
+      "provider": "fx",
+      "name": "fx \u00b7 zip jacket",
+      "file": "fx.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/fx",
+      "profile": {
+        "texture": "t3craft:entity/agent/fx",
+        "model": "wide"
+      },
+      "primary": true,
+      "accent": "#B8E04A",
+      "description": "Charcoal zip jacket with chartreuse sleeve stripes and lanyard, black crop."
+    },
+    {
+      "id": "fx_2",
+      "provider": "fx",
+      "name": "fx \u00b7 apron",
+      "file": "fx_2.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/fx_2",
+      "profile": {
+        "texture": "t3craft:entity/agent/fx_2",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#1F2421",
+      "description": "Chartreuse apron over a charcoal tee, long braids, charcoal trousers."
+    },
+    {
+      "id": "fx_3",
+      "provider": "fx",
+      "name": "fx \u00b7 denim + headphones",
+      "file": "fx_3.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/fx_3",
+      "profile": {
+        "texture": "t3craft:entity/agent/fx_3",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#B8E04A",
+      "description": "Charcoal denim jacket with chartreuse stitching and headphones, blond side-part and moustache."
+    },
+    {
+      "id": "default",
+      "provider": "default",
+      "name": "Default \u00b7 quarter-zip",
+      "file": "default.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/default",
+      "profile": {
+        "texture": "t3craft:entity/agent/default",
+        "model": "wide"
+      },
+      "primary": true,
+      "accent": "#6E8293",
+      "description": "Slate quarter-zip with white collar, navy-grey trousers, brown crop."
+    },
+    {
+      "id": "default_2",
+      "provider": "default",
+      "name": "Default \u00b7 cardigan",
+      "file": "default_2.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/default_2",
+      "profile": {
+        "texture": "t3craft:entity/agent/default_2",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#4F6273",
+      "description": "Slate cardigan over a white top, auburn ponytail, clip badge."
+    },
+    {
+      "id": "default_3",
+      "provider": "default",
+      "name": "Default \u00b7 hoodie",
+      "file": "default_3.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/default_3",
+      "profile": {
+        "texture": "t3craft:entity/agent/default_3",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#F4F5F6",
+      "description": "Slate hoodie, white lanyard, curly hair."
+    },
+    {
+      "id": "default_4",
+      "provider": "default",
+      "name": "Default \u00b7 rain jacket",
+      "file": "default_4.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/default_4",
+      "profile": {
+        "texture": "t3craft:entity/agent/default_4",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#F4F5F6",
+      "description": "Slate rain jacket with white zip, slate cap, navy-grey trousers."
+    },
+    {
+      "id": "default_5",
+      "provider": "default",
+      "name": "Default \u00b7 denim jacket",
+      "file": "default_5.png",
+      "model": "slim",
+      "texture": "t3craft:entity/agent/default_5",
+      "profile": {
+        "texture": "t3craft:entity/agent/default_5",
+        "model": "slim"
+      },
+      "primary": false,
+      "accent": "#6E8293",
+      "description": "Slate-blue denim jacket over a white tee, black bun."
+    },
+    {
+      "id": "default_6",
+      "provider": "default",
+      "name": "Default \u00b7 sweater vest",
+      "file": "default_6.png",
+      "model": "wide",
+      "texture": "t3craft:entity/agent/default_6",
+      "profile": {
+        "texture": "t3craft:entity/agent/default_6",
+        "model": "wide"
+      },
+      "primary": false,
+      "accent": "#6E8293",
+      "description": "Slate sweater vest over a white shirt, shaved head with stubble, broad build."
+    }
+  ]
+}
