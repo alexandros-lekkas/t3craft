@@ -1,0 +1,28 @@
+name: ✨ Idea / feature request
+description: Suggest something for T3 Craft.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        T3 Craft aims for **few features, done very clearly**. The best ideas make things simpler, not bigger.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the moment you want to be better?
+      description: Describe the situation, like "when an agent finishes while I'm mining, I…"
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: Sketches, mockups and builds are very welcome.
+    validations:
+      required: true
+  - type: checkboxes
+    id: simple
+    attributes:
+      label: Simplicity check
+      options:
+        - label: This doesn't need a new settings screen or command for players.

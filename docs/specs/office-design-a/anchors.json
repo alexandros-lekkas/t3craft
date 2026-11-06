@@ -1,0 +1,1205 @@
+{
+ "anchors": {
+  "floors": [
+   {
+    "floor": 0,
+    "y": 0,
+    "work": [
+     {
+      "slot": 0,
+      "x": 3,
+      "z": 2,
+      "sink": 0.3,
+      "yaw": 0,
+      "desk": [
+       3,
+       3
+      ],
+      "monitor": [
+       3,
+       1,
+       3
+      ]
+     },
+     {
+      "slot": 1,
+      "x": 4,
+      "z": 2,
+      "sink": 0.3,
+      "yaw": 0,
+      "desk": [
+       4,
+       3
+      ],
+      "monitor": [
+       4,
+       1,
+       3
+      ]
+     },
+     {
+      "slot": 2,
+      "x": 5,
+      "z": 2,
+      "sink": 0.3,
+      "yaw": 0,
+      "desk": [
+       5,
+       3
+      ],
+      "monitor": [
+       5,
+       1,
+       3
+      ]
+     },
+     {
+      "slot": 3,
+      "x": 6,
+      "z": 2,
+      "sink": 0.3,
+      "yaw": 0,
+      "desk": [
+       6,
+       3
+      ],
+      "monitor": [
+       6,
+       1,
+       3
+      ]
+     },
+     {
+      "slot": 4,
+      "x": 3,
+      "z": 5,
+      "sink": 0.3,
+      "yaw": 180,
+      "desk": [
+       3,
+       4
+      ],
+      "monitor": [
+       3,
+       1,
+       4
+      ]
+     },
+     {
+      "slot": 5,
+      "x": 4,
+      "z": 5,
+      "sink": 0.3,
+      "yaw": 180,
+      "desk": [
+       4,
+       4
+      ],
+      "monitor": [
+       4,
+       1,
+       4
+      ]
+     },
+     {
+      "slot": 6,
+      "x": 5,
+      "z": 5,
+      "sink": 0.3,
+      "yaw": 180,
+      "desk": [
+       5,
+       4
+      ],
+      "monitor": [
+       5,
+       1,
+       4
+      ]
+     },
+     {
+      "slot": 7,
+      "x": 6,
+      "z": 5,
+      "sink": 0.3,
+      "yaw": 180,
+      "desk": [
+       6,
+       4
+      ],
+      "monitor": [
+       6,
+       1,
+       4
+      ]
+     }
+    ],
+    "needsYou": [
+     {
+      "x": 2,
+      "z": 11,
+      "sink": 0,
+      "yaw": 90
+     },
+     {
+      "x": 2,
+      "z": 12,
+      "sink": 0,
+      "yaw": 90
+     },
+     {
+      "x": 2,
+      "z": 10,
+      "sink": 0,
+      "yaw": 90
+     },
+     {
+      "x": 3,
+      "z": 11,
+      "sink": 0,
+      "yaw": 90
+     },
+     {
+      "x": 3,
+      "z": 12,
+      "sink": 0,
+      "yaw": 90
+     },
+     {
+      "x": 3,
+      "z": 10,
+      "sink": 0,
+      "yaw": 90
+     },
+     {
+      "x": 4,
+      "z": 11,
+      "sink": 0,
+      "yaw": 90
+     },
+     {
+      "x": 4,
+      "z": 12,
+      "sink": 0,
+      "yaw": 90
+     }
+    ],
+    "lounge": [
+     {
+      "x": 10,
+      "z": 12,
+      "sink": 0.3,
+      "yaw": 0
+     },
+     {
+      "x": 9,
+      "z": 12,
+      "sink": 0.3,
+      "yaw": 0
+     },
+     {
+      "x": 11,
+      "z": 12,
+      "sink": 0.3,
+      "yaw": 0
+     },
+     {
+      "x": 8,
+      "z": 12,
+      "sink": 0.3,
+      "yaw": 0
+     },
+     {
+      "x": 12,
+      "z": 12,
+      "sink": 0.3,
+      "yaw": 0
+     },
+     {
+      "x": 7,
+      "z": 14,
+      "sink": 0.3,
+      "yaw": -90
+     },
+     {
+      "x": 14,
+      "z": 13,
+      "sink": 0.3,
+      "yaw": 90
+     },
+     {
+      "x": 7,
+      "z": 13,
+      "sink": 0.3,
+      "yaw": -90
+     }
+    ],
+    "loungeOverflow": [
+     {
+      "x": 7,
+      "z": 15,
+      "sink": 0.3,
+      "yaw": -90
+     },
+     {
+      "x": 14,
+      "z": 15,
+      "sink": 0.3,
+      "yaw": 90
+     },
+     {
+      "x": 21,
+      "z": 13,
+      "sink": 0.3,
+      "yaw": 90
+     },
+     {
+      "x": 19,
+      "z": 16,
+      "sink": 0.3,
+      "yaw": 0
+     },
+     {
+      "x": 13,
+      "z": 4,
+      "sink": 0,
+      "yaw": 180
+     },
+     {
+      "x": 14,
+      "z": 4,
+      "sink": 0,
+      "yaw": 180
+     },
+     {
+      "x": 1,
+      "z": 17,
+      "sink": 0.45,
+      "yaw": 180
+     },
+     {
+      "x": 3,
+      "z": 17,
+      "sink": 0.45,
+      "yaw": 180
+     }
+    ],
+    "fridge": {
+     "x": 16,
+     "z": 1,
+     "sink": 0,
+     "yaw": 180
+    },
+    "whiteboard": {
+     "board": [
+      0,
+      1,
+      10,
+      0,
+      2,
+      12
+     ],
+     "signs": {
+      "left": [
+       1,
+       2,
+       12
+      ],
+      "middle": [
+       1,
+       2,
+       11
+      ],
+      "right": [
+       1,
+       2,
+       10
+      ],
+      "row2": [
+       [
+        1,
+        1,
+        12
+       ],
+       [
+        1,
+        1,
+        11
+       ],
+       [
+        1,
+        1,
+        10
+       ]
+      ]
+     },
+     "facing": "east"
+    },
+    "lectern": {
+     "block": [
+      18,
+      0,
+      12
+     ],
+     "reader": {
+      "x": 17,
+      "z": 12,
+      "sink": 0,
+      "yaw": -90
+     }
+    },
+    "sign": {
+     "block": [
+      21,
+      2,
+      9
+     ],
+     "facing": "west"
+    },
+    "stairUp": {
+     "bottom": {
+      "x": 20,
+      "z": 1
+     },
+     "firstStep": [
+      20,
+      0,
+      2
+     ],
+     "top": [
+      20,
+      5,
+      7
+     ]
+    },
+    "arrival": {
+     "x": 20,
+     "z": 8,
+     "sink": 0,
+     "yaw": 0
+    },
+    "door": {
+     "x": 17,
+     "z": 0,
+     "outside": [
+      17,
+      -2
+     ]
+    }
+   },
+   {
+    "floor": 1,
+    "y": 6,
+    "work": [
+     {
+      "slot": 0,
+      "x": 3,
+      "z": 2,
+      "sink": 0.3,
+      "yaw": 0,
+      "desk": [
+       3,
+       3
+      ],
+      "monitor": [
+       3,
+       1,
+       3
+      ]
+     },
+     {
+      "slot": 1,
+      "x": 4,
+      "z": 2,
+      "sink": 0.3,
+      "yaw": 0,
+      "desk": [
+       4,
+       3
+      ],
+      "monitor": [
+       4,
+       1,
+       3
+      ]
+     },
+     {
+      "slot": 2,
+      "x": 5,
+      "z": 2,
+      "sink": 0.3,
+      "yaw": 0,
+      "desk": [
+       5,
+       3
+      ],
+      "monitor": [
+       5,
+       1,
+       3
+      ]
+     },
+     {
+      "slot": 3,
+      "x": 6,
+      "z": 2,
+      "sink": 0.3,
+      "yaw": 0,
+      "desk": [
+       6,
+       3
+      ],
+      "monitor": [
+       6,
+       1,
+       3
+      ]
+     },
+     {
+      "slot": 4,
+      "x": 3,
+      "z": 5,
+      "sink": 0.3,
+      "yaw": 180,
+      "desk": [
+       3,
+       4
+      ],
+      "monitor": [
+       3,
+       1,
+       4
+      ]
+     },
+     {
+      "slot": 5,
+      "x": 4,
+      "z": 5,
+      "sink": 0.3,
+      "yaw": 180,
+      "desk": [
+       4,
+       4
+      ],
+      "monitor": [
+       4,
+       1,
+       4
+      ]
+     },
+     {
+      "slot": 6,
+      "x": 5,
+      "z": 5,
+      "sink": 0.3,
+      "yaw": 180,
+      "desk": [
+       5,
+       4
+      ],
+      "monitor": [
+       5,
+       1,
+       4
+      ]
+     },
+     {
+      "slot": 7,
+      "x": 6,
+      "z": 5,
+      "sink": 0.3,
+      "yaw": 180,
+      "desk": [
+       6,
+       4
+      ],
+      "monitor": [
+       6,
+       1,
+       4
+      ]
+     }
+    ],
+    "needsYou": [
+     {
+      "x": 2,
+      "z": 11,
+      "sink": 0,
+      "yaw": 90
+     },
+     {
+      "x": 2,
+      "z": 12,
+      "sink": 0,
+      "yaw": 90
+     },
+     {
+      "x": 2,
+      "z": 10,
+      "sink": 0,
+      "yaw": 90
+     },
+     {
+      "x": 3,
+      "z": 11,
+      "sink": 0,
+      "yaw": 90
+     },
+     {
+      "x": 3,
+      "z": 12,
+      "sink": 0,
+      "yaw": 90
+     },
+     {
+      "x": 3,
+      "z": 10,
+      "sink": 0,
+      "yaw": 90
+     },
+     {
+      "x": 4,
+      "z": 11,
+      "sink": 0,
+      "yaw": 90
+     },
+     {
+      "x": 4,
+      "z": 12,
+      "sink": 0,
+      "yaw": 90
+     }
+    ],
+    "lounge": [
+     {
+      "x": 10,
+      "z": 12,
+      "sink": 0.3,
+      "yaw": 0
+     },
+     {
+      "x": 9,
+      "z": 12,
+      "sink": 0.3,
+      "yaw": 0
+     },
+     {
+      "x": 11,
+      "z": 12,
+      "sink": 0.3,
+      "yaw": 0
+     },
+     {
+      "x": 8,
+      "z": 12,
+      "sink": 0.3,
+      "yaw": 0
+     },
+     {
+      "x": 12,
+      "z": 12,
+      "sink": 0.3,
+      "yaw": 0
+     },
+     {
+      "x": 7,
+      "z": 14,
+      "sink": 0.3,
+      "yaw": -90
+     },
+     {
+      "x": 14,
+      "z": 13,
+      "sink": 0.3,
+      "yaw": 90
+     },
+     {
+      "x": 7,
+      "z": 13,
+      "sink": 0.3,
+      "yaw": -90
+     }
+    ],
+    "loungeOverflow": [
+     {
+      "x": 7,
+      "z": 15,
+      "sink": 0.3,
+      "yaw": -90
+     },
+     {
+      "x": 14,
+      "z": 15,
+      "sink": 0.3,
+      "yaw": 90
+     },
+     {
+      "x": 21,
+      "z": 13,
+      "sink": 0.3,
+      "yaw": 90
+     },
+     {
+      "x": 19,
+      "z": 16,
+      "sink": 0.3,
+      "yaw": 0
+     },
+     {
+      "x": 13,
+      "z": 4,
+      "sink": 0,
+      "yaw": 180
+     },
+     {
+      "x": 14,
+      "z": 4,
+      "sink": 0,
+      "yaw": 180
+     },
+     {
+      "x": 1,
+      "z": 17,
+      "sink": 0.45,
+      "yaw": 180
+     },
+     {
+      "x": 3,
+      "z": 17,
+      "sink": 0.45,
+      "yaw": 180
+     }
+    ],
+    "fridge": {
+     "x": 16,
+     "z": 1,
+     "sink": 0,
+     "yaw": 180
+    },
+    "whiteboard": {
+     "board": [
+      0,
+      1,
+      10,
+      0,
+      2,
+      12
+     ],
+     "signs": {
+      "left": [
+       1,
+       2,
+       12
+      ],
+      "middle": [
+       1,
+       2,
+       11
+      ],
+      "right": [
+       1,
+       2,
+       10
+      ],
+      "row2": [
+       [
+        1,
+        1,
+        12
+       ],
+       [
+        1,
+        1,
+        11
+       ],
+       [
+        1,
+        1,
+        10
+       ]
+      ]
+     },
+     "facing": "east"
+    },
+    "lectern": {
+     "block": [
+      18,
+      0,
+      12
+     ],
+     "reader": {
+      "x": 17,
+      "z": 12,
+      "sink": 0,
+      "yaw": -90
+     }
+    },
+    "sign": {
+     "block": [
+      21,
+      2,
+      9
+     ],
+     "facing": "west"
+    },
+    "stairUp": {
+     "bottom": {
+      "x": 20,
+      "z": 1
+     },
+     "firstStep": [
+      20,
+      0,
+      2
+     ],
+     "top": [
+      20,
+      5,
+      7
+     ]
+    },
+    "arrival": {
+     "x": 20,
+     "z": 8,
+     "sink": 0,
+     "yaw": 0
+    }
+   }
+  ],
+  "roof": {
+   "y": 12,
+   "arrival": {
+    "x": 20,
+    "z": 8
+   },
+   "benchSouth": [
+    {
+     "x": 5,
+     "z": 10,
+     "sink": 0.3,
+     "yaw": 0
+    },
+    {
+     "x": 6,
+     "z": 10,
+     "sink": 0.3,
+     "yaw": 0
+    },
+    {
+     "x": 7,
+     "z": 10,
+     "sink": 0.3,
+     "yaw": 0
+    },
+    {
+     "x": 8,
+     "z": 10,
+     "sink": 0.3,
+     "yaw": 0
+    },
+    {
+     "x": 9,
+     "z": 10,
+     "sink": 0.3,
+     "yaw": 0
+    }
+   ],
+   "benchNorth": [
+    {
+     "x": 5,
+     "z": 14,
+     "sink": 0.3,
+     "yaw": 180
+    },
+    {
+     "x": 6,
+     "z": 14,
+     "sink": 0.3,
+     "yaw": 180
+    },
+    {
+     "x": 7,
+     "z": 14,
+     "sink": 0.3,
+     "yaw": 180
+    },
+    {
+     "x": 8,
+     "z": 14,
+     "sink": 0.3,
+     "yaw": 180
+    },
+    {
+     "x": 9,
+     "z": 14,
+     "sink": 0.3,
+     "yaw": 180
+    }
+   ]
+  },
+  "exterior": {
+   "sign": [
+    19,
+    2,
+    -2
+   ],
+   "door": [
+    17,
+    0,
+    -1
+   ],
+   "path": [
+    16,
+    -1,
+    -6,
+    19,
+    -1,
+    -2
+   ]
+  }
+ },
+ "lamps": [
+  {
+   "floor": 0,
+   "x": 3,
+   "y": 3,
+   "z": 3,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 0,
+   "x": 3,
+   "y": 3,
+   "z": 4,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 0,
+   "x": 4,
+   "y": 3,
+   "z": 3,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 0,
+   "x": 4,
+   "y": 3,
+   "z": 4,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 0,
+   "x": 5,
+   "y": 3,
+   "z": 3,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 0,
+   "x": 5,
+   "y": 3,
+   "z": 4,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 0,
+   "x": 6,
+   "y": 3,
+   "z": 3,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 0,
+   "x": 6,
+   "y": 3,
+   "z": 4,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 0,
+   "x": 13,
+   "y": 3,
+   "z": 3,
+   "day": "iron_chain[axis=y]",
+   "night": "lantern[hanging=true]",
+   "kind": "island lantern"
+  },
+  {
+   "floor": 0,
+   "x": 14,
+   "y": 3,
+   "z": 3,
+   "day": "iron_chain[axis=y]",
+   "night": "lantern[hanging=true]",
+   "kind": "island lantern"
+  },
+  {
+   "floor": 0,
+   "x": 1,
+   "y": 3,
+   "z": 11,
+   "day": "air",
+   "night": "end_rod[facing=east]",
+   "kind": "whiteboard picture light"
+  },
+  {
+   "floor": 0,
+   "x": 9,
+   "y": 1,
+   "z": 14,
+   "day": "white_candle[candles=3,lit=false]",
+   "night": "white_candle[candles=3,lit=true]",
+   "kind": "candles"
+  },
+  {
+   "floor": 0,
+   "x": 11,
+   "y": 1,
+   "z": 14,
+   "day": "yellow_candle[candles=2,lit=false]",
+   "night": "yellow_candle[candles=2,lit=true]",
+   "kind": "candles"
+  },
+  {
+   "floor": 0,
+   "x": 10,
+   "y": 3,
+   "z": 14,
+   "day": "white_wool",
+   "night": "shroomlight",
+   "kind": "lounge pendant"
+  },
+  {
+   "floor": 0,
+   "x": 14,
+   "y": 2,
+   "z": 14,
+   "day": "white_wool",
+   "night": "shroomlight",
+   "kind": "floor lamp"
+  },
+  {
+   "floor": 0,
+   "x": 18,
+   "y": 3,
+   "z": 12,
+   "day": "white_wool",
+   "night": "shroomlight",
+   "kind": "lectern pendant"
+  },
+  {
+   "floor": 1,
+   "x": 3,
+   "y": 9,
+   "z": 3,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 1,
+   "x": 3,
+   "y": 9,
+   "z": 4,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 1,
+   "x": 4,
+   "y": 9,
+   "z": 3,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 1,
+   "x": 4,
+   "y": 9,
+   "z": 4,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 1,
+   "x": 5,
+   "y": 9,
+   "z": 3,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 1,
+   "x": 5,
+   "y": 9,
+   "z": 4,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 1,
+   "x": 6,
+   "y": 9,
+   "z": 3,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 1,
+   "x": 6,
+   "y": 9,
+   "z": 4,
+   "day": "iron_chain[axis=x]",
+   "night": "end_rod[facing=east]",
+   "kind": "desk bar"
+  },
+  {
+   "floor": 1,
+   "x": 13,
+   "y": 9,
+   "z": 3,
+   "day": "iron_chain[axis=y]",
+   "night": "lantern[hanging=true]",
+   "kind": "island lantern"
+  },
+  {
+   "floor": 1,
+   "x": 14,
+   "y": 9,
+   "z": 3,
+   "day": "iron_chain[axis=y]",
+   "night": "lantern[hanging=true]",
+   "kind": "island lantern"
+  },
+  {
+   "floor": 1,
+   "x": 1,
+   "y": 9,
+   "z": 11,
+   "day": "air",
+   "night": "end_rod[facing=east]",
+   "kind": "whiteboard picture light"
+  },
+  {
+   "floor": 1,
+   "x": 9,
+   "y": 7,
+   "z": 14,
+   "day": "white_candle[candles=3,lit=false]",
+   "night": "white_candle[candles=3,lit=true]",
+   "kind": "candles"
+  },
+  {
+   "floor": 1,
+   "x": 11,
+   "y": 7,
+   "z": 14,
+   "day": "yellow_candle[candles=2,lit=false]",
+   "night": "yellow_candle[candles=2,lit=true]",
+   "kind": "candles"
+  },
+  {
+   "floor": 1,
+   "x": 10,
+   "y": 9,
+   "z": 14,
+   "day": "white_wool",
+   "night": "shroomlight",
+   "kind": "lounge pendant"
+  },
+  {
+   "floor": 1,
+   "x": 14,
+   "y": 8,
+   "z": 14,
+   "day": "white_wool",
+   "night": "shroomlight",
+   "kind": "floor lamp"
+  },
+  {
+   "floor": 1,
+   "x": 18,
+   "y": 9,
+   "z": 12,
+   "day": "white_wool",
+   "night": "shroomlight",
+   "kind": "lectern pendant"
+  },
+  {
+   "floor": "roof",
+   "x": 5,
+   "y": 14,
+   "z": 12,
+   "day": "air",
+   "night": "lantern[hanging=true]",
+   "kind": "pergola lantern"
+  },
+  {
+   "floor": "roof",
+   "x": 7,
+   "y": 14,
+   "z": 12,
+   "day": "air",
+   "night": "lantern[hanging=true]",
+   "kind": "pergola lantern"
+  },
+  {
+   "floor": "roof",
+   "x": 9,
+   "y": 14,
+   "z": 12,
+   "day": "air",
+   "night": "lantern[hanging=true]",
+   "kind": "pergola lantern"
+  },
+  {
+   "floor": "roof",
+   "x": 14,
+   "y": 13,
+   "z": 5,
+   "day": "air",
+   "night": "lantern[hanging=false]",
+   "kind": "table lantern"
+  },
+  {
+   "floor": 0,
+   "x": 17,
+   "y": 3,
+   "z": -2,
+   "day": "air",
+   "night": "lantern[hanging=true]",
+   "kind": "entry lantern"
+  },
+  {
+   "floor": 0,
+   "x": 18,
+   "y": 3,
+   "z": -2,
+   "day": "air",
+   "night": "lantern[hanging=true]",
+   "kind": "entry lantern"
+  }
+ ]
+}

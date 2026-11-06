@@ -1,12 +1,14 @@
 # Your first T3 Craft session
 
+> Written for the 0.5.0 release (legacy pairing flow). The 0.6 flow is simpler: install the modpack in the official Minecraft Launcher, launch, done. See the [README](../README.md#-get-it).
+
 This is an early Fabric mod, not a replacement for T3 Code. Use a disposable Minecraft world for your first try. Office construction changes blocks and requires command permission.
 
 ## Before you start
 
 - Minecraft Java 26.3, Fabric Loader 0.19.5+, Fabric API for 26.3, and the [0.5.0 release jar](https://github.com/alexandros-lekkas/t3craft/releases/tag/v0.5.0).
 - A running T3 Code environment with Settings → Connections. T3's client protocol may change; the README records the tested nightly versions.
-- For Prism, select Java 25 for the 26.3 profile. Keep your existing launcher profiles and worlds intact.
+- Use the official Minecraft Launcher with the dedicated T3 Craft installation and Java 25. Keep existing worlds intact.
 
 ## The useful first five minutes
 

@@ -20,7 +20,7 @@ Draft copy for the T3 Craft project page on Modrinth. Nothing here is published 
 | Primary category | Utility |
 | Additional categories | Management, Social |
 | Icon | `src/main/resources/assets/t3craft/icon.png` (128x128). Modrinth accepts it; a 512x512 export of `scripts/icon-1024.png` looks sharper. |
-| Gallery | `docs/panel.jpg`, `docs/agent-build.jpg`, `docs/approval.jpg`, `docs/done-ping.jpg`, plus the demo GIF below |
+| Gallery | `docs/images/ingame-approval-0.5.jpg`, `docs/images/ingame-agent-build.jpg`, `docs/images/ingame-approval-0.5.jpg`, `docs/images/ingame-done-ping.jpg`, plus the demo GIF below |
 
 ### First version
 
@@ -40,7 +40,7 @@ Draft copy for the T3 Craft project page on Modrinth. Nothing here is published 
 ```markdown
 **T3 Craft puts [T3 Code](https://t3.codes) inside Minecraft.** Send a prompt to your coding agent, go back to mining, and get one ping when it finishes, needs an approval, or has a question. Approve commands and answer questions without leaving the game. Agents can even see and build in your world.
 
-![The T3 panel in Minecraft](https://raw.githubusercontent.com/alexandros-lekkas/t3craft/main/docs/panel.jpg)
+![The T3 panel in Minecraft](https://raw.githubusercontent.com/alexandros-lekkas/t3craft/main/docs/images/ingame-approval-0.5.jpg)
 
 > You need T3 Code running on a machine you control (your laptop, a home server). T3 Craft talks to it the same way the T3 mobile app does. Verified against **T3 Code nightly 0.0.46-nightly.20261004.2644**; legacy (protocol 1) servers are also supported.
 

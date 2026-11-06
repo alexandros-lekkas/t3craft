@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Questions and show-and-tell
+    url: https://github.com/alexandros-lekkas/t3craft/discussions
+    about: Ask questions and share your office builds and clips here.
+  - name: 🔒 Security issue
+    url: https://github.com/alexandros-lekkas/t3craft/security/advisories/new
+    about: Please report vulnerabilities privately.
+  - name: T3 Code bugs
+    url: https://github.com/pingdotgg/t3code/issues
+    about: Problems in T3 Code itself (not the Minecraft side) go here.

@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T3 World Screens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --page:#16181b; --ink:#e8e6e1; --muted:#9a9790; --accent:#7fc59a; --rule:#2a2d31;
+  --btn:#6d6d6d; --btn-hi:#a9a9a9; --btn-lo:#3b3b3b; --btn-txt:#fff; --hover:#8b9bd6;
+  --mc-grey:#a8a8a8; --mc-dim:#7e7e7e; --green:#55ff55; --red:#ff5555; --yellow:#ffff55;
+}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){ --page:#f1efe9; --ink:#1f2023; --muted:#5f5d58; --rule:#d9d5cc; --accent:#2f7d52; } }
+:root[data-theme="light"]{ --page:#f1efe9; --ink:#1f2023; --muted:#5f5d58; --rule:#d9d5cc; --accent:#2f7d52; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 Inter,system-ui,sans-serif}
+.wrap{max-width:900px;margin:0 auto;padding:28px 16px 60px}
+header h1{font-size:26px;margin:0 0 4px;letter-spacing:-.5px}
+header p{margin:0;color:var(--muted);max-width:640px}
+.nav{display:flex;flex-wrap:wrap;gap:6px;margin:20px 0 10px}
+.nav button{font:600 12px Inter,sans-serif;border:1px solid var(--rule);background:transparent;color:var(--ink);padding:7px 11px;border-radius:6px;cursor:pointer}
+.nav button.on{background:var(--accent);border-color:var(--accent);color:#0d1a12}
+.demo{display:flex;gap:14px;align-items:center;font-size:13px;color:var(--muted);margin-bottom:12px;flex-wrap:wrap}
+.demo label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.caption{color:var(--muted);font-size:13px;margin:10px 2px 0}
+.caption b{color:var(--ink)}
+
+/* ---- Minecraft-ish frame (640×400 logical, scaled) ---- */
+.frame{position:relative;width:100%;aspect-ratio:16/10;overflow:hidden;border-radius:6px;background:#000;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+.screen{position:absolute;left:0;top:0;width:640px;height:400px;transform-origin:0 0;font-family:VT323,monospace;font-size:18px;color:#fff;
+  text-shadow:2px 2px 0 #3f3f3f;image-rendering:pixelated;display:none}
+.screen.on{display:block}
+.dirt{background-color:#2b2016;background-image:
+  linear-gradient(45deg,rgba(0,0,0,.25) 25%,transparent 25%,transparent 75%,rgba(0,0,0,.25) 75%),
+  linear-gradient(45deg,rgba(255,255,255,.04) 25%,transparent 25%,transparent 75%,rgba(255,255,255,.04) 75%);
+  background-size:16px 16px;background-position:0 0,8px 8px}
+.dirt::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.55)}
+.pano{background:linear-gradient(#7fb0e8 0%,#b9d6f2 45%,#6c9a4b 46%,#4d7a35 70%,#3b5e2a 100%)}
+.pano::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 30%,transparent 40%,rgba(0,0,0,.35))}
+.layer{position:absolute;inset:0;z-index:1}
+.title{position:absolute;top:14px;width:100%;text-align:center;font-size:20px}
+.band{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.25)}
+.band.top{top:40px}.band.bot{bottom:44px}
+.inner{position:absolute;left:0;right:0;top:41px;bottom:45px;background:rgba(0,0,0,.35)}
+
+.mcbtn{position:absolute;height:20px;background:var(--btn);border:1px solid #000;box-shadow:inset 1px 1px 0 var(--btn-hi),inset -1px -2px 0 var(--btn-lo);
+  color:var(--btn-txt);text-align:center;line-height:18px;font:18px VT323,monospace;text-shadow:2px 2px 0 #3f3f3f;cursor:pointer;padding:0 4px;white-space:nowrap;overflow:hidden}
+.mcbtn:hover,.mcbtn:focus-visible{outline:none;border-color:#fff}
+.mcbtn.primary{border-color:#fff}
+.mcbtn.off{color:#a0a0a0;background:#4a4a4a;box-shadow:none;cursor:default}
+.mcbtn.link{background:none;border:none;box-shadow:none;color:var(--mc-grey);text-decoration:underline;text-align:left;padding:0}
+.mcbtn.link:hover{color:#fff}
+.edit{position:absolute;height:20px;background:#000;border:1px solid #a0a0a0;padding:0 4px;line-height:18px;color:#e0e0e0;font:18px VT323,monospace}
+.edit.focus{border-color:#fff}
+.edit .hint{color:#707070}
+.lbl{position:absolute;color:var(--mc-grey);font-size:17px}
+.desc{position:absolute;color:var(--mc-dim);font-size:16px;line-height:15px;text-shadow:1px 1px 0 #222}
+.cb{position:absolute;display:flex;gap:6px;align-items:center;cursor:pointer;font-size:18px}
+.cb i{width:17px;height:17px;background:#000;border:1px solid #a0a0a0;display:inline-block;position:relative;flex:none}
+.cb.on i::after{content:"";position:absolute;left:4px;top:0px;width:5px;height:10px;border:solid #fff;border-width:0 3px 3px 0;transform:rotate(40deg)}
+.cb:hover i{border-color:#fff}
+.status{position:absolute;font-size:17px}
+.dot{color:var(--green)} .dotoff{color:#888}
+.tip{position:absolute;background:#100010f0;border:1px solid #2a0a5e;outline:1px solid #100010;padding:3px 6px;font-size:16px;line-height:15px;z-index:5;max-width:220px}
+.logo{position:absolute;top:44px;width:100%;text-align:center;font-size:44px;letter-spacing:4px;color:#ddd;text-shadow:3px 3px 0 #333}
+.logo small{display:block;font-size:16px;letter-spacing:2px;color:#ffff55;transform:rotate(-8deg);position:absolute;right:150px;top:52px}
+.ver{position:absolute;left:3px;bottom:2px;font-size:16px}
+.copy{position:absolute;right:3px;bottom:2px;font-size:16px}
+.err{color:var(--red)} .ok{color:var(--green)}
+.tabs{position:absolute;top:0;left:0;right:0;height:24px;display:flex;justify-content:center;gap:0}
+.tab{width:130px;height:24px;background:#555;border:1px solid #000;box-shadow:inset 1px 1px 0 #888;text-align:center;line-height:22px}
+.tab.sel{background:#7a7a7a;border-bottom-color:#7a7a7a}
+.banner{position:absolute;left:150px;right:150px;top:34px;height:22px;background:#1d3b2a;border:1px solid #55c27f;color:#c8f5d8;line-height:20px;padding:0 6px;font-size:17px;text-shadow:1px 1px 0 #0b1a11}
+/* world scene */
+.sky{position:absolute;inset:0;background:linear-gradient(#8cc2ff,#cfe6ff 60%,#e9f3ff)}
+.sun{position:absolute;right:120px;top:40px;width:34px;height:34px;background:#fff6c0;box-shadow:0 0 30px #fff6c0}
+.hill{position:absolute;left:-40px;right:-40px;bottom:0;height:160px;background:#5f9a3e;border-top:10px solid #79b84f}
+.water{position:absolute;right:0;bottom:120px;width:240px;height:50px;background:#3f76e4;opacity:.85}
+.plaza{position:absolute;left:150px;right:150px;bottom:0;height:70px;background:#b8b8b4;border-top:3px solid #d6d6d2;transform:perspective(300px) rotateX(35deg);transform-origin:bottom}
+.bldg{position:absolute;left:200px;width:240px;bottom:90px;height:170px;background:#eef3f2;border:3px solid #c9d3d1}
+.bldg .glass{position:absolute;left:10px;right:10px;height:42px;background:linear-gradient(135deg,#b7dfe3,#8fc6cf);border:2px solid #d8e3e1}
+.bldg .g1{top:12px}.bldg .g2{top:68px}
+.bldg .door{position:absolute;left:104px;bottom:0;width:32px;height:44px;background:#3a2a1a;border:2px solid #1d150d}
+.roof{position:absolute;left:192px;width:256px;bottom:258px;height:14px;background:#8fe0c4;border:2px solid #6cc0a5}
+.plant{position:absolute;bottom:272px;width:26px;height:12px;background:#73c66a}
+.sign{position:absolute;left:258px;bottom:225px;width:124px;height:20px;background:#c9a76b;border:2px solid #7a5d2c;color:#2b1d08;font-size:15px;text-align:center;line-height:16px;text-shadow:none}
+.villager{position:absolute;width:10px;height:22px;background:#8a6b50;bottom:96px}
+.villager::before{content:"";position:absolute;top:-10px;left:-1px;width:12px;height:11px;background:#c49a76}
+.nametag{position:absolute;bottom:128px;background:rgba(0,0,0,.35);padding:0 3px;font-size:14px;text-shadow:none;white-space:nowrap}
+.cross{position:absolute;left:316px;top:196px;width:9px;height:9px}
+.cross::before,.cross::after{content:"";position:absolute;background:#fff;mix-blend-mode:difference}
+.cross::before{left:4px;top:0;width:1px;height:9px}.cross::after{top:4px;left:0;width:9px;height:1px}
+.hotbar{position:absolute;bottom:4px;left:229px;width:182px;height:22px;background:rgba(0,0,0,.45);border:2px solid #555;display:flex}
+.hotbar span{flex:1;border-right:1px solid #444}
+.hotbar span.sel{outline:2px solid #fff}
+.toast{position:absolute;right:6px;top:6px;width:200px;background:#212121;border:2px solid #000;box-shadow:inset 0 0 0 1px #555;padding:5px 7px;font-size:16px;line-height:15px;z-index:3}
+.toast b{color:#ffff55;font-weight:normal;display:block;margin-bottom:2px}
+.hud{position:absolute;left:4px;top:4px;font-size:16px;background:rgba(0,0,0,.35);padding:1px 4px}
+.note{position:absolute;left:8px;bottom:30px;font-size:15px;color:#fff;background:rgba(0,0,0,.45);padding:2px 5px}
+.flow{border:1px solid var(--rule);border-radius:8px;padding:14px 16px;margin-top:26px}
+.flow h2{font-size:16px;margin:0 0 6px}
+.flow ol{margin:0;padding-left:20px;color:var(--muted)}
+.flow ol b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>T3 World: screen mockups</h1>
+    <p>Vanilla-styled screens for "Create T3 Craft World" and the first arrival. Copy matches <code>t3-world-spec.md</code>. Seed names are placeholders until the seed list lands.</p>
+  </header>
+
+  <div class="nav" id="nav"></div>
+  <div class="demo">
+    <label><input type="checkbox" id="paired" checked> Demo state: a T3 machine is already paired</label>
+    <label><input type="checkbox" id="hasWorld"> Demo state: a T3 world already exists</label>
+  </div>
+
+  <div class="frame" id="frame">
+    <!-- 1 Title -->
+    <div class="screen pano" data-id="title" data-name="1 · Title screen">
+      <div class="layer">
+        <div class="logo">[ title logo ]<small>Agents included!</small></div>
+        <div class="mcbtn" style="left:220px;top:166px;width:98px">Singleplayer</div>
+        <div class="mcbtn primary" style="left:322px;top:166px;width:98px" data-go="t3world" id="titleT3">T3 World</div>
+        <div class="tip" style="left:426px;top:160px;">Your world with your agents in it. Office at spawn, ready to go.</div>
+        <div class="mcbtn" style="left:220px;top:190px;width:200px">Multiplayer</div>
+        <div class="mcbtn" style="left:220px;top:214px;width:200px">Minecraft Realms</div>
+        <div class="mcbtn" style="left:220px;top:250px;width:98px">Options...</div>
+        <div class="mcbtn" style="left:322px;top:250px;width:98px">Quit Game</div>
+        <div class="ver">Minecraft 26.3 (Fabric)</div><div class="copy">T3 Craft 0.6.0</div>
+      </div>
+    </div>
+
+    <!-- 2 Hub -->
+    <div class="screen dirt" data-id="hub" data-name="2 · T3 World hub">
+      <div class="layer">
+        <div class="title">T3 World</div>
+        <div class="mcbtn primary" style="left:220px;top:150px;width:200px" data-go="load">Continue: Harbor HQ</div>
+        <div class="desc" style="left:220px;top:174px;width:200px;text-align:center">Last played 2 hours ago · 2 machines · Creative</div>
+        <div class="mcbtn" style="left:220px;top:206px;width:200px" data-go="page1">New T3 World</div>
+        <div class="mcbtn" style="left:270px;top:352px;width:100px" data-go="title">Back</div>
+      </div>
+    </div>
+
+    <!-- 3 Page 1 -->
+    <div class="screen dirt" data-id="page1" data-name="3 · New T3 World">
+      <div class="layer">
+        <div class="title">New T3 World</div><div class="band top"></div><div class="inner"></div><div class="band bot"></div>
+        <div class="lbl" style="left:165px;top:48px">World Name</div>
+        <div class="edit focus" style="left:165px;top:64px;width:310px">T3 World<span style="animation:blink 1s steps(1) infinite">_</span></div>
+
+        <div class="mcbtn" style="left:165px;top:92px;width:310px" id="placeBtn">Place: Harbor Hill</div>
+        <div class="desc" style="left:165px;top:114px;width:310px" id="placeDesc"></div>
+        <div class="edit" style="left:165px;top:130px;width:310px;display:none" id="seedBox"><span class="hint">Seed (number or text)</span></div>
+
+        <div class="mcbtn" style="left:165px;top:142px;width:310px" id="modeBtn">Game Mode: Creative</div>
+        <div class="desc" style="left:165px;top:164px;width:310px" id="modeDesc"></div>
+
+        <div class="cb on" style="left:165px;top:186px" data-cb>  <i></i>Build my office at spawn</div>
+        <div class="desc" style="left:188px;top:205px;width:290px">Your agents' office is waiting when you arrive. One floor per paired machine; new machines add a floor.</div>
+
+        <div class="cb on" style="left:165px;top:238px" data-cb><i></i>My agents can build for me</div>
+        <div class="desc" style="left:188px;top:257px;width:290px">Agents on this computer can run commands in your worlds through T3 Craft. Every command shows in chat. /t3 agent-build off to stop.</div>
+
+        <div class="status" style="left:165px;top:292px;width:310px" id="pairStatus"></div>
+        <div class="desc" style="left:165px;top:318px;width:310px;color:#5f5f5f">Cheats are on so your agents can build. Change anything later in More options or with /gamerule.</div>
+
+        <div class="mcbtn link" style="left:8px;top:367px;width:110px" data-go="vanilla">More options…</div>
+        <div class="mcbtn primary" style="left:165px;top:364px;width:153px" id="createBtn">Create T3 World</div>
+        <div class="mcbtn" style="left:322px;top:364px;width:153px" data-go="back1">Cancel</div>
+      </div>
+    </div>
+
+    <!-- 4 Page 2 -->
+    <div class="screen dirt" data-id="page2" data-name="4 · Connect your agents">
+      <div class="layer">
+        <div class="title">Connect your agents</div><div class="band top"></div><div class="inner"></div><div class="band bot"></div>
+        <div class="desc" style="left:165px;top:54px;width:310px;color:#bdbdbd;font-size:17px;line-height:16px">Your agents live on a T3 machine. In T3 Code, open Settings → Connections and create a pairing link, then paste it here. The link stays private: it is hidden on screen and never goes to chat.</div>
+        <div class="lbl" style="left:165px;top:124px">Pairing link</div>
+        <div class="edit focus" style="left:165px;top:140px;width:310px" id="linkBox"><span class="hint">Paste your T3 pairing link</span></div>
+        <div class="mcbtn" style="left:165px;top:166px;width:100px" id="pasteBtn">Paste link</div>
+        <div class="lbl" style="left:165px;top:196px">Machine name (optional)</div>
+        <div class="edit" style="left:165px;top:212px;width:310px"><span class="hint">e.g. MacBook Pro</span></div>
+        <div class="status" style="left:165px;top:240px;width:310px" id="pairMsg"></div>
+        <div class="desc" style="left:165px;top:280px;width:200px">Agents reach this world at 127.0.0.1:25590/mcp</div>
+        <div class="mcbtn" style="left:345px;top:276px;width:130px" id="copyMcp">Copy Claude Code setup</div>
+        <div class="mcbtn link" style="left:8px;top:367px;width:60px" data-go="page1">Back</div>
+        <div class="mcbtn off" style="left:165px;top:364px;width:153px" id="pairBtn">Pair &amp; create world</div>
+        <div class="mcbtn" style="left:322px;top:364px;width:153px" data-go="loadSkip">Skip for now</div>
+      </div>
+    </div>
+
+    <!-- 5 Vanilla Create World with banner -->
+    <div class="screen dirt" data-id="vanilla" data-name="5 · More options (vanilla, prefilled)">
+      <div class="layer">
+        <div class="tabs"><div class="tab sel">Game</div><div class="tab">World</div><div class="tab">More</div></div>
+        <div class="banner" id="banner">T3 Craft: your office and agents will be set up in this world.</div>
+        <div class="mcbtn" style="left:494px;top:35px;width:100px" id="plainBtn">✕ Plain world</div>
+        <div class="lbl" style="left:165px;top:72px">World Name</div>
+        <div class="edit" style="left:165px;top:88px;width:310px">T3 World</div>
+        <div class="mcbtn" style="left:165px;top:120px;width:310px">Game Mode: Creative</div>
+        <div class="mcbtn" style="left:165px;top:146px;width:310px">Difficulty: Peaceful</div>
+        <div class="mcbtn" style="left:165px;top:172px;width:310px">Allow Commands: ON</div>
+        <div class="desc" style="left:165px;top:196px;width:310px">Seed, game rules and data packs are prefilled with T3 defaults in the World and More tabs.</div>
+        <div class="mcbtn primary" style="left:165px;top:364px;width:153px" data-go="load">Create New World</div>
+        <div class="mcbtn" style="left:322px;top:364px;width:153px" data-go="page1">Cancel</div>
+      </div>
+    </div>
+
+    <!-- 6 Loading -->
+    <div class="screen dirt" data-id="load" data-name="6 · Creating (setup runs here)">
+      <div class="layer">
+        <div class="title" style="top:150px">Preparing your office…</div>
+        <div style="position:absolute;left:220px;top:190px;width:200px;height:6px;background:#333;border:1px solid #777"><div id="bar" style="height:100%;width:0;background:#55ff55"></div></div>
+        <div class="desc" style="left:160px;top:210px;width:320px;text-align:center" id="loadStep">Finding a flat, dry spot with a view…</div>
+      </div>
+    </div>
+
+    <!-- 7 Arrival -->
+    <div class="screen" data-id="arrive" data-name="7 · First arrival">
+      <div class="sky"></div><div class="sun"></div><div class="water"></div><div class="hill"></div>
+      <div class="roof"></div><div class="plant" style="left:220px"></div><div class="plant" style="left:394px"></div>
+      <div class="bldg"><div class="glass g1"></div><div class="glass g2"></div><div class="door"></div></div>
+      <div class="sign" id="lobbySign">Lobby · 2 floors</div>
+      <div class="plaza"></div>
+      <div class="villager" style="left:290px"></div><div class="nametag" style="left:262px">fix-auth · Working</div>
+      <div class="villager" style="left:360px"></div><div class="nametag" style="left:336px;color:#ffff55">Needs you: npm test</div>
+      <div class="cross"></div>
+      <div class="hud" id="hudLine">fix-auth · Working 0m 12s · editing auth.ts</div>
+      <div class="toast" id="toast"><b>Welcome to T3 World</b><span id="toastBody">Your office is right ahead. Press ` to talk to your agents.</span></div>
+      <div class="hotbar"><span class="sel"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <div class="note">You spawn on the plaza, facing the door. Spawn radius 0.</div>
+    </div>
+  </div>
+  <p class="caption" id="cap"></p>
+
+  <div class="flow">
+    <h2>Clicks to a playing world</h2>
+    <ol>
+      <li><b>Paired:</b> T3 World → Create T3 World (2 clicks, or Enter twice).</li>
+      <li><b>Unpaired:</b> T3 World → Next: Connect agents → Paste link → Pair &amp; create world (4), or Skip for now (3).</li>
+      <li><b>Returning:</b> T3 World → Continue (2).</li>
+      <li>No confirmation dialogs anywhere. ✕ Plain world and Skip for now are one click and take effect immediately.</li>
+    </ol>
+  </div>
+</div>
+
+<style>@keyframes blink{50%{opacity:0}}</style>
+<script>
+const seeds=[
+  {name:"Harbor Hill",blurb:"Grassy rise over a quiet bay. Office faces the sunset."},
+  {name:"Cherry Ridge",blurb:"Cherry grove above a river valley. Office faces east."},
+  {name:"Meadow Point",blurb:"Flat meadow at a lake's edge. Office faces the water."},
+  {name:"Surprise me",blurb:"A random world. Your office finds a flat, dry spot near spawn."},
+  {name:"Custom seed",blurb:"Your office finds a flat, dry spot near spawn.",custom:true}
+];
+const modes=[{n:"Creative",d:"Fly and build freely. Peaceful, so nothing wanders into the office."},
+             {n:"Survival",d:"Day and night, mobs, hunger. You keep your inventory when you die."}];
+let si=0,mi=0,linked=false,officeOn=true;
+const $=id=>document.getElementById(id);
+const screens=[...document.querySelectorAll('.screen')];
+const nav=$('nav');
+screens.forEach(s=>{const b=document.createElement('button');b.textContent=s.dataset.name;b.onclick=()=>show(s.dataset.id);b.dataset.id=s.dataset.id;nav.appendChild(b);});
+function fit(){const w=$('frame').clientWidth;screens.forEach(s=>s.style.transform=`scale(${w/640})`);}
+addEventListener('resize',fit);
+let timer;
+function show(id){
+  clearInterval(timer);
+  screens.forEach(s=>s.classList.toggle('on',s.dataset.id===id));
+  [...nav.children].forEach(b=>b.classList.toggle('on',b.dataset.id===id));
+  const s=screens.find(s=>s.dataset.id===id);
+  $('cap').innerHTML=captions[id]||'';
+  if(id==='page1')render1();
+  if(id==='load')runLoad();
+  if(id==='arrive')renderArrive();
+}
+const captions={
+  title:'<b>TitleScreen</b>, via <code>ScreenEvents.AFTER_INIT</code>: Singleplayer shrinks to 98 px and <b>T3 World</b> takes the other half of the row. No other button moves.',
+  hub:'Shown only when a T3 world exists. Enter = Continue, which loads straight in.',
+  page1:'<b>T3WorldScreen</b>, page 1. Vanilla widgets only (EditBox, CycleButton, Checkbox). Click the Place and Game Mode buttons to cycle. With a machine paired, the primary button creates the world through <code>WorldOpenFlows.createFreshLevel</code>.',
+  page2:'Only when nothing is paired. Reuses the private <code>PrivateLink</code> field from T3ConnectionsScreen, so the link is hidden and never in chat. Try Paste link.',
+  vanilla:'"More options…" opens the vanilla Create World screen with <code>WorldCreationUiState</code> prefilled and a T3 banner. ✕ Plain world drops the T3 setup in one click.',
+  load:'Setup runs in <code>SERVER_STARTED</code> on the integrated server, behind the vanilla progress screen. It finds or validates the site, places lobby + floors + roof, sets spawn and sets the weather.',
+  arrive:'First join: the player is on the plaza facing the door, residents walk in, and a single welcome toast appears.'
+};
+function render1(){
+  const p=seeds[si];$('placeBtn').textContent='Place: '+p.name;$('placeDesc').textContent=p.blurb;
+  $('seedBox').style.display=p.custom?'block':'none';
+  $('placeDesc').style.top=p.custom?'114px':'114px';
+  const m=modes[mi];$('modeBtn').textContent='Game Mode: '+m.n;$('modeDesc').textContent=m.d;
+  // shift mode block when custom seed box shows
+  const off=p.custom?16:0;
+  $('modeBtn').style.top=(142+off)+'px';$('modeDesc').style.top=(164+off)+'px';
+  const paired=$('paired').checked;
+  $('pairStatus').innerHTML=paired?'<span class="dot">●</span> T3: MacBook Pro, home-server':'<span class="dotoff">○</span> <span style="color:#a0a0a0">No T3 machine paired yet. You can pair on the next step.</span>';
+  $('createBtn').textContent=paired?'Create T3 World':'Next: Connect agents';
+}
+$('placeBtn').onclick=()=>{si=(si+1)%seeds.length;render1();};
+$('modeBtn').onclick=()=>{mi=(mi+1)%modes.length;render1();};
+document.querySelectorAll('[data-cb]').forEach((c,i)=>c.onclick=()=>{c.classList.toggle('on');if(i===0)officeOn=c.classList.contains('on');});
+$('createBtn').onclick=()=>show($('paired').checked?'load':'page2');
+$('paired').onchange=()=>{const on=screens.find(s=>s.classList.contains('on'));if(on.dataset.id==='page1')render1();};
+$('pasteBtn').onclick=()=>{linked=true;$('linkBox').innerHTML='••••••••••••••••••••••••••';$('pairBtn').classList.remove('off');$('pairBtn').classList.add('primary');};
+$('pairBtn').onclick=()=>{if(!linked)return;$('pairMsg').innerHTML='Pairing…';setTimeout(()=>{$('pairMsg').innerHTML='<span class="ok">Paired with MacBook Pro. Creating your world…</span>';$('paired').checked=true;setTimeout(()=>show('load'),900);},800);};
+$('copyMcp').onclick=()=>{$('copyMcp').textContent='Copied';setTimeout(()=>$('copyMcp').textContent='Copy Claude Code setup',1200);};
+$('plainBtn').onclick=()=>{const b=$('banner');const plain=b.dataset.plain==='1';b.dataset.plain=plain?'0':'1';
+  b.textContent=plain?'T3 Craft: your office and agents will be set up in this world.':'Plain world: no T3 office or setup. (Click again to restore.)';
+  b.style.background=plain?'#1d3b2a':'#333';b.style.borderColor=plain?'#55c27f':'#777';};
+let skipped=false;
+document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>{
+  let g=el.dataset.go;
+  if(g==='t3world')g=$('hasWorld').checked?'hub':'page1';
+  if(g==='back1')g='title';
+  if(g==='loadSkip'){skipped=true;$('paired').checked=false;g='load';}
+  else if(g==='load'){skipped=false;}
+  show(g);
+}));
+function runLoad(){
+  const steps=['Finding a flat, dry spot with a view…','Placing lobby…','Placing floor 1 · MacBook Pro…','Placing roof garden…','Setting spawn on the plaza…'];
+  let t=0;$('bar').style.width='0';
+  timer=setInterval(()=>{t++;$('bar').style.width=Math.min(100,t*20)+'%';$('loadStep').textContent=steps[Math.min(steps.length-1,t)]||'';
+    if(t>=6){clearInterval(timer);show('arrive');}},550);
+}
+function renderArrive(){
+  const paired=$('paired').checked;
+  $('toastBody').textContent=paired?'Your office is right ahead. Press ` to talk to your agents.':'Your office is ready. Press ` to pair a T3 machine and your agents move in.';
+  $('lobbySign').textContent=paired?'Lobby · 2 floors':'Press ` to pair';
+  document.querySelectorAll('[data-id="arrive"] .villager,[data-id="arrive"] .nametag').forEach(e=>e.style.display=paired?'block':'none');
+  $('hudLine').style.display=paired?'block':'none';
+}
+fit();show('title');
+</script>
+</body>
+</html>
