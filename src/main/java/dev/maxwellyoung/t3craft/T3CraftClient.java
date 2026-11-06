@@ -299,18 +299,21 @@ public final class T3CraftClient implements ClientModInitializer {
 
 	/** Sends to the focused thread, or starts a new thread beside it. Runs off-thread; reports back in chat. */
 	public void send(String text, boolean newThread) {
-		send(text, newThread, null);
+		send(text, newThread, null, null);
 	}
 
-	/** {@code model} overrides the thread's model for this turn (and the thread from then on); null keeps it. */
-	public void send(String text, boolean newThread, com.google.gson.JsonObject model) {
+	/**
+	 * {@code model} overrides the thread's model for this turn (and the thread from then on); null keeps it.
+	 * Returns false when nothing was sent; {@code onFailure} runs on the game thread if the request later fails.
+	 */
+	public boolean send(String text, boolean newThread, com.google.gson.JsonObject model, Runnable onFailure) {
 		T3State.Snapshot snapshot = state.snapshot();
 		// A new thread only borrows project and settings, so any recent thread can stand in.
 		T3State.ThreadRow row = snapshot.focusedRow();
 		if (row == null && newThread && !snapshot.threads().isEmpty()) row = snapshot.threads().getFirst();
 		if (row == null) {
 			chat(Component.literal("Pick a thread first (` then click one, or /t3 threads).").withStyle(ChatFormatting.RED));
-			return;
+			return false;
 		}
 		T3State.ThreadRow target = row;
 		// The target's own environment: a thread from the home server goes to the home server.
@@ -324,7 +327,8 @@ public final class T3CraftClient implements ClientModInitializer {
 				api.sendPrompt(target.raw(), text, model);
 				state.watch(target.id());
 			}
-		}, this::reportError);
+		}, e -> { reportError(e); if (onFailure != null) Minecraft.getInstance().execute(onFailure); });
+		return true;
 	}
 
 	public void respond(T3State.Approval approval, String decision) {

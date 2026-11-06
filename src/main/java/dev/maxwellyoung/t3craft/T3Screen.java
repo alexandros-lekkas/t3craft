@@ -82,9 +82,11 @@ final class T3Screen extends Screen {
 		int mainWidth = width - mainX - MARGIN;
 		int composerY = height - MARGIN - 12 - COMPOSER;
 
+		// A resize re-runs init and the new box copies the old one's text; only the first init loads the saved draft.
+		boolean first = composer == null;
 		composer = new EditBox(font, mainX, composerY, mainWidth, COMPOSER, composer, Component.literal("Prompt"));
 		composer.setMaxLength(8000);
-		if (composer.getValue().isEmpty()) composer.setValue(mod.draft(draftKey()));
+		if (first) composer.setValue(mod.draft(draftKey()));
 		updateHint();
 		addRenderableWidget(composer);
 		setInitialFocus(composer);
@@ -216,6 +218,30 @@ final class T3Screen extends Screen {
 		return newThread ? "new" : mod.state().focusedThreadId();
 	}
 
+	/** Every change of what the composer is for: park the text as the old target's draft, switch, load the new one's. */
+	private void switchDraft(Runnable change) {
+		mod.saveDraft(draftKey(), composer.getValue());
+		change.run();
+		composer.setValue(mod.draft(draftKey()));
+		updateHint();
+	}
+
+	/** A send failed after the composer was cleared: the text goes back in front of whatever is there now. */
+	private static void restoreFailedSend(T3CraftClient mod, String key, String text) {
+		if (net.minecraft.client.Minecraft.getInstance().gui.screen() instanceof T3Screen open) {
+			if ("new".equals(key) && !open.newThread && open.composer.getValue().isBlank()) open.switchDraft(() -> open.newThread = true);
+			if (java.util.Objects.equals(key, open.draftKey())) {
+				open.composer.setValue(joinDraft(text, open.composer.getValue()));
+				return;
+			}
+		}
+		mod.saveDraft(key, joinDraft(text, mod.draft(key)));
+	}
+
+	private static String joinDraft(String restored, String current) {
+		return current.isBlank() || current.equals(restored) ? restored : restored + " " + current;
+	}
+
 	private void updateHint() {
 		T3State.ThreadRow row = mod.state().snapshot().focusedRow();
 		String hint = newThread
@@ -335,8 +361,7 @@ final class T3Screen extends Screen {
 
 	/** Used by the dev self-test: same as clicking + New. */
 	void startNewThread() {
-		newThread = true;
-		updateHint();
+		if (!newThread) switchDraft(() -> newThread = true);
 	}
 
 	/** Used by the dev self-test. */
@@ -353,8 +378,10 @@ final class T3Screen extends Screen {
 	private void submit(boolean stayOpen) {
 		String text = composer.getValue().trim();
 		if (text.isEmpty()) return;
-		mod.send(text, newThread, pickedModel);
-		mod.saveDraft(draftKey(), "");
+		String key = draftKey();
+		// Nothing was sent (no thread to send to): keep the text and the panel.
+		if (!mod.send(text, newThread, pickedModel, () -> restoreFailedSend(mod, key, text))) return;
+		mod.saveDraft(key, "");
 		composer.setValue("");
 		newThread = false;
 		pickedModel = null;
@@ -423,7 +450,7 @@ final class T3Screen extends Screen {
 				List<Object> rows = pickerRows();
 				if (index >= 0 && index < rows.size() && rows.get(index) instanceof PickerEntry entry) {
 					pickedModel = T3Api.modelSelection(entry.provider().instanceId(), entry.model().slug());
-					if (entry.needsNewThread()) newThread = true;
+					if (entry.needsNewThread() && !newThread) switchDraft(() -> newThread = true);
 					updateHint();
 					pickerOpen = false;
 					setFocused(composer);
@@ -459,11 +486,12 @@ final class T3Screen extends Screen {
 			&& event.y() < listTop + visibleRows() * ROW) {
 			int index = (int) ((event.y() - listTop) / ROW) + sidebarScroll;
 			if (index < rows.size()) {
-				mod.saveDraft(draftKey(), composer.getValue());
-				mod.focus(rows.get(index).id());
-				selectedRequest = null;
-				newThread = false;
-				composer.setValue(mod.draft(draftKey()));
+				String id = rows.get(index).id();
+				switchDraft(() -> {
+					mod.focus(id);
+					selectedRequest = null;
+					newThread = false;
+				});
 				pickedModel = null;
 				pickerOpen = false;
 				scroll = 0;
@@ -472,8 +500,7 @@ final class T3Screen extends Screen {
 			}
 		}
 		if (event.x() >= MARGIN + SIDEBAR - NEW_WIDTH && event.x() < MARGIN + SIDEBAR && event.y() >= MARGIN && event.y() < MARGIN + HEADER) {
-			newThread = !newThread;
-			updateHint();
+			switchDraft(() -> newThread = !newThread);
 			setFocused(composer);
 			return true;
 		}
