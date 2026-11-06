@@ -54,7 +54,7 @@ final class T3Hud implements HudElement {
 		if (shown == null && waitingAnywhere > 0) {
 			// Nothing followed is active, but threads elsewhere are waiting: just the count.
 			Font font = minecraft.font;
-			String text = waitingAnywhere + " waiting  [`]";
+			String text = waitingAnywhere + " waiting  [" + mod.openKeyName() + "]";
 			graphics.fill(4, 4, 4 + 12 + font.width(text) + 6, 18, 0xA0101014);
 			graphics.fill(8, 9, 12, 13, color(T3State.Status.NEEDS_YOU));
 			graphics.text(font, text, 16, 7, 0xFF9CA3AF, false);
@@ -72,7 +72,7 @@ final class T3Hud implements HudElement {
 			if (shown.step() != null) step = " · " + shown.step();
 		}
 		String suffix = (othersWaiting > 0 ? "  +" + othersWaiting + " waiting" : "")
-			+ (shown.status() == T3State.Status.NEEDS_YOU ? "  [`]" : "");
+			+ (shown.status() == T3State.Status.NEEDS_YOU ? "  [" + mod.openKeyName() + "]" : "");
 
 		// Stay clear of the toast column on the right; shorten the title first, then drop the step.
 		int maxWidth = graphics.guiWidth() - TOAST_COLUMN - 12;

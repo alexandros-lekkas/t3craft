@@ -107,7 +107,7 @@ final class T3Screen extends Screen {
 			.bounds(width - MARGIN - 44, MARGIN + 3, 44, 18).build());
 		review = addRenderableWidget(Button.builder(Component.literal("Review"), b -> { if (shownFocus != null) mod.openReview(shownFocus.threadId()); })
 			.bounds(width - MARGIN - 102, MARGIN + 3, 54, 18).build());
-		addRenderableWidget(Button.builder(Component.literal("Decisions (J)"), b -> mod.openDecisions())
+		addRenderableWidget(Button.builder(Component.literal("Decisions (" + mod.decisionsKey().getTranslatedKeyMessage().getString() + ")"), b -> mod.openDecisions())
 			.bounds(MARGIN + 5, height - MARGIN - 25, SIDEBAR - 10, 18).build());
 		pin = addRenderableWidget(Button.builder(Component.literal("Pin desk"), b -> mod.togglePin(mod.state().snapshot().focusedRow()))
 			.bounds(MARGIN + 5, height - MARGIN - 47, 78, 18).build());
@@ -446,7 +446,7 @@ final class T3Screen extends Screen {
 			answer(event.key() == InputConstants.KEY_Y ? "accept" : "decline");
 			return true;
 		}
-		if (composerEmpty && event.key() == InputConstants.KEY_GRAVE && System.currentTimeMillis() - openedAt > 250) {
+		if (composerEmpty && openKeyCloses() && mod.openKey().matches(event) && System.currentTimeMillis() - openedAt > 250) {
 			onClose();
 			return true;
 		}
@@ -455,15 +455,26 @@ final class T3Screen extends Screen {
 
 	@Override
 	public boolean charTyped(CharacterEvent event) {
-		// Swallow the ` that opened the panel, digits that picked an option, and Y/N that answered an approval.
+		// Swallow the open key's character (` by default), digits that picked an option, and Y/N that answered an approval.
 		if (composer.getValue().isEmpty() && !newThread && currentQuestion() != null && event.codepoint() >= '1' && event.codepoint() <= '9') {
 			return true;
 		}
-		if (composer.getValue().isEmpty() && (event.codepoint() == '`'
+		if (composer.getValue().isEmpty() && (typesOpenKey(event.codepoint())
 			|| (approve.visible && (event.codepoint() == 'y' || event.codepoint() == 'n' || event.codepoint() == 'Y' || event.codepoint() == 'N')))) {
 			return true;
 		}
 		return super.charTyped(event);
+	}
+
+	/** Whether this character is what the open key types, so pressing it to open or close never lands in the composer. */
+	private boolean typesOpenKey(int codepoint) {
+		return openKeyCloses() && mod.openKeyName().equalsIgnoreCase(Character.toString(codepoint));
+	}
+
+	/** Bound to a letter or digit, the open key would eat the first character of a prompt, so then only Esc closes. */
+	private boolean openKeyCloses() {
+		String name = mod.openKeyName();
+		return name.codePointCount(0, name.length()) != 1 || !Character.isLetterOrDigit(name.codePointAt(0));
 	}
 
 	@Override

@@ -69,6 +69,12 @@ public final class T3CraftClient implements ClientModInitializer {
 		return config.paired();
 	}
 
+	/** The registered (and possibly rebound) keys, so screens match and label them instead of hardcoding. */
+	KeyMapping openKey() { return openKey; }
+	KeyMapping decisionsKey() { return decisionsKey; }
+	/** What the open key is bound to, for hints ("`" by default). */
+	String openKeyName() { return openKey.getTranslatedKeyMessage().getString(); }
+
 	@Override
 	public void onInitializeClient() {
 		instance = this;
@@ -312,7 +318,7 @@ public final class T3CraftClient implements ClientModInitializer {
 		T3State.ThreadRow row = snapshot.focusedRow();
 		if (row == null && newThread && !snapshot.threads().isEmpty()) row = snapshot.threads().getFirst();
 		if (row == null) {
-			chat(Component.literal("Pick a thread first (` then click one, or /t3 threads).").withStyle(ChatFormatting.RED));
+			chat(Component.literal("Pick a thread first (" + openKeyName() + " then click one, or /t3 threads).").withStyle(ChatFormatting.RED));
 			return false;
 		}
 		T3State.ThreadRow target = row;
@@ -407,7 +413,7 @@ public final class T3CraftClient implements ClientModInitializer {
 		// Already looking at this thread in the panel: the sound is enough, a toast would cover it.
 		if (minecraft.gui.screen() instanceof T3Screen && event.thread().id().equals(state.focusedThreadId())) return;
 		// Short text keeps the toast at its 190-px minimum, so it never grows over the corner status.
-		Component toastTitle = heading.copy().append(Component.literal(" · ` to open").withStyle(ChatFormatting.GRAY));
+		Component toastTitle = heading.copy().append(Component.literal(" · " + openKeyName() + " to open").withStyle(ChatFormatting.GRAY));
 		SystemToast.addOrUpdate(minecraft.gui.toastManager(), TOAST, toastTitle,
 			Component.literal(T3Hud.ellipsize(minecraft.font, title, 160)));
 	}
@@ -524,7 +530,7 @@ public final class T3CraftClient implements ClientModInitializer {
 	private int pair(CommandContext<FabricClientCommandSource> ctx) {
 		chat(Component.literal("Pairing…"));
 		pairEnvironment(StringArgumentType.getString(ctx, "link"), null, null, error -> chat(Component.literal(error == null
-			? "Paired. Press ` to open the panel; /t3 connections to manage machines." : error)
+			? "Paired. Press " + openKeyName() + " to open the panel; /t3 connections to manage machines." : error)
 			.withStyle(error == null ? ChatFormatting.GREEN : ChatFormatting.RED)));
 		return 1;
 	}
@@ -537,7 +543,7 @@ public final class T3CraftClient implements ClientModInitializer {
 		}
 		int shown = Math.min(20, snapshot.threads().size());
 		if (snapshot.threads().size() > shown) {
-			chat(Component.literal("Most recent " + shown + " of " + snapshot.threads().size() + " threads; press ` for all of them.")
+			chat(Component.literal("Most recent " + shown + " of " + snapshot.threads().size() + " threads; press " + openKeyName() + " for all of them.")
 				.withStyle(ChatFormatting.GRAY));
 		}
 		for (int i = 0; i < shown; i++) {

@@ -43,7 +43,8 @@ final class T3DeskScreen extends Screen {
 	private T3Decisions.Entry selection() { return rows.stream().filter(e -> e.key().equals(selected)).findFirst().orElse(null); }
 	void openSelected() { var e = selection(); if (e != null && open.active) mod.openRequest(e); }
 	@Override public boolean keyPressed(KeyEvent event) {
-		if (event.key() == InputConstants.KEY_J || event.key() == InputConstants.KEY_ESCAPE) { onClose(); return true; }
+		// The decisions key closes the desk it opened, whatever it is bound to.
+		if (mod.decisionsKey().matches(event) || event.key() == InputConstants.KEY_ESCAPE) { onClose(); return true; }
 		if (event.isConfirmation()) { openSelected(); return true; }
 		return super.keyPressed(event);
 	}
