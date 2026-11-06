@@ -122,3 +122,12 @@ tasks.register('connectionCheck', JavaExec) {
 	mainClass = 'dev.maxwellyoung.t3craft.ConnectionChecks'
 	args = [project.findProperty('fixturePort') ?: '25680']
 }
+
+tasks.register('uiCheck', JavaExec) {
+	description = 'Pure UI logic (diff headers, table cells, ellipsize) without starting Minecraft.'
+	classpath = sourceSets.smoke.runtimeClasspath
+	mainClass = 'dev.maxwellyoung.t3craft.UiChecks'
+}
+
+// No fixture needed, so `build` runs it everywhere.
+tasks.named('check') { dependsOn 'uiCheck' }
