@@ -46,7 +46,9 @@ final class T3Village {
 	/** Runs at the start of the client tick so a right-click on a villager is claimed before vanilla sees it. */
 	void tick(Minecraft minecraft) {
 		BlockPos anchor = mod.villageAnchor();
-		if (minecraft.level != level || anchor == null) clear();
+		// The office's furniture is part of the building, so it does not wait for a pairing; the agents do.
+		OfficeFrame frame = mod.officeFrame();
+		if (minecraft.level != level || anchor == null && frame == null) clear();
 		level = minecraft.level;
 		if (level == null || minecraft.player == null) return;
 		ticks++;
@@ -66,9 +68,8 @@ final class T3Village {
 		}
 
 		// Shared villagers can be opened by a paired client without placing a local village.
-		if (anchor == null) return;
+		if (anchor == null && frame == null) return;
 
-		OfficeFrame frame = mod.officeFrame();
 		if (frame != null && minecraft.gui.screen() == null
 			&& minecraft.hitResult instanceof net.minecraft.world.phys.BlockHitResult hit) {
 			// Hit tests happen in the design's own frame, whichever way this office is turned.
@@ -89,7 +90,7 @@ final class T3Village {
 		boolean office = frame != null;
 		if (office && mod.office().building()) return;
 		if (ticks % 10 == 0) {
-			if (office) syncOffice(snapshot, frame);
+			if (office) syncOffice(snapshot, frame, anchor != null);
 			else sync(snapshot, anchor);
 		}
 		for (Map.Entry<String, Mannequin> entry : villagers.entrySet()) {
@@ -140,9 +141,38 @@ final class T3Village {
 
 	}
 
-	/** Office mode: sync the brain with the thread list, then villagers, whiteboards and lamps. */
-	private void syncOffice(T3State.Snapshot snapshot, OfficeFrame frame) {
+	/**
+	 * Office mode: sync the brain with the thread list, then villagers, desk laptops, props,
+	 * whiteboards and lamps. Unpaired, the office keeps its props and lamps and has no agents.
+	 */
+	private void syncOffice(T3State.Snapshot snapshot, OfficeFrame frame, boolean paired) {
 		List<String> floors = mod.floors();
+		if (paired) syncResidents(snapshot, frame);
+		else if (!villagers.isEmpty() || !brain.agents().isEmpty()) clearResidents();
+		laptops.sync(level,frame,paired?brain.agents().values():List.of(),Math.max(2,floors.size()*2));
+		if (mod.office().building() || ticks < nextDecorationAttempt) return;
+		nextDecorationAttempt = ticks + 100;
+		// Retry after chunk reloads; never resend unchanged content on a timer.
+		// Each floor's whiteboard: who needs you and what for.
+		for (int floor = 0; floor < Math.max(2, floors.size()*2); floor++) {
+			List<T3Office.Note> notes = brain.notes(floor, mod.state()::waitingDetail);
+			String key = notes.toString();
+			if (!OfficeSite.loaded(level, frame, T3Office.whiteboard(floor, notes))) { boards.remove(floor); continue; }
+			if (!key.equals(boards.get(floor))) {
+				int index = floor;
+				mod.office().send(frame, T3Office.whiteboard(floor, notes), () -> boards.put(index, key));
+			}
+		}
+		// Lamps follow this world's day/night cycle.
+		boolean dark = OfficeProps.night(level);
+		if (!OfficeSite.loaded(level, frame, T3Office.lamps(floors.size(), dark))) { night = null; return; }
+		if (night == null || night != dark) {
+			mod.office().send(frame, T3Office.lamps(floors.size(), dark), () -> night = dark);
+		}
+	}
+
+	/** The paired part of the office: one villager per agent the brain seats. */
+	private void syncResidents(T3State.Snapshot snapshot, OfficeFrame frame) {
 		OfficeRoster.Preferences prefs = mod.officePreferences();
 		prefs.normalize();
 		Map<String, Integer> previousDesks = Map.copyOf(prefs.desks);
@@ -175,26 +205,6 @@ final class T3Village {
 				AgentAppearance.update(villager, row, mod.state().online(row.id()), mod.state().driverFor(row));
 			}
 		}
-		laptops.sync(level,frame,brain.agents().values(),Math.max(2,floors.size()*2));
-		if (mod.office().building() || ticks < nextDecorationAttempt) return;
-		nextDecorationAttempt = ticks + 100;
-		// Retry after chunk reloads; never resend unchanged content on a timer.
-		// Each floor's whiteboard: who needs you and what for.
-		for (int floor = 0; floor < Math.max(2, floors.size()*2); floor++) {
-			List<T3Office.Note> notes = brain.notes(floor, mod.state()::waitingDetail);
-			String key = notes.toString();
-			if (!OfficeSite.loaded(level, frame, T3Office.whiteboard(floor, notes))) { boards.remove(floor); continue; }
-			if (!key.equals(boards.get(floor))) {
-				int index = floor;
-				mod.office().send(frame, T3Office.whiteboard(floor, notes), () -> boards.put(index, key));
-			}
-		}
-		// Lamps follow this world's day/night cycle.
-		boolean dark = OfficeProps.night(level);
-		if (!OfficeSite.loaded(level, frame, T3Office.lamps(floors.size(), dark))) { night = null; return; }
-		if (night == null || night != dark) {
-			mod.office().send(frame, T3Office.lamps(floors.size(), dark), () -> night = dark);
-		}
 	}
 
 	/** The thread a shared village or shared office villager stands for, if it is one of ours. */
@@ -220,15 +230,20 @@ final class T3Village {
 
  void faceThread(String thread){brain.face(thread);}
 	void clear() {
+		clearResidents();
+  laptops.clear();
+		boards.clear();
+		night = null;
+	}
+
+	/** Removes the agents (unpaired, or leaving the world); the office's props stay with {@link #laptops}. */
+	private void clearResidents() {
 		if (level != null) {
 			for (Mannequin villager : villagers.values()) level.removeEntity(villager.getId(), Entity.RemovalReason.DISCARDED);
 		}
 		villagers.clear();
-  laptops.clear();
 		threadByEntity.clear();
 		brain.clear();
-		boards.clear();
-		night = null;
 	}
 
 	private void sync(T3State.Snapshot snapshot, BlockPos anchor) {

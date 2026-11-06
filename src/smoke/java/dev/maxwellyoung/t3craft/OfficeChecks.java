@@ -57,6 +57,7 @@ public final class OfficeChecks {
 	public static void main(String[] args) throws Exception {
 		checkPlacement();
 		checkScandi();
+		checkProps();
 		checkCommandDispatch();
 		check(!OfficeQueue.permissionFailure(net.minecraft.network.chat.Component.literal("Unknown command: permission")), "literal chat is not a permission denial");
 		for (String key : List.of("command.unknown.command", "commands.generic.permission"))
@@ -229,6 +230,49 @@ public final class OfficeChecks {
 		check(OfficeSite.occupied(bounds, origin, blueprint, read, pos -> pos.equals(shulkerPos) ? shulker : null), "non-empty office shulker requires confirmation");
 		shulker.clearContent();
 		check(OfficeSite.occupied(bounds, null, List.of(), read, pos -> pos.equals(shulkerPos) ? shulker : null), "unowned empty shulker remains protected");
+	}
+
+	/**
+	 * Every prop of the office, for every turn and floor count: the full set, one stable identity
+	 * each (so a rebuild replaces rather than duplicates), inside the build, and turned with it.
+	 */
+	private static void checkProps() {
+		int perFloor = OfficeProps.PROPS.size();
+		check(perFloor == 59, "props.json has the full pack: " + perFloor);
+		var origin = new net.minecraft.core.BlockPos(-40, 70, 12);
+		for (var rotation : net.minecraft.world.level.block.Rotation.values()) for (int floors : new int[] {2, 4}) {
+			var frame = new OfficeFrame(origin, rotation);
+			String where = rotation + ", " + floors + " floors";
+			var placed = OfficeProps.placements(frame, floors);
+			check(placed.size() == perFloor * floors, "every prop placed (" + where + "): " + placed.size());
+			var ids = new java.util.HashSet<java.util.UUID>();
+			for (var p : placed) check(ids.add(p.id()), "one identity per prop (" + where + "): " + p.item());
+			check(ids.equals(new java.util.HashSet<>(OfficeProps.placements(frame, floors).stream().map(OfficeProps.Placement::id).toList())), "a rebuild reuses every identity, so nothing duplicates (" + where + ")");
+			var box = OfficePlacement.bounds(frame, floors);
+			int[] door = OfficeDesign.doorOutside();
+			var doorAt = frame.point(door[0] + .5, 0, door[1] + .5);
+			for (int i = 0; i < placed.size(); i++) {
+				var p = placed.get(i);
+				var design = OfficeProps.PROPS.get(i % perFloor).getAsJsonObject();
+				var pos = design.getAsJsonArray("pos");
+				double x = pos.get(0).getAsDouble(), y = pos.get(1).getAsDouble() + T3Office.FLOOR_HEIGHT * (i / perFloor), z = pos.get(2).getAsDouble();
+				String what = design.get("id").getAsString() + " on floor " + (i / perFloor) + " (" + where + ")";
+				check(p.item().equals(design.get("item").getAsString()) && p.floor() == i / perFloor, "placement order follows the design: " + what);
+				check(box.contains(p.pos()), "inside the building: " + what + " at " + p.pos());
+				check(Math.abs(p.pos().y - (origin.getY() + y)) < 1e-9, "on its floor: " + what);
+				// Turning is rigid: every prop keeps its distance to the door, and its facing turns with the office.
+				double designDistance = Math.hypot(x - (door[0] + .5), z - (door[1] + .5));
+				double worldDistance = Math.hypot(p.pos().x - doorAt.x, p.pos().z - doorAt.z);
+				check(Math.abs(designDistance - worldDistance) < 1e-9, "turned with the office: " + what);
+				check(Math.abs(net.minecraft.util.Mth.wrapDegrees(p.yaw() - design.get("yaw").getAsFloat() - frame.degrees())) < 1e-3, "faces turn with the office: " + what);
+				// Inside a cell (not on its edge), the prop stands in the turned copy of its design cell.
+				if (x % 1 != 0 && z % 1 != 0)
+					check(frame.local(net.minecraft.core.BlockPos.containing(p.pos())).equals(net.minecraft.core.BlockPos.containing(x, y, z)), "in its turned design cell: " + what);
+			}
+		}
+		check(!OfficeProps.uuid(origin, 0, "desk0.chair").equals(OfficeProps.uuid(origin.east(), 0, "desk0.chair"))
+			&& !OfficeProps.uuid(origin, 0, "desk0.chair").equals(OfficeProps.uuid(origin, 1, "desk0.chair")), "two offices or two floors never share a prop");
+		System.out.println("Office props: " + perFloor + " per floor, every turn, stable identities");
 	}
 
 	private static void checkCommandDispatch() {

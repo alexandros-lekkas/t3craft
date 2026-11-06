@@ -218,12 +218,16 @@ public final class T3CraftClient implements ClientModInitializer {
 		return net.minecraft.world.level.block.Rotation.NONE;
 	}
 
-	/** This world's office as a frame (origin and turn), or null when its village isn't an office. */
+	/**
+	 * This world's office as a frame (origin and turn), or null when its village isn't an office.
+	 * Unlike {@link #villageAnchor()} it does not need a pairing: a built office keeps its furniture
+	 * while no machine is paired.
+	 */
 	OfficeFrame officeFrame() {
 		String world = worldKey();
 		if (world == null || !config.officeWorlds.contains(world)) return null;
-		var anchor = villageAnchor();
-		return anchor == null ? null : new OfficeFrame(anchor, officeRotation(world));
+		int[] pos = config.villages.get(world);
+		return pos == null || pos.length != 3 ? null : new OfficeFrame(new net.minecraft.core.BlockPos(pos[0], pos[1], pos[2]), officeRotation(world));
 	}
 
 	public net.minecraft.core.BlockPos villageAnchor() {
