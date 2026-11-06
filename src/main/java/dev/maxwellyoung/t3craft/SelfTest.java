@@ -14,7 +14,7 @@ import net.minecraft.world.entity.npc.villager.Villager;
  * {@code shared:<link>} pairs and places the dev server's shared village. Never active in normal play.
  */
 final class SelfTest {
-	private enum Step { ACTIVITY_OPEN, ACTIVITY_CHECK, ACTIVITY_RETURN, ACTIVITY_REVIEW, ACTIVITY_NEXT, ACTIVITY_BACK, ACTIVITY_OFFLINE, ACTIVITY_OFFLINE_BACK, SETUP_FORM, SETUP_INVALID, SETUP_EXPIRED, SETUP_A, SETUP_B, SETUP_AUTH, SETUP_WRONG, SETUP_REPAIRED, SETUP_REMOVED, SETUP_RETURN, SETUP_RESTORE, SETUP_LAST, SETUP_LIVE, STABLE_SITE, STABLE_CHURN, STABLE_CAPTURE, STABLE_OFFLINE, STABLE_RECOVER, STABLE_RESTORE, STABLE_ARCHIVE, SHARED_STABLE, SHARED_CHURN, SHARED_TARGET, SHARED_OPEN, SHARED_UNPIN, AUTH_ERROR, AUTH_RECOVER, PROTOCOL_ERROR, PROTOCOL_RECOVER, RELEASE_SITE, RELEASE_OPEN, RELEASE_CHECK, RELEASE_FEEDBACK, DESK_SITE, DESK_OPEN, DESK_REQUEST, DESK_ANSWERED, DESK_REVIEW_OPEN, DESK_REVIEW, DESK_DIFF, DESK_FEEDBACK, DESK_SIDEBAR, SILK_WORLD, OFFICE_SITE, OFFICE, FLOW_SEND, FLOW_WAIT, FLOW_CLICK, FLOW_DONE, OFFICE_SHARED_PAIR, OFFICE_SHARED_BUILD, OFFICE_SHARED_CHECK, VFLOW_SEND, VFLOW_WAIT, VFLOW_CLICK, VFLOW_DONE, SHARED_PAIR, SHARED_CHECK, SHARED_COUNT, THREADS, PREP, DONE_PANEL, PAIR_JOIN, PAIR_WAIT, DRAFT_TYPE, DRAFT_REOPEN, DRAFT_CHECK, WAIT_WORLD, OPEN, SEND, ASK_WAIT, ASK_ANSWERED, LOOK, WATCH, VILLAGE, VILLAGE_LOOK, VILLAGE_CLICK, VILLAGE_CHECK, WAIT_WORKING, WAIT_APPROVAL_OR_DONE, WAIT_DONE, CLOSE, HUD, FINISH, DONE }
+	private enum Step { HIDDEN_DECISION, HIDDEN_CARD, HIDDEN_SETTLED, ACTIVITY_OPEN, ACTIVITY_CHECK, ACTIVITY_RETURN, ACTIVITY_REVIEW, ACTIVITY_NEXT, ACTIVITY_BACK, ACTIVITY_OFFLINE, ACTIVITY_OFFLINE_BACK, SETUP_FORM, SETUP_INVALID, SETUP_EXPIRED, SETUP_A, SETUP_B, SETUP_AUTH, SETUP_WRONG, SETUP_REPAIRED, SETUP_REMOVED, SETUP_RETURN, SETUP_RESTORE, SETUP_LAST, SETUP_LIVE, STABLE_SITE, STABLE_CHURN, STABLE_CAPTURE, STABLE_OFFLINE, STABLE_RECOVER, STABLE_RESTORE, STABLE_ARCHIVE, SHARED_STABLE, SHARED_CHURN, SHARED_TARGET, SHARED_OPEN, SHARED_UNPIN, AUTH_ERROR, AUTH_RECOVER, PROTOCOL_ERROR, PROTOCOL_RECOVER, RELEASE_SITE, RELEASE_OPEN, RELEASE_CHECK, RELEASE_FEEDBACK, DESK_SITE, DESK_OPEN, DESK_REQUEST, DESK_ANSWERED, DESK_REVIEW_OPEN, DESK_REVIEW, DESK_DIFF, DESK_FEEDBACK, DESK_SIDEBAR, SILK_WORLD, OFFICE_SITE, OFFICE, FLOW_SEND, FLOW_WAIT, FLOW_CLICK, FLOW_DONE, OFFICE_SHARED_PAIR, OFFICE_SHARED_BUILD, OFFICE_SHARED_CHECK, VFLOW_SEND, VFLOW_WAIT, VFLOW_CLICK, VFLOW_DONE, SHARED_PAIR, SHARED_CHECK, SHARED_COUNT, THREADS, PREP, DONE_PANEL, PAIR_JOIN, PAIR_WAIT, DRAFT_TYPE, DRAFT_REOPEN, DRAFT_CHECK, WAIT_WORLD, OPEN, SEND, ASK_WAIT, ASK_ANSWERED, LOOK, WATCH, VILLAGE, VILLAGE_LOOK, VILLAGE_CLICK, VILLAGE_CHECK, WAIT_WORKING, WAIT_APPROVAL_OR_DONE, WAIT_DONE, CLOSE, HUD, FINISH, DONE }
 
 	private final T3CraftClient mod;
 	private final String prompt;
@@ -77,6 +77,28 @@ final class SelfTest {
 		T3State.Snapshot snapshot = mod.state().snapshot();
 		T3State.ThreadRow row = snapshot.focusedRow();
 		switch (step) {
+			case HIDDEN_DECISION -> {
+				var entry = mod.state().decisions().stream().filter(e -> "vis-subagent".equals(e.thread().id()) && e.requestId() != null).findFirst().orElse(null);
+				if (entry == null) return;
+				mod.openRequest(entry);
+				advance(Step.HIDDEN_CARD, "opened hidden child Decision through client screen path");
+			}
+			case HIDDEN_CARD -> {
+				if (ticks < 40 || snapshot.focus() == null || !"vis-subagent".equals(snapshot.focus().threadId())) return;
+				if (!(minecraft.gui.screen() instanceof T3Screen screen) || !screen.requestCardVisibleForTest()
+					|| snapshot.threads().stream().anyMatch(r -> "vis-subagent".equals(r.id()))) {
+					finish(minecraft, "FAIL hidden child request card missing or child leaked into sidebar"); return;
+				}
+				mod.focus("vis-settled");
+				advance(Step.HIDDEN_SETTLED, "hidden child card rendered; opening settled conversation");
+			}
+			case HIDDEN_SETTLED -> {
+				if (ticks < 40 || row == null || !"vis-settled".equals(row.id()) || snapshot.focus() == null) return;
+				if (snapshot.focus().messages().isEmpty() || snapshot.threads().stream().anyMatch(r -> "vis-settled".equals(r.id()))) {
+					finish(minecraft, "FAIL settled conversation missing or leaked into sidebar"); return;
+				}
+				finish(minecraft, "PASS hidden Decision screen renders request card and settled focus retains conversation");
+			}
 			case SETUP_FORM -> {
 				if (ticks < 200) return;
 				if (!(minecraft.gui.screen() instanceof T3ConnectionsScreen screen) || !screen.formForTest()) { finish(minecraft, "FAIL private setup entry"); return; }
@@ -960,6 +982,12 @@ final class SelfTest {
 				finish(minecraft, "half-written prompt".equals(value) ? "PASS (pair + draft)" : "FAIL draft was '" + value + "'");
 			}
 			case WAIT_WORLD -> {
+				if ("hidden-decisions".equals(prompt)) {
+					if (minecraft.player == null || !snapshot.connected()) return;
+					fixtureControl(minecraft, "visibility");
+					mod.state().setPanelOpen(true);
+					advance(Step.HIDDEN_DECISION, "loading hidden child fixture"); return;
+				}
 				if ("activity-review".equals(prompt) || "activity-live".equals(prompt)) {
 					if (minecraft.player == null || ticks < 600 || snapshot.focus() == null || !snapshot.connected()) return;
 					if ("activity-review".equals(prompt) && !"A-done-0".equals(snapshot.focusedId())) { finish(minecraft, "FAIL requires isolated fixture focus"); return; }

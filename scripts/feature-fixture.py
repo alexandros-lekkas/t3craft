@@ -103,6 +103,11 @@ class Fixture(ThreadingHTTPServer):
         self.mcp_violations = []
         self.mcp_posts = 0
         self.mcp_history_mode = None
+        self.mcp_detail_error = False
+        self.mcp_items = [
+            {'position': 1, 'itemId': 'message-1', 'type': 'assistant_message', 'text': 'MCP reply', 'status': 'completed', 'updatedAt': '2026-11-01T00:00:00Z', 'textTruncated': False},
+            {'position': 2, 'itemId': 'tool-1', 'type': 'command_execution', 'title': 'Fixture command', 'text': 'echo fixture', 'status': 'completed', 'updatedAt': '2026-11-01T00:00:00Z', 'textTruncated': False},
+        ]
         self.visibility = False
         self.mcp_answered_ids = set()
         self.mcp_answered = False
@@ -157,6 +162,14 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/_qa/mcp-hybrid':
                 self.server.threads['mcp-approval'] = thread('mcp-approval', True)
                 self.server.threads['mcp-question'] = thread('mcp-question', True, True)
+                return self.reply({'ok': True})
+            if self.path.startswith('/_qa/mcp-item?'):
+                q = parse_qs(urlparse(self.path).query)
+                item = next(i for i in self.server.mcp_items if i['itemId'] == q['itemId'][0])
+                item.update(status=q['status'][0], text=q['text'][0])
+                return self.reply({'ok': True})
+            if self.path in ('/_qa/mcp-detail-error', '/_qa/mcp-detail-ok'):
+                self.server.mcp_detail_error = self.path.endswith('error')
                 return self.reply({'ok': True})
             if self.path in ('/_qa/mcp-history-long', '/_qa/mcp-history-null'):
                 self.server.mcp_history_mode = self.path.rsplit('-', 1)[1]; return self.reply({'ok': True})
@@ -334,16 +347,17 @@ class Handler(BaseHTTPRequestHandler):
         elif name == 't3_thread_read':
             row['worktreePath'] = '/fixture/worktree'
             row['branch'] = 'fixture-branch'
-            if args.get('view') == 'activity':
-                if 'afterPosition' not in args:
-                    items = [{'position': 1, 'itemId': 'message-1', 'type': 'assistant_message', 'text': 'MCP reply', 'status': 'completed', 'updatedAt': now, 'textTruncated': False}]
-                    more = True
-                elif args['afterPosition'] == 1:
-                    items = [{'position': 2, 'itemId': 'tool-1', 'type': 'command_execution', 'title': 'Fixture command', 'text': 'echo fixture', 'status': 'completed', 'updatedAt': now, 'textTruncated': False}]
-                    more = False
-                elif args['afterPosition'] == 2 and self.server.mcp_sent:
-                    items = [{'position': 3, 'itemId': 'message-2', 'type': 'assistant_message', 'text': 'Sent', 'status': 'completed', 'updatedAt': now}]; more = False
-                else: items, more = [], False
+            if self.server.mcp_detail_error and ident == 'mcp-question':
+                return self.reply({'jsonrpc': '2.0', 'id': request['id'], 'result': {'isError': True, 'content': [{'type': 'text', 'text': 'Thread detail unavailable'}]}})
+            history = list(self.server.mcp_items)
+            if self.server.mcp_sent:
+                history.append({'position': 3, 'itemId': 'message-2', 'type': 'assistant_message', 'text': 'Sent', 'status': 'completed', 'updatedAt': now})
+            if 'itemId' in args:
+                items = [item for item in history if item['itemId'] == args['itemId']]
+                more = False
+            elif args.get('view') == 'activity':
+                remaining = [item for item in history if item['position'] > args.get('afterPosition', 0)]
+                items, more = remaining[:1], len(remaining) > 1
             else: items, more = [], False
             result = {'thread': row, 'recentRuns': [], 'items': items, 'hasMore': more, 'nextPosition': items[-1]['position'] if items else None}
             if self.server.mcp_history_mode == 'long':

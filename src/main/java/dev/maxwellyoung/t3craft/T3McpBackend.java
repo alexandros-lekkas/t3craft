@@ -221,7 +221,7 @@ final class T3McpBackend implements T3Backend {
         // Positions are stable; refresh in-progress items whose text can change in place.
         for (var entry : new ArrayList<>(history.items.entrySet())) {
             String status = T3Protocol.string(entry.getValue(), "status");
-            if (!"running".equals(status) && !"pending".equals(status)) continue;
+            if (status != null && java.util.Set.of("completed", "failed", "cancelled", "interrupted").contains(status)) continue;
             JsonObject itemRead = obj("threadId", id); itemRead.addProperty("itemId", entry.getKey()); itemRead.addProperty("view", "activity"); itemRead.addProperty("maxCharsPerItem", 50000);
             for (var value : T3Protocol.array(call("t3_thread_read", itemRead), "items")) history.items.put(entry.getKey(), value.getAsJsonObject().deepCopy());
         }

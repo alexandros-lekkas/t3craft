@@ -372,6 +372,8 @@ final class T3Screen extends Screen {
 	}
 
 	/** Used by the dev self-test. */
+	boolean requestCardVisibleForTest() { return questionBox != null || approvalBox != null; }
+
 	void setComposerForTest(String text) {
 		composer.setValue(text);
 	}
@@ -717,6 +719,7 @@ final class T3Screen extends Screen {
 		int bottom = composerY - 6 - approvalHeight - questionHeight;
 		int top = MARGIN + HEADER + 4;
 		String connectionError = mod.state().connectionError(row.id());
+		if (connectionError == null) connectionError = snapshot.detailError();
 		if (connectionError != null) {
 			int errorHeight = Math.min(Math.max(0, bottom - top - 10), font.split(Component.literal(connectionError), x1 - x0 - 20).size() * font.lineHeight + 8);
 			graphics.enableScissor(x0, top, x1, top + errorHeight);
