@@ -18,6 +18,7 @@ final class T3DeskScreen extends Screen {
 	private int scroll, detailScroll;
 	private Button open;
 	private List<T3Decisions.Entry> rows = List.of();
+	private final T3Scroll listWheel = new T3Scroll(), detailWheel = new T3Scroll();
 
 	T3DeskScreen(T3CraftClient mod) { super(Component.literal("Decision desk")); this.mod = mod; }
 	@Override protected void init() {
@@ -55,8 +56,8 @@ final class T3DeskScreen extends Screen {
 		return super.mouseClicked(event, doubleClick);
 	}
 	@Override public boolean mouseScrolled(double x, double y, double horizontal, double vertical) {
-		if (x < side()) scroll = Math.max(0, Math.min(scroll - (int) vertical, Math.max(0, rows.size() - visible())));
-		else detailScroll = Math.max(0, detailScroll - (int) (vertical * 3));
+		if (x < side()) scroll = Math.max(0, Math.min(scroll - listWheel.rows(vertical), Math.max(0, rows.size() - visible())));
+		else detailScroll = Math.max(0, detailScroll - detailWheel.rows(vertical * 3));
 		return true;
 	}
 	@Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {

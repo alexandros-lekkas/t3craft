@@ -23,6 +23,7 @@ final class T3ReviewScreen extends Screen {
 	private Button previous, next;
 	private List<T3Diff.Line> numbered = List.of();
 	private List<Integer> hunks = List.of();
+	private final T3Scroll fileWheel = new T3Scroll(), patchWheel = new T3Scroll();
 
 	T3ReviewScreen(T3CraftClient mod, String threadId) { super(Component.literal("Checkpoint review")); this.mod = mod; this.threadId = threadId; }
 	@Override protected void init() {
@@ -95,8 +96,8 @@ final class T3ReviewScreen extends Screen {
 		return super.mouseClicked(event, doubleClick);
 	}
 	@Override public boolean mouseScrolled(double x, double y, double h, double v) {
-		if (x < side()) fileScroll = Math.max(0, Math.min(fileScroll - (int) v, Math.max(0, files.size() + 1 - visible())));
-		else scroll = Math.max(0, scroll - (int) (v * 3));
+		if (x < side()) fileScroll = Math.max(0, Math.min(fileScroll - fileWheel.rows(v), Math.max(0, files.size() + 1 - visible())));
+		else scroll = Math.max(0, scroll - patchWheel.rows(v * 3));
 		return true;
 	}
 	@Override public boolean keyPressed(KeyEvent event) {
