@@ -20,7 +20,7 @@ It is fully interactive. In the capture below, `minecraft` was typed from Minecr
 
 - **Esc** always returns to the game. It is never sent to the page.
 - **F1–F12** (F2 screenshot, F3 debug, F11 fullscreen) stay with Minecraft.
-- Everything else goes to T3. Typing uses `Input.insertText`, so any keyboard layout and Unicode work. Named keys (Enter, Backspace, arrows, Home/End, Page Up/Down, Delete, Tab) and Ctrl/⌘ shortcuts are sent as key events. ⌘/Ctrl+V pastes Minecraft's clipboard. ⌘/Ctrl+C and X copy the page selection to the real clipboard.
+- Everything else goes to T3. Typing uses `Input.insertText`, so any keyboard layout and Unicode work. Named keys (Enter, Backspace, arrows, Home/End, Page Up/Down, Delete, Tab) and Ctrl/⌘ shortcuts are sent as key events. Shift, Ctrl, Alt and ⌘ are sent as their own keydown/keyup transitions too (with left/right location), so held-Shift range selection and chords that watch the modifier keys work. ⌘/Ctrl+V pastes Minecraft's clipboard. ⌘/Ctrl+C and X copy the page selection to the real clipboard.
 - The laptop opens on the focused thread the first time, and again whenever the focused thread changed since the last open. Otherwise it keeps its own place, so drafts and scroll survive closing it.
 - **Answering a ping** (` within a minute of a *Done* / *Needs you* toast) always jumps to the thread that pinged, even if the laptop was open on something else:
 
@@ -30,7 +30,7 @@ It is fully interactive. In the capture below, `minecraft` was typed from Minecr
 
 ## Agent card: one agent's thread
 
-Right-click an agent (the villager route in `T3Village`). That thread opens in a centred floating window, about 60% of the screen. The world behind it is blurred, never covered with the menu dirt texture. It's T3's own thread page, deep-linked to `/<environmentId>/<threadId>`, at a narrow viewport, so T3 uses its compact layout with the sidebar hidden.
+Right-click an agent (the use-key route in `OfficeResidents`). That thread opens in a centred floating window, about 60% of the screen. The world behind it is blurred, never covered with the menu dirt texture. It's T3's own thread page, deep-linked to `/<environmentId>/<threadId>`, at a narrow viewport, so T3 uses its compact layout with the sidebar hidden.
 
 ![The agent card: one thread over the blurred world](../images/shots/ui-real-agent-card-scale5.png)
 
@@ -80,6 +80,7 @@ If T3 shows its **Pair with this environment** screen (`/pair`), the mod mints a
 - The CLI is never killed. If it has not answered after 20 s the laptop falls back to the native panel and the CLI is left to finish on its own (its output is drained on a daemon thread).
 - The link (`/pair#token=…`) is loaded once in a fresh document; T3 redeems the token itself. The credential is never written to disk by the mod.
 - T3's session cookie then lives in the mod's Chrome profile, so later launches skip pairing. Verified: a second launch did not pair again.
+- The office, HUD and native screens need a bearer token rather than a cookie. `T3AutoConnect` mints a separate least-privilege link (`orchestration:read`, `orchestration:operate`) and exchanges it at `/oauth/token`, saving the token to `config/t3craft.json`; it retries every 15 s while T3 isn't running (backing off when T3 refuses) and pairs again when the local T3 stops accepting the token. The player never sees a link.
 
 ## Fallback
 
@@ -108,4 +109,4 @@ The native panel (`T3Screen`) opens unchanged when:
   - CDP messages: metrics, screencast size and quality, request envelope, modifier bits, clicks, wheel, Enter, ⌘A, F-keys and Esc never forwarded, `insertText`;
   - the JPEG header parser and deep-link encoding.
 - `./gradlew webProbe -Pthread=<id>` (opt-in, read-only) loads the real local T3 without Minecraft. It saves a laptop frame, a card frame and a 4K-resize frame, and checks each is exactly the expected size.
-- `./gradlew runClient -PwebShowcase=<threadId> [-PwebPing=<threadId>] [-PwebPair=<link>]` (dev only, read-only) produced the screenshots above. It checks the page state over CDP (the search box holds the query; the laptop and card are on the expected route) and logs every rejected CDP command. It does not start the Minecraft MCP server, so it can run beside a real game. `-PwebPair` pairs the dev client first so the office has agents; with an agent in the office it right-clicks its villager for the card capture, otherwise it opens the card the way the right-click handler does.
+- `./gradlew runClient -PwebShowcase=<threadId> [-PwebPing=<threadId>] [-PwebPair=<link>]` (dev only, read-only) produced the screenshots above. It checks the page state over CDP (the search box holds the query; the laptop and card are on the expected route) and logs every rejected CDP command. It does not start the Minecraft MCP server, so it can run beside a real game. `-PwebPair` pairs the dev client first so the office has agents (a dev-only path; players are paired by `T3AutoConnect`); with an agent in the office it right-clicks its character for the card capture, otherwise it opens the card the way the right-click handler does.

@@ -10,9 +10,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 
-/** Paired environments and last focused thread. Tokens are credentials, so the file is owner-only. */
+/**
+ * Paired environments, office locations and the last focused thread. Tokens are credentials, so the file is owner-only.
+ * There is no settings screen: the mod pairs with the local T3 Code by itself, and everything here is a power-user
+ * override edited by hand.
+ */
 public final class T3Config {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+	/** The Minecraft MCP server's default port; {@link #mcpPort} or {@code -Dt3craft.mcpPort} override it. */
+	public static final int DEFAULT_MCP_PORT = 25590;
 
 	public static final class Environment {
 		public String label;
@@ -37,18 +43,14 @@ public final class T3Config {
 	public String baseUrl;
 	public String accessToken;
 	public String threadId;
-	/**
-	 * Where the agent villagers stand. On a client this is only the pre-0.1.5 single village,
-	 * adopted by the first world visited; on a server it is the shared village.
-	 */
-	public int[] village;
-	/** Client: each world's village, keyed by world (server address or save) and dimension. */
-	public java.util.Map<String, int[]> villages = new java.util.HashMap<>();
-	/** Client: worlds (same keys) whose village is the Silk office built at that spot. */
-	public java.util.Set<String> officeWorlds = new java.util.HashSet<>();
-	/** Client: how each office world's office is turned (a {@code Rotation} name); absent means the design's own orientation. */
+	/** Client: each world's office origin, keyed by world (server address or save) and dimension. */
+	public java.util.Map<String, int[]> offices = new java.util.HashMap<>();
+	/** Client: how each world's office is turned (a {@code Rotation} name); absent means the design's own orientation. */
 	public java.util.Map<String, String> officeRotations = new java.util.HashMap<>();
-	/** Server: where the shared Silk office stands; null when it's off. */
+	// Pre-0.6 fields: the village anchor per world and the worlds whose village was an office. Migrated into offices on load.
+	public java.util.Map<String, int[]> villages;
+	public java.util.Set<String> officeWorlds;
+	/** Server: where the shared office stands; null when it's off. */
 	public int[] serverOffice;
 	/** Client spatial preferences, independently saved per world and dimension. */
 	public java.util.Map<String, OfficeRoster.Preferences> officePreferences = new java.util.HashMap<>();
@@ -58,13 +60,15 @@ public final class T3Config {
 	public boolean books = true;
 	/** Lets local agents run commands through the MCP server. On by default: no gates ({@code /t3 agent-build off} turns it off). */
 	public boolean agentCommands = true;
-	/** Shows the debug and admin subcommands of {@code /t3} (pairing, threads, village, books…). Off: players see only what they need. */
+	/** Shows the debug and admin subcommands of {@code /t3} (threads, pins, books, unpair…). Off: players see only what they need. */
 	public boolean debug;
 	/**
 	 * Stream T3 Code's web app through a hidden Chrome instead of the native screens. Off by default, and there is
 	 * no in-game switch: edit {@code t3craft.json}. While it is off, Chrome is never started.
 	 */
 	public boolean webUi;
+	/** Preferred port for the Minecraft MCP server; the next free port is used when it is taken. */
+	public int mcpPort = DEFAULT_MCP_PORT;
 
 	public boolean paired() {
 		return !environments.isEmpty();
@@ -110,14 +114,16 @@ public final class T3Config {
 					if (config.environments.isEmpty() && config.baseUrl != null && config.accessToken != null) {
 						config.environments.add(new Environment("This Mac", config.baseUrl, config.accessToken));
 					}
-					if (config.villages == null) config.villages = new java.util.HashMap<>();
-					if (config.officeWorlds == null) config.officeWorlds = new java.util.HashSet<>();
+					if (config.offices == null) config.offices = new java.util.HashMap<>();
 					if (config.officeRotations == null) config.officeRotations = new java.util.HashMap<>();
+					migrateVillages(config);
+					config.offices.values().removeIf(point -> point == null || point.length != 3);
 					if (config.officePreferences == null) config.officePreferences = new java.util.HashMap<>();
 					config.officePreferences.values().removeIf(java.util.Objects::isNull);
 					config.officePreferences.values().forEach(OfficeRoster.Preferences::normalize);
 					if (config.sharedOfficePreferences == null) config.sharedOfficePreferences = new OfficeRoster.Preferences();
 					config.sharedOfficePreferences.normalize();
+					if (config.mcpPort <= 0 || config.mcpPort > 65535) config.mcpPort = DEFAULT_MCP_PORT;
 					config.baseUrl = null;
 					config.accessToken = null;
 					return config;
@@ -127,6 +133,18 @@ public final class T3Config {
 			T3Log.LOGGER.warn("Could not read {}; starting unpaired", path, e);
 		}
 		return new T3Config();
+	}
+
+	/** A pre-0.6 world keeps its office where it stood; plain villages (no office) are dropped with the village mode. */
+	static void migrateVillages(T3Config config) {
+		if (config.villages != null && config.officeWorlds != null) {
+			for (String world : config.officeWorlds) {
+				int[] point = config.villages.get(world);
+				if (point != null && !config.offices.containsKey(world)) config.offices.put(world, point);
+			}
+		}
+		config.villages = null;
+		config.officeWorlds = null;
 	}
 
 	/** Write a private replacement first so a new pairing is never briefly world-readable. */

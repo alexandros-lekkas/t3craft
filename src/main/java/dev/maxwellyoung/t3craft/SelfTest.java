@@ -9,12 +9,12 @@ import net.minecraft.world.entity.decoration.Mannequin;
  * {@code look} only opens the panel, captures it, and hands the game back (read-only).
  * Any other prompt: opens the panel,
  * sends the prompt, approves the first request, and captures Minecraft's own framebuffer at
- * each stage into run/screenshots. {@code villageflow:<prompt>} runs the same prompt from the
- * village (nametag detail, approve by right-clicking the villager, report book) and
- * {@code shared:<link>} pairs and places the dev server's shared village. Never active in normal play.
+ * each stage into run/screenshots. {@code officeflow:<prompt>} runs the same prompt from the office
+ * (whiteboard detail, approve by right-clicking the agent, report book) and {@code sharedoffice:<link>}
+ * pairs the dev server and builds its shared office. Never active in normal play.
  */
 final class SelfTest {
-	private enum Step { HIDDEN_DECISION, HIDDEN_CARD, HIDDEN_SETTLED, ACTIVITY_OPEN, ACTIVITY_CHECK, ACTIVITY_RETURN, ACTIVITY_REVIEW, ACTIVITY_NEXT, ACTIVITY_BACK, ACTIVITY_OFFLINE, ACTIVITY_OFFLINE_BACK, SETUP_FORM, SETUP_INVALID, SETUP_EXPIRED, SETUP_A, SETUP_B, SETUP_AUTH, SETUP_WRONG, SETUP_REPAIRED, SETUP_REMOVED, SETUP_RETURN, SETUP_RESTORE, SETUP_LAST, SETUP_LIVE, STABLE_SITE, STABLE_CHURN, STABLE_CAPTURE, STABLE_OFFLINE, STABLE_RECOVER, STABLE_RESTORE, STABLE_ARCHIVE, SHARED_STABLE, SHARED_CHURN, SHARED_TARGET, SHARED_OPEN, SHARED_UNPIN, AUTH_ERROR, AUTH_RECOVER, PROTOCOL_ERROR, PROTOCOL_RECOVER, RELEASE_SITE, RELEASE_OPEN, RELEASE_CHECK, RELEASE_FEEDBACK, DESK_SITE, DESK_OPEN, DESK_REQUEST, DESK_ANSWERED, DESK_REVIEW_OPEN, DESK_REVIEW, DESK_DIFF, DESK_FEEDBACK, DESK_SIDEBAR, SILK_WORLD, OFFICE_SITE, OFFICE, FLOW_SEND, FLOW_WAIT, FLOW_CLICK, FLOW_DONE, OFFICE_SHARED_PAIR, OFFICE_SHARED_BUILD, OFFICE_SHARED_CHECK, VFLOW_SEND, VFLOW_WAIT, VFLOW_CLICK, VFLOW_DONE, SHARED_PAIR, SHARED_CHECK, SHARED_COUNT, THREADS, PREP, DONE_PANEL, PAIR_JOIN, PAIR_WAIT, DRAFT_TYPE, DRAFT_REOPEN, DRAFT_CHECK, WAIT_WORLD, OPEN, SEND, ASK_WAIT, ASK_ANSWERED, LOOK, WATCH, VILLAGE, VILLAGE_LOOK, VILLAGE_CLICK, VILLAGE_CHECK, WAIT_WORKING, WAIT_APPROVAL_OR_DONE, WAIT_DONE, CLOSE, HUD, FINISH, DONE }
+	private enum Step { HIDDEN_DECISION, HIDDEN_CARD, HIDDEN_SETTLED, ACTIVITY_OPEN, ACTIVITY_CHECK, ACTIVITY_RETURN, ACTIVITY_REVIEW, ACTIVITY_NEXT, ACTIVITY_BACK, ACTIVITY_OFFLINE, ACTIVITY_OFFLINE_BACK, STABLE_SITE, STABLE_CHURN, STABLE_CAPTURE, STABLE_OFFLINE, STABLE_RECOVER, STABLE_RESTORE, STABLE_ARCHIVE, SHARED_STABLE, SHARED_CHURN, SHARED_TARGET, SHARED_OPEN, SHARED_UNPIN, AUTH_ERROR, AUTH_RECOVER, PROTOCOL_ERROR, PROTOCOL_RECOVER, RELEASE_SITE, RELEASE_OPEN, RELEASE_CHECK, RELEASE_FEEDBACK, DESK_SITE, DESK_OPEN, DESK_REQUEST, DESK_ANSWERED, DESK_REVIEW_OPEN, DESK_REVIEW, DESK_DIFF, DESK_FEEDBACK, DESK_SIDEBAR, SILK_WORLD, OFFICE_SITE, OFFICE, FLOW_SEND, FLOW_WAIT, FLOW_CLICK, FLOW_DONE, OFFICE_SHARED_PAIR, OFFICE_SHARED_BUILD, OFFICE_SHARED_CHECK, THREADS, PREP, DONE_PANEL, WAIT_WORLD, OPEN, SEND, ASK_WAIT, ASK_ANSWERED, LOOK, WATCH, WAIT_WORKING, WAIT_APPROVAL_OR_DONE, WAIT_DONE, CLOSE, HUD, FINISH, DONE }
 
 	private final T3CraftClient mod;
 	private final String prompt;
@@ -23,7 +23,6 @@ final class SelfTest {
 	private int deadline = 20 * 600;
 	private int targetEntity;
 	private int pinnedDesk;
-	private T3ConnectionsScreen pendingPair;
 	private T3Office.Spot pinnedGoal;
 	private net.minecraft.world.phys.Vec3 sharedPosition;
 	private String targetThread;
@@ -39,7 +38,7 @@ final class SelfTest {
 	private SelfTest(T3CraftClient mod, String prompt) {
 		this.mod = mod;
 		this.prompt = prompt;
-		this.step = prompt.startsWith("pair:") ? Step.PAIR_JOIN : Step.WAIT_WORLD;
+		this.step = Step.WAIT_WORLD;
 		this.flow = prompt.startsWith("officeflow:");
 		this.sharedOffice = prompt.startsWith("sharedoffice:");
 	}
@@ -56,7 +55,7 @@ final class SelfTest {
   visualTick++;
   if(visualTick<1250 && mc.gui.screen()!=null)mc.gui.setScreen(null);
   if(visualTick==40){mc.gui.setScreen(null);mod.buildOffice();}
-  var o=mod.villageAnchor(); if(o==null)return;
+  var o=mod.officeOrigin(); if(o==null)return;
   if(visualTick==100){visualCommand(mc,"difficulty peaceful");visualCommand(mc,"time set day");}
   if(visualTick==700)visualCamera(mc,o,42,18,40,14,7,11);
   if(visualTick==750)shot(mc,"office-exterior");
@@ -64,15 +63,15 @@ final class SelfTest {
   if(visualTick==850)shot(mc,"office-interior");
   if(visualTick==860)visualCamera(mc,o,21,.7,6,21,1.3,0);
   if(visualTick==890)shot(mc,"office-kitchenette");
-  if(visualTick==900){var a=mod.village().brainForTest().agents().values().stream().filter(v->v.status==T3State.Status.NEEDS_YOU).findFirst().orElseThrow();visualCamera(mc,o,a.x-1.5,a.y()+.5,a.z-2,a.x,a.y()+1.5,a.z);}
+  if(visualTick==900){var a=mod.residents().brainForTest().agents().values().stream().filter(v->v.status==T3State.Status.NEEDS_YOU).findFirst().orElseThrow();visualCamera(mc,o,a.x-1.5,a.y()+.5,a.z-2,a.x,a.y()+1.5,a.z);}
   if(visualTick==940){
-   var a=mod.village().brainForTest().agents().values().stream().filter(v->v.status==T3State.Status.NEEDS_YOU).findFirst().orElseThrow();
+   var a=mod.residents().brainForTest().agents().values().stream().filter(v->v.status==T3State.Status.NEEDS_YOU).findFirst().orElseThrow();
    mc.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES,new net.minecraft.world.phys.Vec3(o.getX()+a.x,o.getY()+a.y()+1.5,o.getZ()+a.z));
    if(mc.gui.hud.isHidden())mc.gui.hud.toggle();
   }
   if(visualTick==950){
-   var a=mod.village().brainForTest().agents().values().stream().filter(v->v.status==T3State.Status.NEEDS_YOU).findFirst().orElseThrow();
-   for(var entry:mod.village().threadsByEntity().entrySet())if(entry.getValue().equals(a.threadId)&&mc.level.getEntity(entry.getKey()) instanceof Mannequin m){float angle=Math.abs(net.minecraft.util.Mth.wrapDegrees(m.getYHeadRot()-m.getYRot()));if(angle>50.1||angle<5)throw new IllegalStateException("Head turn outside hold/clamp "+angle);T3CraftClient.LOGGER.info("OFFICE_VISUAL PASS needs-you head turn {} degrees",angle);}
+   var a=mod.residents().brainForTest().agents().values().stream().filter(v->v.status==T3State.Status.NEEDS_YOU).findFirst().orElseThrow();
+   for(var entry:mod.residents().threadsByEntity().entrySet())if(entry.getValue().equals(a.threadId)&&mc.level.getEntity(entry.getKey()) instanceof Mannequin m){float angle=Math.abs(net.minecraft.util.Mth.wrapDegrees(m.getYHeadRot()-m.getYRot()));if(angle>50.1||angle<5)throw new IllegalStateException("Head turn outside hold/clamp "+angle);T3CraftClient.LOGGER.info("OFFICE_VISUAL PASS needs-you head turn {} degrees",angle);}
    shot(mc,"office-needs-you");
   }
   if(visualTick==1000){visualCommand(mc,"time set midnight");var server=mc.getSingleplayerServer();server.execute(()->{for(String command:T3Office.lamps(1,true))server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(),T3Office.absolute(command,o.getX(),o.getY(),o.getZ()));});visualCamera(mc,o,12,.8,9,6,1.1,3);}
@@ -80,7 +79,7 @@ final class SelfTest {
   if(visualTick==1100)visualCamera(mc,o,12,6.8,9,6,7.1,3);
   if(visualTick==1150)shot(mc,"office-upper-floor");
   if(visualTick==1200){
-   var agents=mod.village().brainForTest().agents();long lower=agents.values().stream().filter(a->a.floor==0).count(),upper=agents.values().stream().filter(a->a.floor==1).count();
+   var agents=mod.residents().brainForTest().agents();long lower=agents.values().stream().filter(a->a.floor==0).count(),upper=agents.values().stream().filter(a->a.floor==1).count();
    long laptops=0;java.util.Set<java.util.UUID> ids=new java.util.HashSet<>();for(var entity:mc.level.entitiesForRendering())if(entity.entityTags().contains("t3craft_laptop")){laptops++;if(!ids.add(entity.getUUID()))throw new IllegalStateException("Duplicate desk UUID");}
    if(lower!=8||upper!=4||laptops!=24)throw new IllegalStateException("Office roster/pairs "+lower+"/"+upper+"/"+laptops);
    if(!mc.level.getBlockState(o.offset(15,5,10)).is(net.minecraft.world.level.block.Blocks.BIRCH_PLANKS))throw new IllegalStateException("Upper floor was not placed");
@@ -123,22 +122,22 @@ final class SelfTest {
   if (mc.player == null || mc.level == null || !mod.state().snapshot().connected()) { if (ticks > 1200) { T3CraftClient.LOGGER.error("NATIVE_UI failed to load world/fixture; closing test client"); mc.stop(); } return; }
   mc.options.pauseOnLostFocus = false;
   nativeTick++;
-  var o = mod.villageAnchor();
+  var o = mod.officeOrigin();
   if (o == null) { if (nativeTick > 400) { T3CraftClient.LOGGER.error("NATIVE_UI no office in this world"); mc.stop(); } return; }
   if (nativeTick == 20) { visualCommand(mc, "difficulty peaceful"); visualCommand(mc, "time set 1000"); visualCommand(mc, "weather clear"); visualCommand(mc, "gamemode creative"); }
   if (nativeTick == 300) {
-   var a = mod.village().brainForTest().agents().values().stream().filter(v -> v.status == T3State.Status.NEEDS_YOU).findFirst().orElseThrow();
+   var a = mod.residents().brainForTest().agents().values().stream().filter(v -> v.status == T3State.Status.NEEDS_YOU).findFirst().orElseThrow();
    targetThread = a.threadId;
    visualCamera(mc, o, a.x - 1.4, a.y() + .3, a.z - 2.0, a.x, a.y() + 1.5, a.z);
   }
   if (nativeTick == 340) {
-   var a = mod.village().brainForTest().agents().get(targetThread);
+   var a = mod.residents().brainForTest().agents().get(targetThread);
    mc.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, new net.minecraft.world.phys.Vec3(o.getX() + a.x, o.getY() + a.y() + 1.4, o.getZ() + a.z));
    if (mc.gui.hud.isHidden()) mc.gui.hud.toggle();
   }
   if (nativeTick == 370) shot(mc, "native-agent-aim");
   if (nativeTick == 380) {
-   if (!(mc.hitResult instanceof net.minecraft.world.phys.EntityHitResult hit) || !targetThread.equals(mod.village().threadsByEntity().get(hit.getEntity().getId()))) throw new IllegalStateException("Crosshair missed the waiting agent: " + mc.hitResult);
+   if (!(mc.hitResult instanceof net.minecraft.world.phys.EntityHitResult hit) || !targetThread.equals(mod.residents().threadsByEntity().get(hit.getEntity().getId()))) throw new IllegalStateException("Crosshair missed the waiting agent: " + mc.hitResult);
    net.minecraft.client.KeyMapping.click(mc.options.keyUse.getDefaultKey());
   }
   if (nativeTick == 420) {
@@ -214,15 +213,11 @@ final class SelfTest {
 		if (!button.active) throw new IllegalStateException("QA button disabled: " + label);
 		click(screen, button.getX() + button.getWidth() / 2, button.getY() + button.getHeight() / 2);
 	}
-	private static void pasteLink(Minecraft minecraft, T3ConnectionsScreen screen, String value) {
-		String previous = minecraft.keyboardHandler.getClipboard();
-		try { minecraft.keyboardHandler.setClipboard(value); press(screen, "Paste link"); }
-		finally { minecraft.keyboardHandler.setClipboard(previous); }
-	}
 
 	private void fixtureControl(Minecraft minecraft, String action) {
 		mod.state().run(() -> {
-			var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:25682/_qa/" + action))
+			// Protocol 2 fixture A; -Dt3craft.fixturePort (-PfixturePort) moves it when the fixtures run on allocated ports.
+			var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:" + Integer.getInteger("t3craft.fixturePort", 25682) + "/_qa/" + action))
 				.timeout(java.time.Duration.ofSeconds(3)).GET().build();
 			var response = java.net.http.HttpClient.newHttpClient().send(request, java.net.http.HttpResponse.BodyHandlers.discarding());
 			if (response.statusCode() != 200) throw new java.io.IOException("Fixture control failed");
@@ -261,92 +256,10 @@ final class SelfTest {
 				}
 				finish(minecraft, "PASS hidden Decision screen renders request card and settled focus retains conversation");
 			}
-			case SETUP_FORM -> {
-				if (ticks < 200) return;
-				if (!(minecraft.gui.screen() instanceof T3ConnectionsScreen screen) || !screen.formForTest()) { finish(minecraft, "FAIL private setup entry"); return; }
-				pasteLink(minecraft, screen, "invalid fixture-secret");
-				if (screen.privateNarrationForTest().contains("fixture-secret") || !screen.linkForTest().contains("fixture-secret")) { finish(minecraft, "FAIL private link narration/input"); return; }
-				shot(minecraft, "private-pairing-form"); press(screen, "Pair machine"); advance(Step.SETUP_INVALID, "malformed credential-bearing link");
-			}
-			case SETUP_INVALID -> {
-				if (ticks < 20 || !(minecraft.gui.screen() instanceof T3ConnectionsScreen screen) || !screen.messageForTest().contains("invalid")) return;
-				if (mod.paired() || screen.messageForTest().contains("fixture-secret")) { finish(minecraft, "FAIL invalid link leaked or saved"); return; }
-				pasteLink(minecraft, screen, "http://127.0.0.1:25682/pair#token=expired-fixture"); press(screen, "Pair machine");
-				advance(Step.SETUP_EXPIRED, "expired bootstrap link");
-			}
-			case SETUP_EXPIRED -> {
-				if (ticks < 20 || !(minecraft.gui.screen() instanceof T3ConnectionsScreen screen) || !screen.messageForTest().contains("fresh link")) return;
-				if (mod.paired() || screen.messageForTest().contains("expired-fixture")) { finish(minecraft, "FAIL expired link leaked or saved"); return; }
-				shot(minecraft, "expired-private-pairing"); pasteLink(minecraft, screen, "http://127.0.0.1:25682/pair#token=fixture-pairing"); press(screen, "Pair machine");
-				advance(Step.SETUP_A, "pairing A through actual paste and submit buttons");
-			}
-			case SETUP_A -> {
-				if (ticks < 40 || !(minecraft.gui.screen() instanceof T3ConnectionsScreen screen) || screen.formForTest() || !mod.state().online("A-done-0")) return;
-				if (mod.environments().size() != 1 || !screen.linkForTest().isEmpty()) { finish(minecraft, "FAIL first pairing save/credential clear"); return; }
-				press(screen, "Add machine"); pasteLink(minecraft, screen, "http://127.0.0.1:25683/pair#token=fixture-pairing"); press(screen, "Pair machine");
-				advance(Step.SETUP_B, "adding second machine");
-			}
-			case SETUP_B -> {
-				if (ticks < 40 || !(minecraft.gui.screen() instanceof T3ConnectionsScreen screen) || screen.formForTest() || !mod.state().online("B-done-0")) return;
-				if (!mod.state().online("A-done-0") || mod.environments().size() != 2) { finish(minecraft, "FAIL second pairing disrupted A"); return; }
-				mod.focus("B-done-0"); press(screen, "Done");
-				T3Screen panel = (T3Screen) minecraft.gui.screen(); panel.setComposerForTest("Keep my healthy-machine draft"); mod.togglePin(mod.state().snapshot().focusedRow()); mod.openConnections();
-				fixtureControl(minecraft, "auth-failed"); advance(Step.SETUP_AUTH, "failed A while B remains focused with a draft and pin");
-			}
-			case SETUP_AUTH -> {
-				if (ticks < 40 || mod.state().online("A-done-0") || mod.state().machines().stream().noneMatch(m -> m.owner().endsWith(":25682") && m.error() != null && m.error().contains("Settings → Environments"))) return;
-				if (!mod.state().online("B-done-0")) { finish(minecraft, "FAIL healthy peer offline"); return; }
-				T3ConnectionsScreen screen = (T3ConnectionsScreen) minecraft.gui.screen(); shot(minecraft, "machine-health-and-recovery");
-				press(screen, "Re-pair"); pasteLink(minecraft, screen, "http://127.0.0.1:25683/pair#token=fixture-pairing"); press(screen, "Pair machine");
-				advance(Step.SETUP_WRONG, "wrong-owner replacement must be refused");
-			}
-			case SETUP_WRONG -> {
-				if (ticks < 20 || !(minecraft.gui.screen() instanceof T3ConnectionsScreen screen) || !screen.messageForTest().contains("Use Add machine")) return;
-				if (mod.environments().size() != 2 || mod.state().online("A-done-0")) { finish(minecraft, "FAIL wrong-owner re-pair changed machines"); return; }
-				pasteLink(minecraft, screen, "http://127.0.0.1:25682/pair#token=fixture-pairing"); press(screen, "Pair machine"); advance(Step.SETUP_REPAIRED, "correct fresh bootstrap repairs A");
-			}
-			case SETUP_REPAIRED -> {
-				if (ticks < 40 || !(minecraft.gui.screen() instanceof T3ConnectionsScreen screen) || screen.formForTest() || !mod.state().online("A-done-0")) return;
-				if (!mod.state().online("B-done-0") || mod.environments().size() != 2 || !mod.officePreferences().pins.stream().anyMatch(p -> p.threadId().equals("B-done-0"))) { finish(minecraft, "FAIL re-pair lost peer or pin"); return; }
-				press(screen, "Retry"); press(screen, "Remove"); press(screen, "Keep machine");
-				if (mod.environments().size() != 2) { finish(minecraft, "FAIL removal cancel"); return; }
-				press(screen, "Remove"); press(screen, "Remove locally"); advance(Step.SETUP_REMOVED, "removing only A through confirmation");
-			}
-			case SETUP_REMOVED -> {
-				if (ticks < 30 || mod.state().machines().size() != 1) return;
-				if (mod.environments().size() != 1 || !mod.state().online("B-done-0") || mod.state().apiFor("A-done-0") != null || !"B-done-0".equals(mod.state().focusedThreadId())) { finish(minecraft, "FAIL per-machine removal scope/focus"); return; }
-				press((T3ConnectionsScreen) minecraft.gui.screen(), "Done"); advance(Step.SETUP_RETURN, "returning to healthy machine draft");
-			}
-			case SETUP_RETURN -> {
-				if (ticks < 20) return;
-				if (!(minecraft.gui.screen() instanceof T3Screen screen) || !"Keep my healthy-machine draft".equals(screen.composerValueForTest())) { finish(minecraft, "FAIL connection management lost draft"); return; }
-				shot(minecraft, "connection-return-draft"); finish(minecraft, "PASS guided setup: private paste, malformed/expired link, two machines, wrong-owner refusal, re-pair/retry, confirmed/cancelled per-machine removal, healthy peer focus/draft/pin");
-			}
-			case SETUP_RESTORE -> {
-				if (ticks < 30) return;
-				if (mod.environments().size() != 1 || !mod.state().online("B-done-0") || mod.state().apiFor("A-done-0") != null || !mod.officePreferences().pins.stream().anyMatch(p -> p.threadId().equals("B-done-0"))) { finish(minecraft, "FAIL saved connections/pin restart"); return; }
-				T3ConnectionsScreen screen = (T3ConnectionsScreen) minecraft.gui.screen();
-				press(screen, "Add machine"); pasteLink(minecraft, screen, "http://127.0.0.1:25682/pair#token=delayed-fixture"); press(screen, "Pair machine"); pendingPair = screen; press(screen, "Back");
-				mod.openConnections(); screen = (T3ConnectionsScreen) minecraft.gui.screen();
-				press(screen, "Remove"); press(screen, "Remove locally"); advance(Step.SETUP_LAST, "last removal during an unfinished pairing");
-			}
-			case SETUP_LAST -> {
-				if (ticks < 100 || !mod.state().machines().isEmpty() || pendingPair == null || !pendingPair.messageForTest().contains("Connections changed")) return;
-				if (mod.paired() || !snapshot.threads().isEmpty() || mod.state().focusedThreadId() != null) { finish(minecraft, "FAIL last removal retained access or focus"); return; }
-				press((T3ConnectionsScreen) minecraft.gui.screen(), "Done"); mod.openPanel();
-				if (!(minecraft.gui.screen() instanceof T3ConnectionsScreen screen) || !screen.formForTest()) { finish(minecraft, "FAIL last removal cannot re-enter setup"); return; }
-				shot(minecraft, "unpaired-ready-to-connect"); finish(minecraft, "PASS restart restored only retained machine and pin; late pairing cannot resurrect a removed machine; last removal clears access/focus and returns to guided setup");
-			}
-			case SETUP_LIVE -> {
-				if (ticks < 60 || mod.state().machines().isEmpty()) return;
-				if (mod.state().machines().stream().anyMatch(m -> !m.online() || m.protocol() != 2)) { finish(minecraft, "FAIL existing real T3 health"); return; }
-				shot(minecraft, "existing-live-machine-health"); finish(minecraft, "PASS existing real T3 protocol-2 health in Connections; no fresh pairing or agent dispatch");
-			}
-
 			case STABLE_SITE -> {
 				if (ticks < 220 || mod.office().building()) return;
-				OfficeBrain.Agent pin = mod.village().brainForTest().agents().get("A-done-0");
-				if (pin == null || !mod.village().brainForTest().agents().containsKey("A-waiting") || !mod.village().brainForTest().agents().containsKey("B-waiting")) {
+				OfficeBrain.Agent pin = mod.residents().brainForTest().agents().get("A-done-0");
+				if (pin == null || !mod.residents().brainForTest().agents().containsKey("A-waiting") || !mod.residents().brainForTest().agents().containsKey("B-waiting")) {
 					finish(minecraft, "FAIL pinned/waiting residents missing"); return;
 				}
 				pinnedDesk = pin.desk; pinnedGoal = pin.goal; targetEntity = villagerFor(minecraft, "A-done-0").getId();
@@ -354,7 +267,7 @@ final class SelfTest {
 			}
 			case STABLE_CHURN -> {
 				if (ticks < 60 || snapshot.threads().size() != 32) return;
-				OfficeBrain.Agent pin = mod.village().brainForTest().agents().get("A-done-0");
+				OfficeBrain.Agent pin = mod.residents().brainForTest().agents().get("A-done-0");
 				if (pin == null || pin.desk != pinnedDesk || !pin.goal.equals(pinnedGoal) || villagerFor(minecraft, "A-done-0").getId() != targetEntity) {
 					finish(minecraft, "FAIL churn moved pinned desk or replaced villager"); return;
 				}
@@ -381,7 +294,7 @@ final class SelfTest {
 			}
 			case STABLE_RECOVER -> {
 				if (ticks < 40 || !mod.state().online("A-done-0")) return;
-				OfficeBrain.Agent pin = mod.village().brainForTest().agents().get("A-done-0");
+				OfficeBrain.Agent pin = mod.residents().brainForTest().agents().get("A-done-0");
 				if (pin == null || pin.desk != pinnedDesk || villagerFor(minecraft, "A-done-0").getId() != targetEntity || !(minecraft.gui.screen() instanceof T3Screen screen) || !"Office QA draft".equals(screen.composerValueForTest())) {
 					finish(minecraft, "FAIL reconnect changed pinned desk/entity or draft"); return;
 				}
@@ -390,7 +303,7 @@ final class SelfTest {
 			}
 			case STABLE_RESTORE -> {
 				if (ticks < 40) return;
-				OfficeBrain.Agent pin = mod.village().brainForTest().agents().get("A-done-0");
+				OfficeBrain.Agent pin = mod.residents().brainForTest().agents().get("A-done-0");
 				int expected = Integer.getInteger("t3craft.expectedDesk", -1);
 				if (pin == null || pin.desk != expected || !mod.officePreferences().pins.stream().anyMatch(p -> p.threadId().equals("A-done-0"))) {
 					finish(minecraft, "FAIL restarted client lost pinned desk"); return;
@@ -400,7 +313,7 @@ final class SelfTest {
 			}
 			case STABLE_ARCHIVE -> {
 				if (ticks < 60 || snapshot.threads().stream().anyMatch(r -> r.id().equals("A-done-0"))) return;
-				if (mod.village().brainForTest().agents().containsKey("A-done-0") || !(minecraft.gui.screen() instanceof T3PinsScreen screen)) {
+				if (mod.residents().brainForTest().agents().containsKey("A-done-0") || !(minecraft.gui.screen() instanceof T3PinsScreen screen)) {
 					finish(minecraft, "FAIL archived resident remained"); return;
 				}
 				shot(minecraft, "unavailable-pin");
@@ -538,7 +451,7 @@ final class SelfTest {
 
 			case RELEASE_SITE -> {
 				if (mod.office().building() || ticks < 240) return;
-				var o = mod.villageAnchor();
+				var o = mod.officeOrigin();
 				if (ticks == 240) view(minecraft, o, 10, 0, 19.5, 12.5, 0.8, 19.5);
 				if (ticks == 270) minecraft.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES,
 					new net.minecraft.world.phys.Vec3(o.getX() + 12.5, o.getY() + 0.8, o.getZ() + 19.5));
@@ -587,7 +500,7 @@ final class SelfTest {
 
 			case DESK_SITE -> {
 				if (mod.office().building() || ticks < 240) return;
-				var o = mod.villageAnchor();
+				var o = mod.officeOrigin();
 				if (ticks == 240) view(minecraft, o, 4.5, 1.1, 27.5, 2.5, 3.4, 27.5);
 				if (ticks < 280) return;
 				shot(minecraft, "decision-whiteboard");
@@ -623,13 +536,13 @@ final class SelfTest {
 				}
 				minecraft.gui.setScreen(null);
 				mod.focus("A-done-0");
-				var o = mod.villageAnchor();
+				var o = mod.officeOrigin();
 				view(minecraft, o, 10.0, 0.0, 19.5, 12.5, 0.8, 19.5);
 				advance(Step.DESK_REVIEW_OPEN, "one decision remains; aiming at review lectern");
 			}
 			case DESK_REVIEW_OPEN -> {
 				if (ticks == 30) {
-					var o = mod.villageAnchor();
+					var o = mod.officeOrigin();
 					minecraft.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES,
 						new net.minecraft.world.phys.Vec3(o.getX() + 12.5, o.getY() + 0.8, o.getZ() + 19.5));
 				}
@@ -701,10 +614,10 @@ final class SelfTest {
 				}
 				if (!built) return;
 				if (ticks % 20 != 0) return;
-				int agents = mod.village().brainForTest().agents().size();
+				int agents = mod.residents().brainForTest().agents().size();
 				if (agents == 0) return;
 				shot(minecraft, "silk-world");
-				finish(minecraft, "PASS silk world: office at " + mod.villageAnchor().toShortString() + ", " + agents + " agents, floors " + mod.floors());
+				finish(minecraft, "PASS silk world: office at " + mod.officeOrigin().toShortString() + ", " + agents + " agents, floors " + mod.floors());
 			}
 			case OFFICE_SITE -> {
 				if (ticks < 60) return;
@@ -723,7 +636,7 @@ final class SelfTest {
 					return;
 				}
 				built = true;
-				var o = mod.villageAnchor();
+				var o = mod.officeOrigin();
 				if (flow && ticks == 20) {
 					// Stand at the work tables, looking at the whiteboard end.
 					minecraft.player.getAbilities().flying = true;
@@ -786,7 +699,7 @@ final class SelfTest {
 					mod.office().send(o, T3Office.lamps(mod.floors().size(), NycSun.isNight(java.time.Instant.now())));
 				}
 				if (ticks >= 600) {
-					T3CraftClient.LOGGER.info("SELFTEST office villagers per floor: {}", perFloor());
+					T3CraftClient.LOGGER.info("SELFTEST office agents per floor: {}", perFloor());
 					T3CraftClient.LOGGER.info("SELFTEST RESULT PASS (office); game left running");
 					step = Step.DONE;
 				}
@@ -802,9 +715,9 @@ final class SelfTest {
 				if (ticks == 60) shot(minecraft, "flow-working");
 				String detail = mod.state().waitingDetail(row.id());
 				if (row.status() != T3State.Status.NEEDS_YOU || detail == null || detail.isEmpty()) return;
-				OfficeBrain.Agent waiting = mod.village().brainForTest().agents().get(row.id());
+				OfficeBrain.Agent waiting = mod.residents().brainForTest().agents().get(row.id());
 				if (waiting == null || waiting.zone != OfficeBrain.Zone.NEEDS_YOU || !waiting.settled()) return;
-				var o = mod.villageAnchor();
+				var o = mod.officeOrigin();
 				if (ticks % 20 != 0) return;
 				// Wait for the brain to reach the board and the board to be written.
 				var board = minecraft.level.getBlockEntity(new net.minecraft.core.BlockPos(o.getX() + 2, o.getY() + 3, o.getZ() + 27));
@@ -818,10 +731,10 @@ final class SelfTest {
 			case FLOW_CLICK -> {
 				if (ticks == 30) shot(minecraft, "flow-whiteboard");
 				if (ticks == 35) {
-					// Look at the waiting villager and right-click it like a player would.
+					// Look at the waiting agent and right-click it like a player would.
 					var villager = villagerFor(minecraft, row.id());
 					if (villager == null) {
-						finish(minecraft, "FAIL no villager for the waiting thread");
+						finish(minecraft, "FAIL no agent for the waiting thread");
 						return;
 					}
 					minecraft.player.getAbilities().flying = false;
@@ -845,20 +758,20 @@ final class SelfTest {
 					mod.respond(approval, "accept");
 					minecraft.gui.setScreen(null);
 					// Watch the walk from the work tables to the fridge and the sofa.
-					view(minecraft, mod.villageAnchor(), 12, 3.2, 12, 3, 0.5, 6);
-					advance(Step.FLOW_DONE, "approved " + approval.detail() + " from the villager");
+					view(minecraft, mod.officeOrigin(), 12, 3.2, 12, 3, 0.5, 6);
+					advance(Step.FLOW_DONE, "approved " + approval.detail() + " from the agent");
 				}
 			}
 			case FLOW_DONE -> {
 				if (row == null) return;
-				OfficeBrain.Agent agent = mod.village().brainForTest().agents().get(row.id());
+				OfficeBrain.Agent agent = mod.residents().brainForTest().agents().get(row.id());
 				if (agent != null && agent.pause > 0 && !sawDrink) {
 					sawDrink = true;
 					shot(minecraft, "flow-fridge");
 				}
 				if (agent != null && agent.holding && agent.settled() && doneAt == 0) {
 					doneAt = ticks;
-					view(minecraft, mod.villageAnchor(), 7, 2.6, 20.5, 7, 0.8, 26);
+					view(minecraft, mod.officeOrigin(), 7, 2.6, 20.5, 7, 0.8, 26);
 				}
 				if (doneAt > 0 && ticks - doneAt == 30) shot(minecraft, "flow-sofa");
 				if (doneAt > 0 && ticks - doneAt >= 40) {
@@ -880,7 +793,7 @@ final class SelfTest {
 			case OFFICE_SHARED_PAIR -> {
 				if (ticks == 1) {
 					ClientCommands.send("t3office off");
-					ClientCommands.send("t3village pair " + prompt.substring(prompt.indexOf(':') + 1).strip());
+					ClientCommands.send("t3office pair " + prompt.substring(prompt.indexOf(':') + 1).strip());
 				}
 				if (ticks == 200) {
 					ClientCommands.send("t3office build");
@@ -897,7 +810,7 @@ final class SelfTest {
 				}
 				if (ticks == 300) {
 					shot(minecraft, "shared-office");
-					advance(Step.OFFICE_SHARED_CHECK, "looking for server villagers");
+					advance(Step.OFFICE_SHARED_CHECK, "looking for server agents");
 				}
 			}
 			case OFFICE_SHARED_CHECK -> {
@@ -934,133 +847,6 @@ final class SelfTest {
 					if (!ok) finish(minecraft, "FAIL right-click on a server villager did not open its thread");
 				}
 				if (ticks == 90) finish(minecraft, "PASS (shared office)");
-			}
-			case VFLOW_SEND -> {
-				if (ticks < 40) return;
-				// Like pressing Enter: sends and goes back to the world.
-				if (minecraft.gui.screen() instanceof T3Screen screen) screen.typeAndSubmit(prompt.substring(12).strip(), false);
-				advance(Step.VFLOW_WAIT, "sent; waiting for the villager to need me");
-			}
-			case VFLOW_WAIT -> {
-				if (row == null || row.status() != T3State.Status.NEEDS_YOU || ticks % 10 != 0) return;
-				String detail = mod.state().waitingDetail(row.id());
-				Mannequin villager = villagerFor(minecraft, row.id());
-				if (detail == null || detail.isEmpty() || villager == null || villager.getCustomName() == null) return;
-				String name = villager.getCustomName().getString();
-				String expected = detail.strip().replaceAll("\\s+", " ");
-				expected = expected.substring(0, Math.min(12, expected.length()));
-				if (!name.contains(expected)) return; // the name refreshes every half second
-				T3CraftClient.LOGGER.info("SELFTEST villager nametag: '{}' (waiting on '{}')", name, detail);
-				targetEntity = villager.getId();
-				ClientCommands.send("tp @s " + (villager.getX() + 2.5) + " " + villager.getY() + " " + villager.getZ());
-				advance(Step.VFLOW_CLICK, "needs you: " + detail);
-			}
-			case VFLOW_CLICK -> {
-				if (!(minecraft.level.getEntity(targetEntity) instanceof Mannequin villager)) {
-					finish(minecraft, "FAIL waiting villager disappeared");
-					return;
-				}
-				if (ticks == 20) {
-					minecraft.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, villager.position().add(0, 1.2, 0));
-				}
-				if (ticks == 30) shot(minecraft, "villager-needs-you");
-				if (ticks == 35) net.minecraft.client.KeyMapping.click(minecraft.options.keyUse.getDefaultKey());
-				if (ticks == 60) {
-					if (!(minecraft.gui.screen() instanceof T3Screen) || snapshot.focus() == null || snapshot.focus().approvals().isEmpty()) {
-						finish(minecraft, "FAIL right-clicking the waiting villager did not open its approval");
-						return;
-					}
-					shot(minecraft, "villager-approval");
-					var approval = snapshot.focus().approvals().getFirst();
-					mod.respond(approval, "accept");
-					minecraft.gui.setScreen(null);
-					advance(Step.VFLOW_DONE, "approved " + approval.detail() + " from the villager");
-				}
-			}
-			case VFLOW_DONE -> {
-				if (row == null) return;
-				// Later approvals (e.g. queued turns) are accepted too, until the thread is done.
-				if (row.status() == T3State.Status.NEEDS_YOU && snapshot.focus() != null && !snapshot.focus().approvals().isEmpty() && ticks % 40 == 0) {
-					mod.respond(snapshot.focus().approvals().getFirst(), "accept");
-				}
-				if (row.status() != T3State.Status.DONE) return;
-				if (doneAt == 0) doneAt = ticks;
-				var book = minecraft.player.getInventory().getNonEquipmentItems().stream()
-					.filter(stack -> stack.is(net.minecraft.world.item.Items.WRITTEN_BOOK)).findFirst().orElse(null);
-				if (book == null) {
-					if (ticks - doneAt > 200) finish(minecraft, "FAIL no report book after the thread finished");
-					return;
-				}
-				var content = book.get(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT);
-				T3CraftClient.LOGGER.info("SELFTEST report book '{}', {} page(s): {}", content.title().raw(), content.pages().size(),
-					content.pages().getFirst().raw().getString().replace('\n', ' '));
-				minecraft.gui.setScreen(new net.minecraft.client.gui.screens.inventory.BookViewScreen(
-					net.minecraft.client.gui.screens.inventory.BookViewScreen.BookAccess.fromItem(book)));
-				advance(Step.FINISH, "book delivered");
-			}
-			case SHARED_COUNT -> {
-				if (ticks < 200) return;
-				var ids = new java.util.ArrayList<java.util.UUID>();
-				for (var entity : minecraft.level.entitiesForRendering()) {
-					if (entity instanceof Mannequin villager && villager.getId() > 0 && ours(snapshot, villager)) ids.add(villager.getUUID());
-				}
-				long unique = ids.stream().distinct().count();
-				T3CraftClient.LOGGER.info("SELFTEST shared villagers after restart: {} ({} unique)", ids.size(), unique);
-				ClientCommands.send("t3village off");
-				finish(minecraft, !ids.isEmpty() && ids.size() == unique && ids.size() <= 8 ? "PASS (no duplicates after restart)"
-					: "FAIL " + ids.size() + " villagers, " + unique + " unique");
-			}
-			case SHARED_PAIR -> {
-				if (ticks < 200) return;
-				ClientCommands.send("t3village here");
-				advance(Step.SHARED_CHECK, "placed the shared village");
-			}
-			case SHARED_CHECK -> {
-				if (ticks == 100) {
-					var names = new java.util.ArrayList<String>();
-					Mannequin target = null;
-					for (var entity : minecraft.level.entitiesForRendering()) {
-						if (entity instanceof Mannequin villager && villager.getId() > 0 && ours(snapshot, villager)) {
-							names.add(villager.getCustomName() == null ? "?" : villager.getCustomName().getString());
-							if (target == null || villager.distanceTo(minecraft.player) < target.distanceTo(minecraft.player)) target = villager;
-						}
-					}
-					T3CraftClient.LOGGER.info("SELFTEST shared village server villagers ({}): {}", names.size(), names);
-					if (target == null || names.size() > 8) {
-						finish(minecraft, "FAIL expected 1-8 shared villagers, saw " + names.size());
-						return;
-					}
-					shot(minecraft, "shared-village");
-					targetEntity = target.getId();
-					ClientCommands.send("tp @s " + (target.getX() + 2.5) + " " + target.getY() + " " + target.getZ());
-				}
-				if (ticks == 120 && minecraft.level.getEntity(targetEntity) instanceof Mannequin target) {
-					minecraft.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, target.position().add(0, 1.2, 0));
-				}
-				if (ticks == 125) net.minecraft.client.KeyMapping.click(minecraft.options.keyUse.getDefaultKey());
-				if (ticks == 150) {
-					var focused = snapshot.focusedRow();
-					boolean ok = minecraft.gui.screen() instanceof T3Screen && focused != null
-						&& minecraft.level.getEntity(targetEntity) instanceof Mannequin target && VillageLayout.villagerUuid(focused.id()).equals(target.getUUID());
-					shot(minecraft, "shared-panel");
-					T3CraftClient.LOGGER.info("SELFTEST shared click opened '{}'", focused == null ? null : focused.title());
-					if (!ok) {
-						finish(minecraft, "FAIL right-clicking a shared villager did not open its thread");
-						return;
-					}
-					minecraft.gui.setScreen(null);
-					// shared-keep: leave the village up so a server restart can be checked with shared-count.
-					if (prompt.startsWith("shared-keep:")) {
-						finish(minecraft, "PASS (shared village, kept)");
-						return;
-					}
-					ClientCommands.send("t3village off");
-				}
-				if (ticks == 200) {
-					long left = minecraft.level.getEntities((net.minecraft.world.entity.Entity) null, minecraft.player.getBoundingBox().inflate(40),
-						entity -> entity instanceof Mannequin villager && villager.getId() > 0 && ours(snapshot, villager)).size();
-					finish(minecraft, left == 0 ? "PASS (shared village)" : "FAIL " + left + " shared villagers left after /t3village off");
-				}
 			}
 			case THREADS -> {
 				if (!(minecraft.gui.screen() instanceof T3Screen screen)) return;
@@ -1105,44 +891,6 @@ final class SelfTest {
 				if (ticks == 150) shot(minecraft, "done-panel");
 				if (ticks >= 160) advance(Step.FINISH, "panel captured");
 			}
-			case PAIR_JOIN -> {
-				if (minecraft.player == null || ticks < 100) return;
-				if (mod.paired()) {
-					finish(minecraft, "FAIL pair test needs an empty config");
-					return;
-				}
-				// Exactly what a player types; Fabric routes client commands from sendCommand.
-				ClientCommands.send("t3 pair " + prompt.substring(5).strip());
-				advance(Step.PAIR_WAIT, "typed /t3 pair <link>");
-			}
-			case PAIR_WAIT -> {
-				if (!mod.paired() || !snapshot.connected() || snapshot.threads().isEmpty() || ticks < 20) return;
-				shot(minecraft, "paired-chat");
-				mod.focus(snapshot.threads().getFirst().id());
-				mod.openPanel();
-				advance(Step.DRAFT_TYPE, "paired; " + snapshot.threads().size() + " threads visible");
-			}
-			case DRAFT_TYPE -> {
-				if (ticks < 20) return;
-				if (!(minecraft.gui.screen() instanceof T3Screen screen)) {
-					finish(minecraft, "FAIL panel did not open after pairing");
-					return;
-				}
-				shot(minecraft, "first-panel");
-				screen.setComposerForTest("half-written prompt");
-				minecraft.gui.setScreen(null);
-				advance(Step.DRAFT_REOPEN, "typed a draft and closed the panel");
-			}
-			case DRAFT_REOPEN -> {
-				if (ticks < 10) return;
-				mod.openPanel();
-				advance(Step.DRAFT_CHECK, "reopened");
-			}
-			case DRAFT_CHECK -> {
-				if (ticks < 10) return;
-				String value = minecraft.gui.screen() instanceof T3Screen screen ? screen.composerValueForTest() : null;
-				finish(minecraft, "half-written prompt".equals(value) ? "PASS (pair + draft)" : "FAIL draft was '" + value + "'");
-			}
 			case WAIT_WORLD -> {
 				if ("hidden-decisions".equals(prompt)) {
 					if (minecraft.player == null || !snapshot.connected()) return;
@@ -1157,18 +905,6 @@ final class SelfTest {
 					advance(Step.ACTIVITY_OPEN, "read-only activity workflow; no prompt submission"); return;
 				}
 
-				if (prompt.startsWith("guided-")) {
-					if (minecraft.player == null || ticks <= 140) return;
-					if ("guided-connections".equals(prompt)) {
-						if (mod.paired()) { finish(minecraft, "FAIL onboarding requires an empty disposable config"); return; }
-						mod.openPanel(); advance(Step.SETUP_FORM, "unpaired open key path reaches private form");
-					} else if ("guided-restore".equals(prompt) && snapshot.connected()) {
-						mod.openConnections(); advance(Step.SETUP_RESTORE, "checking saved machine and pin after restart");
-					} else if ("guided-live".equals(prompt) && snapshot.connected()) {
-						mod.openConnections(); advance(Step.SETUP_LIVE, "read-only existing T3 machine health");
-					}
-					return;
-				}
 				if (minecraft.player != null && snapshot.connected() && !snapshot.threads().isEmpty() && ticks > 100 && prompt.startsWith("new:")) {
 					advance(Step.PREP, "world ready; clearing a view for the build");
 				} else if (minecraft.player != null && snapshot.connected() && !snapshot.threads().isEmpty() && ticks > 100) {
@@ -1241,24 +977,6 @@ final class SelfTest {
 					advance(Step.WATCH, "watching; screenshot every 15s");
 					return;
 				}
-				if (prompt.startsWith("villageflow:") || prompt.startsWith("shared:") || prompt.startsWith("shared-keep:")) {
-					// Local test server only: daylight, creative, and an empty hand so right-clicks reach villagers.
-					ClientCommands.send("time set day");
-					ClientCommands.send("gamemode creative");
-					minecraft.player.getInventory().setSelectedSlot(8);
-					// So the report-book check can only pass on a book from this run.
-					ClientCommands.send("clear @s minecraft:written_book");
-					if (prompt.startsWith("shared")) {
-						ClientCommands.send("t3village off");
-						ClientCommands.send("t3village pair " + prompt.substring(prompt.indexOf(':') + 1).strip());
-						advance(Step.SHARED_PAIR, "pairing the server");
-					} else {
-						mod.placeVillage(3);
-						mod.openPanel();
-						advance(Step.VFLOW_SEND, "village placed, panel open");
-					}
-					return;
-				}
 				if ("silkworld".equals(prompt)) {
 					// One-time setup of a showcase world: the office right here at spawn, door just ahead.
 					ClientCommands.send("gamemode creative");
@@ -1277,20 +995,9 @@ final class SelfTest {
 					return;
 				}
 				if ("anchor".equals(prompt)) {
-					// Which village this world has (each world keeps its own).
-					var anchor = mod.villageAnchor();
+					// Which office this world has (each world keeps its own).
+					var anchor = mod.officeOrigin();
 					finish(minecraft, "PASS anchor " + (anchor == null ? "none" : anchor.toShortString()));
-					return;
-				}
-				if ("shared-count".equals(prompt)) {
-					advance(Step.SHARED_COUNT, "counting shared villagers after a server restart");
-					return;
-				}
-				if ("village".equals(prompt)) {
-					// Local test server only: daylight for readable screenshots.
-					ClientCommands.send("time set day");
-					mod.placeVillage(2);
-					advance(Step.VILLAGE, "village placed");
 					return;
 				}
 				mod.openPanel();
@@ -1423,43 +1130,6 @@ final class SelfTest {
 				}
 				if (ticks % 300 == 0) shot(minecraft, "watch");
 			}
-			case VILLAGE -> {
-				if (ticks < 60) return;
-				var villagers = mod.village().threadsByEntity();
-				if (villagers.isEmpty()) {
-					if (ticks > 400) finish(minecraft, "FAIL no villagers spawned");
-					return;
-				}
-				shot(minecraft, "village");
-				targetEntity = villagers.keySet().stream().max(Integer::compare).orElseThrow();
-				targetThread = villagers.get(targetEntity);
-				var villager = minecraft.level.getEntity(targetEntity);
-				minecraft.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES,
-					villager.position().add(0, 1.2, 0));
-				advance(Step.VILLAGE_LOOK, villagers.size() + " villagers; looking at " + villager.getCustomName().getString());
-			}
-			case VILLAGE_LOOK -> {
-				if (ticks < 20) return;
-				shot(minecraft, "village-close");
-				boolean aimed = minecraft.hitResult instanceof net.minecraft.world.phys.EntityHitResult hit && hit.getEntity().getId() == targetEntity;
-				// A real use-key press, handled by the same path as a mouse right-click.
-				net.minecraft.client.KeyMapping.click(minecraft.options.keyUse.getDefaultKey());
-				advance(Step.VILLAGE_CLICK, "crosshair on villager: " + aimed);
-			}
-			case VILLAGE_CLICK -> {
-				if (ticks < 20) return;
-				boolean opened = minecraft.gui.screen() instanceof T3Screen;
-				boolean focused = targetThread.equals(mod.state().focusedThreadId());
-				advance(Step.VILLAGE_CHECK, "panel open: " + opened + ", focused clicked thread: " + focused);
-				if (!opened || !focused) finish(minecraft, "FAIL right-click did not open the villager's thread");
-			}
-			case VILLAGE_CHECK -> {
-				if (ticks == 30) shot(minecraft, "villager-panel");
-				if (ticks < 50) return;
-				minecraft.gui.setScreen(null);
-				T3CraftClient.LOGGER.info("SELFTEST RESULT PASS (village); game left running");
-				step = Step.DONE;
-			}
 			case CLOSE -> {
 				if (ticks < 20) return;
 				minecraft.gui.setScreen(null);
@@ -1473,7 +1143,6 @@ final class SelfTest {
 			}
 			case FINISH -> {
 				if (flow && ticks == 30) shot(minecraft, "flow-book");
-				if (ticks == 30 && prompt.startsWith("villageflow:")) shot(minecraft, "report-book");
 				if (ticks <= 40) return;
 				if (prompt.startsWith("new:")) {
 					// Real-environment demo: leave the game running for the player.
@@ -1496,7 +1165,8 @@ final class SelfTest {
 	}
 
 	private Mannequin villagerFor(Minecraft minecraft, String threadId) {
-		for (var entry : mod.village().threadsByEntity().entrySet()) {
+		// The client-side Mannequin standing in for a thread in this world's office.
+		for (var entry : mod.residents().threadsByEntity().entrySet()) {
 			if (entry.getValue().equals(threadId) && minecraft.level.getEntity(entry.getKey()) instanceof Mannequin villager) return villager;
 		}
 		return null;
@@ -1509,14 +1179,8 @@ final class SelfTest {
 
 	private String perFloor() {
 		var counts = new java.util.TreeMap<Integer, Integer>();
-		for (OfficeBrain.Agent agent : mod.village().brainForTest().agents().values()) counts.merge(agent.floor, 1, Integer::sum);
+		for (OfficeBrain.Agent agent : mod.residents().brainForTest().agents().values()) counts.merge(agent.floor, 1, Integer::sum);
 		return counts.toString();
-	}
-
-	/** A server villager standing for one of our threads (shared village). */
-	private static boolean ours(T3State.Snapshot snapshot, Mannequin villager) {
-		for (T3State.ThreadRow row : snapshot.threads()) if (VillageLayout.villagerUuid(row.id()).equals(villager.getUUID())) return true;
-		return false;
 	}
 
 	private void advance(Step next, String note) {

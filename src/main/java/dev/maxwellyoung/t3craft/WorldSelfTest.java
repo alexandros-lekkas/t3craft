@@ -117,7 +117,7 @@ final class WorldSelfTest {
 					finish(minecraft, (onPlaza && desks ? "PASS" : "FAIL") + " T3 World '" + data.name + "' place " + place + " seed " + data.seed
 						+ " office " + data.origin.toShortString() + " rotation " + data.rotation + " spawn " + data.spawn.toShortString()
 						+ " yaw " + data.spawnYaw + " pitch " + data.spawnPitch + " arrived " + arrivedAt.toShortString()
-						+ " agents " + mod.village().brainForTest().agents().size() + " working " + workers + " at desks " + seated + (paired ? "" : " (unpaired)"));
+						+ " agents " + mod.residents().brainForTest().agents().size() + " working " + workers + " at desks " + seated + (paired ? "" : " (unpaired)"));
 				}
 				default -> {}
 			}
@@ -128,15 +128,15 @@ final class WorldSelfTest {
 	}
 
 	private int workers() {
-		return (int) mod.village().brainForTest().agents().values().stream().filter(a -> a.zone == OfficeBrain.Zone.WORK).count();
+		return (int) mod.residents().brainForTest().agents().values().stream().filter(a -> a.zone == OfficeBrain.Zone.WORK).count();
 	}
 
 	/** Working agents that have stopped walking and whose Mannequin stands at the desk's world position. */
 	private int settledAtDesks() {
 		int count = 0;
-		for (OfficeBrain.Agent agent : mod.village().brainForTest().agents().values()) {
+		for (OfficeBrain.Agent agent : mod.residents().brainForTest().agents().values()) {
 			if (agent.zone != OfficeBrain.Zone.WORK || !agent.settled()) continue;
-			var villager = mod.village().villagerFor(agent.threadId);
+			var villager = mod.residents().mannequinFor(agent.threadId);
 			if (villager == null) continue;
 			Vec3 expected = frame.point(agent.goal.x() + 0.5, agent.y(), agent.goal.z() + 0.5);
 			double off = villager.position().distanceTo(expected);

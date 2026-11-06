@@ -22,7 +22,7 @@ final class T3McpBackend implements T3Backend {
 	private String session, authBlocked;
  static final String READ_ONLY = "T3 approved T3 Craft for Read only access, so it cannot change anything. Re-pair this machine with its MCP URL and choose Full access on T3's consent page.";
  static final String MODE_LIMIT = "T3 refused: this thread runs with more access than T3 Craft was approved for. Re-pair this machine with its MCP URL and choose Full access on T3's consent page.";
- private static final String AUTH_MESSAGE = "T3 MCP access expired or was revoked. Re-pair this machine with its MCP URL in Connections.";
+ private static final String AUTH_MESSAGE = "T3 MCP access expired or was revoked. Re-pair: T3 Craft reconnects to the T3 Code on this computer by itself; another machine needs a fresh MCP URL in config/t3craft.json.";
  private static final class SessionLost extends IOException {}
  private static T3McpException failure(T3McpException.Kind kind, boolean safe, String message) { return new T3McpException(kind, null, safe, message); }
  private static String cap(String text, int limit) { return text == null ? "Unknown error" : text.substring(0, Math.min(limit, text.length())); }

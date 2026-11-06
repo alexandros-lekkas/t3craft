@@ -197,8 +197,18 @@ final class Cdp implements WebSocket.Listener, AutoCloseable {
 
 	static JsonObject insertText(String text) { return obj("text", text); }
 
-	/** A named (non-text) key, or null when the key types text and should go through insertText instead. */
-	record Key(String key, String code, int windowsCode, String text) {}
+	/**
+	 * A named (non-text) key, or null when the key types text and should go through insertText instead.
+	 * {@code location} is CDP's 1 (left) or 2 (right) for the paired modifier keys, 0 otherwise.
+	 */
+	record Key(String key, String code, int windowsCode, String text, int location) {
+		Key(String key, String code, int windowsCode, String text) { this(key, code, windowsCode, text, 0); }
+
+		/** The CDP modifier bit this key itself toggles (Alt 1, Ctrl 2, Meta 4, Shift 8), or 0 for ordinary keys. */
+		int modifierBit() {
+			return switch (key) { case "Shift" -> 8; case "Control" -> 2; case "Alt" -> 1; case "Meta" -> 4; default -> 0; };
+		}
+	}
 
 	static Key key(int glfwKey) {
 		return switch (glfwKey) {
@@ -214,6 +224,15 @@ final class Cdp implements WebSocket.Listener, AutoCloseable {
 			case 267 -> new Key("PageDown", "PageDown", 34, null);
 			case 268 -> new Key("Home", "Home", 36, null);
 			case 269 -> new Key("End", "End", 35, null);
+			// Modifiers are real keys to the page: held Shift for range selection, Ctrl/⌘ chords, Alt menus.
+			case 340 -> new Key("Shift", "ShiftLeft", 16, null, 1);
+			case 344 -> new Key("Shift", "ShiftRight", 16, null, 2);
+			case 341 -> new Key("Control", "ControlLeft", 17, null, 1);
+			case 345 -> new Key("Control", "ControlRight", 17, null, 2);
+			case 342 -> new Key("Alt", "AltLeft", 18, null, 1);
+			case 346 -> new Key("Alt", "AltRight", 18, null, 2);
+			case 343 -> new Key("Meta", "MetaLeft", 91, null, 1);
+			case 347 -> new Key("Meta", "MetaRight", 93, null, 2);
 			default -> {
 				// Letters and digits only matter with Ctrl/Cmd held (shortcuts); plain typing arrives via charTyped.
 				if (glfwKey >= 65 && glfwKey <= 90) yield new Key(String.valueOf((char) (glfwKey + 32)), "Key" + (char) glfwKey, glfwKey, null);
@@ -242,8 +261,11 @@ final class Cdp implements WebSocket.Listener, AutoCloseable {
 
 	static JsonObject keyEvent(String type, Key key, int glfwMods, boolean mac) {
 		int mods = modifiers(glfwMods);
+		// GLFW reports the modifier state from before a modifier key's own transition; the page expects the state after it.
+		if (type.equals("keyDown")) mods |= key.modifierBit(); else mods &= ~key.modifierBit();
 		JsonObject event = obj("type", type, "key", key.key(), "code", key.code(), "windowsVirtualKeyCode", key.windowsCode(),
 			"nativeVirtualKeyCode", key.windowsCode(), "modifiers", mods);
+		if (key.location() != 0) event.addProperty("location", key.location());
 		if (type.equals("keyDown") && key.text() != null && (mods & ~8) == 0) { event.addProperty("text", key.text()); event.addProperty("unmodifiedText", key.text()); }
 		String command = mac && type.equals("keyDown") ? macCommand(key, mods) : null;
 		if (command != null) {

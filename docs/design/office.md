@@ -27,7 +27,7 @@ The maps are computed from the template (`scripts/office/lighting.cjs` adds the 
 
 ## Going to the office
 
-Use `/t3 office build` to place or explicitly rebuild the office. Once this world has an office, `/t3 office` and `/t3 office go` return you to its entrance plaza, facing the door, even from an unloaded area or another dimension. Singleplayer teleports run directly on the integrated server; remote servers use the existing throttled `/tp` command path and require server permission. With no saved office, bare `/t3 office` builds one.
+Use `/t3 office build` to place or explicitly rebuild the office. Once this world has an office, `/t3 office` and `/t3 office go` return you to its entrance plaza, facing the door, even from an unloaded area or another dimension. Singleplayer teleports run directly on the integrated server; remote servers use the existing throttled `/tp` command path and require server permission. With no saved office, bare `/t3 office` builds one. The office is the only place agents live: the earlier village mode and its villagers were removed on 2026-11-06.
 
 ## Actual Minecraft captures
 
@@ -47,7 +47,7 @@ The dev client uses Java 25, Minecraft 26.3, `guiScale:5`, muted master volume, 
 
 The captured needs-you head turn measured 49.99997°. The client also passed both teleport checks and shut itself down. The reported blank T3 panel was investigated: that earlier test world had failed to load its 26.3 world-generation settings, and the log contained no T3Screen render exception. After using a complete flat-world save, the laptop screenshot above proves the unchanged T3Screen renders at GUI scale 5.
 
-Smoke checks cover generated anchors, minimum floors, extension modules, provider mapping and bundled files, laptop states, deterministic identities, head-turn movement holds, stable allocation, rebuild protection and reconnect behavior. `T3CRAFT_FIXTURE_PORT=25730 scripts/verify-ci.sh` uses isolated ports for the full CI suite; the default CI ports are unchanged.
+Smoke checks cover generated anchors, minimum floors, extension modules, provider mapping and bundled files, laptop states, deterministic identities, head-turn movement holds, stable allocation, rebuild protection and reconnect behavior. `scripts/verify-ci.sh` allocates free fixture ports on every run, so it can run beside another checkout; `T3CRAFT_FIXTURE_PORT=25730 scripts/verify-ci.sh` pins them instead.
 
 To repeat: start `python3 scripts/office/fixture.py`, create a disposable creative flat world, set the options above plus `pauseOnLostFocus:false`, and run `./gradlew runClient -Pselftest=office-a -Pworld=<save-name> -Pconfig=config/office-fixture.json`. Screenshots appear in `run/screenshots`.
 

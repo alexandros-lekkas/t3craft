@@ -11,7 +11,7 @@ import java.util.function.Function;
 
 /**
  * Where every agent is in the office and where it's going, with no Minecraft entities involved.
- * The client village and the shared server office each mirror these agents onto their own
+ * The client office and the shared server office each mirror these agents onto their own
  * Mannequins. Positions are relative to the office origin; each machine has a two-floor suite.
  */
 final class OfficeBrain {
@@ -21,7 +21,7 @@ final class OfficeBrain {
 
 	enum Zone { WORK, NEEDS_YOU, LOUNGE }
 
-	/** One agent (thread) and its villager's state. */
+	/** One agent (thread) and its character's state. */
 	static final class Agent {
 		final String threadId;
 		String title;
@@ -175,7 +175,7 @@ final class OfficeBrain {
 		agents.clear();
 	}
 
-	/** A shared-office villager's entity UUID: derived from its thread, distinct from the shared village's. */
+	/** A shared-office agent's entity UUID, derived from its thread so any client can tell whose it is. */
 	static java.util.UUID villagerUuid(String threadId) {
 		return java.util.UUID.nameUUIDFromBytes(("t3craft-office:" + threadId).getBytes(java.nio.charset.StandardCharsets.UTF_8));
 	}

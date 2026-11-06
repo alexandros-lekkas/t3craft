@@ -78,7 +78,7 @@ public final class T3State {
 	// second request while the thread is still waiting would otherwise never ping.
 	private final Map<String, Set<String>> seenApprovals = new HashMap<>();
 	private final Consumer<Event> onEvent;
-	// What waiting threads are asking (approval command or question), shown on the waiting villager.
+	// What waiting threads are asking (approval command or question), shown on the waiting agent.
 	private final Map<String, String> waitingDetails = new ConcurrentHashMap<>();
 	private final Map<String, JsonObject> waitingThreads = new HashMap<>();
 	private final Map<String, Long> waitingFetchedAt = new HashMap<>();

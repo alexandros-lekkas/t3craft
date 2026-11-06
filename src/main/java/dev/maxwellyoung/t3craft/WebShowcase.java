@@ -12,7 +12,7 @@ import net.minecraft.world.phys.EntityHitResult;
 /**
  * Dev-only, read-only in-game capture of the real T3 UI ({@code ./gradlew runClient -PwebShowcase=<threadId>}):
  * opens the laptop, types into T3's sidebar search (and checks the page really received it), answers a simulated
- * ping with the panel key, opens the agent card the way a right-click does (a physical villager click when this
+ * ping with the panel key, opens the agent card the way a right-click does (a physical agent click when this
  * client is paired and that agent stands in the office), screenshots each, then quits. It never sends anything to a
  * thread.
  *
@@ -66,8 +66,8 @@ final class WebShowcase {
 			case 7 -> { if (ticks >= 15) { shot(minecraft, "ping-toast"); KeyMapping.click(mod.openKey().getDefaultKey()); next(); } }
 			case 8 -> { if (ready(minecraft) && ticks >= 120) { verifyRoute(minecraft, pingThreadId, "ping-jump"); next(); } }
 			case 9 -> { if (ticks >= 20) { minecraft.gui.setScreen(null); next(); } }
-			case 10 -> { if (ticks >= 40) { if (paired && approach(minecraft)) next(); else if (!paired || ticks > 400) { log("agent card via openAgentCard (no villager click: paired={} )", paired); mod.openAgentCard(threadId); stage = 13; } } }
-			case 11 -> clickVillager(minecraft);
+			case 10 -> { if (ticks >= 40) { if (paired && approach(minecraft)) next(); else if (!paired || ticks > 400) { log("agent card via openAgentCard (no agent click: paired={} )", paired); mod.openAgentCard(threadId); stage = 13; } } }
+			case 11 -> clickAgent(minecraft);
 			case 12 -> { if (ready(minecraft) && ticks >= 120) { verifyRoute(minecraft, threadId, "agent-card"); next(); } }
 			case 13 -> { if (ready(minecraft) && ticks >= 120) { if (!(minecraft.gui.screen() instanceof T3WebScreen s && s.mode() == T3WebScreen.Mode.CARD)) log("WARNING: no card on screen"); verifyRoute(minecraft, threadId, "agent-card"); next(); } }
 			case 14 -> { if (ticks >= 30) { minecraft.gui.setScreen(null); next(); } }
@@ -161,31 +161,31 @@ final class WebShowcase {
 		}
 	}
 
-	/** Teleports the player next to the agent's villager (trying each side of it) and looks at it. */
+	/** Teleports the player next to the agent's character (trying each side of it) and looks at it. */
 	private boolean approach(Minecraft minecraft) {
-		Mannequin villager = mod.village().villagerFor(threadId);
-		if (villager == null) return false;
+		Mannequin agent = mod.residents().mannequinFor(threadId);
+		if (agent == null) return false;
 		double[][] sides = {{1.6, 0}, {-1.6, 0}, {0, 1.6}, {0, -1.6}};
 		double[] side = sides[offset % sides.length];
-		ClientCommands.send("tp @s " + (villager.getX() + side[0]) + " " + Math.floor(villager.getY()) + " " + (villager.getZ() + side[1]));
-		log("approaching villager for {} at {},{},{} from side {}", threadId, villager.getX(), villager.getY(), villager.getZ(), offset);
+		ClientCommands.send("tp @s " + (agent.getX() + side[0]) + " " + Math.floor(agent.getY()) + " " + (agent.getZ() + side[1]));
+		log("approaching agent for {} at {},{},{} from side {}", threadId, agent.getX(), agent.getY(), agent.getZ(), offset);
 		return true;
 	}
 
-	/** A real use-key click on the villager, exactly what a player does; another side is tried when the ray misses. */
-	private void clickVillager(Minecraft minecraft) {
+	/** A real use-key click on the agent, exactly what a player does; another side is tried when the ray misses. */
+	private void clickAgent(Minecraft minecraft) {
 		if (ticks < 20) return;
-		Mannequin villager = mod.village().villagerFor(threadId);
-		if (villager == null) { log("villager vanished; falling back to openAgentCard"); mod.openAgentCard(threadId); stage = 13; ticks = 0; return; }
-		minecraft.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, villager.getEyePosition());
-		if (!(minecraft.hitResult instanceof EntityHitResult hit) || hit.getEntity() != villager) {
+		Mannequin agent = mod.residents().mannequinFor(threadId);
+		if (agent == null) { log("agent vanished; falling back to openAgentCard"); mod.openAgentCard(threadId); stage = 13; ticks = 0; return; }
+		minecraft.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, agent.getEyePosition());
+		if (!(minecraft.hitResult instanceof EntityHitResult hit) || hit.getEntity() != agent) {
 			if (ticks > 60) {
 				if (++offset < 4) { approach(minecraft); ticks = 0; }
-				else { log("villager ray never hit; falling back to openAgentCard"); mod.openAgentCard(threadId); stage = 13; ticks = 0; }
+				else { log("agent ray never hit; falling back to openAgentCard"); mod.openAgentCard(threadId); stage = 13; ticks = 0; }
 			}
 			return;
 		}
-		log("villager in crosshair; right-clicking it");
+		log("agent in crosshair; right-clicking it");
 		KeyMapping.click(minecraft.options.keyUse.getDefaultKey());
 		next();
 	}

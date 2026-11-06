@@ -1,0 +1,264 @@
+package dev.maxwellyoung.t3craft;
+
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.decoration.Mannequin;
+import net.minecraft.world.phys.EntityHitResult;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Your threads as player-shaped agents in this world's office. The brain decides where each agent
+ * goes; this mirrors them onto client-side Mannequins (negative entity ids, never sent to the
+ * server), so it works on any server. Right-click one to open its thread. Right-clicks on a
+ * dedicated server's shared office (real entities, see {@link ServerOffice}) open threads too.
+ */
+final class OfficeResidents {
+	private static final int FIRST_ID = -7_300_000;
+
+	private final T3CraftClient mod;
+	private final Map<String, Mannequin> agents = new HashMap<>();
+	private final Map<Integer, String> threadByEntity = new HashMap<>();
+	private ClientLevel level;
+	private int ticks;
+	private int nextDecorationAttempt;
+	private int nextId = FIRST_ID;
+	private final OfficeBrain brain = new OfficeBrain();
+	private final Map<Integer, String> boards = new HashMap<>();
+	private Boolean night;
+	private final DeskLaptops laptops = new DeskLaptops();
+
+	OfficeResidents(T3CraftClient mod) {
+		this.mod = mod;
+	}
+
+	/** Runs at the start of the client tick so a right-click on an agent is claimed before vanilla sees it. */
+	void tick(Minecraft minecraft) {
+		// The office's furniture is part of the building, so it does not wait for a pairing; the agents do.
+		OfficeFrame frame = mod.officeFrame();
+		boolean paired = mod.officeOrigin() != null;
+		if (minecraft.level != level || frame == null) clear();
+		level = minecraft.level;
+		if (level == null || minecraft.player == null) return;
+		ticks++;
+
+		if (minecraft.gui.screen() == null && minecraft.hitResult instanceof EntityHitResult hit) {
+			String threadId = threadByEntity.get(hit.getEntity().getId());
+			// A shared office's agents are real entities whose UUID encodes the thread.
+			if (threadId == null) threadId = threadForUuid(hit.getEntity().getUUID());
+			if (threadId != null && minecraft.options.keyUse.consumeClick()) {
+				while (minecraft.options.keyUse.consumeClick()) {
+					// Drain queued clicks so vanilla never sends an interact for an entity the server doesn't have.
+				}
+				brain.face(threadId);
+				mod.openAgentCard(threadId);
+				return;
+			}
+		}
+
+		// Shared agents can be opened by a paired client without an office of its own.
+		if (frame == null) return;
+		if (minecraft.gui.screen() == null && minecraft.hitResult instanceof net.minecraft.world.phys.BlockHitResult hit) {
+			// Hit tests happen in the design's own frame, whichever way this office is turned.
+			BlockPos position = frame.local(hit.getBlockPos());
+			int x = position.getX(), z = position.getZ();
+			int floor = Math.floorDiv(position.getY(), T3Office.FLOOR_HEIGHT);
+			boolean board = x >= 0 && x <= 1 && z >= 14 && z <= 16;
+			boolean lectern = x == 26 && z == 16;
+			if (floor >= 0 && floor < Math.max(2, mod.floors().size() * 2) && (board || lectern) && minecraft.options.keyUse.consumeClick()) {
+				while (minecraft.options.keyUse.consumeClick()) {}
+				if (board) mod.openDecisions();
+				else mod.openReview(mod.state().focusedThreadId());
+				return;
+			}
+		}
+
+		T3State.Snapshot snapshot = mod.state().snapshot();
+		if (mod.office().building()) return;
+		if (ticks % 10 == 0) sync(snapshot, frame, paired);
+		if (ticks % 8 == 0) {
+			for (Map.Entry<String, Mannequin> entry : agents.entrySet()) effects(entry.getValue(), row(snapshot, entry.getKey()));
+		}
+	}
+
+	/**
+	 * After the world has ticked: advance the brain and mirror each agent onto its Mannequin. Moving
+	 * here (not before the tick) lets the renderer interpolate from the old position. Vanilla owns
+	 * walk animation; only position, yaw and head yaw are set here.
+	 */
+	void animate(Minecraft minecraft) {
+		if (level == null || minecraft.player == null) return;
+		OfficeFrame frame = mod.officeFrame();
+		if (frame == null) return;
+		brain.tick();
+		for (OfficeBrain.Agent agent : brain.agents().values()) {
+			Mannequin mannequin = agents.get(agent.threadId);
+			if (mannequin == null) continue;
+			mannequin.setPos(frame.point(agent.x, agent.y(), agent.z));
+			float yaw = frame.yaw(agent.yaw);
+			mannequin.setYRot(yaw);
+			mannequin.setYBodyRot(yaw);
+			if (minecraft.player.distanceToSqr(mannequin) < 9) agent.faceHold = Math.max(agent.faceHold, 8);
+			if (agent.faceHold > 0) AgentPose.face(mannequin, minecraft.player); else AgentPose.rest(mannequin);
+			AgentPose.set(mannequin, agent.settled() && agent.goal.seat());
+			// A drink from the fridge, carried to the sofa.
+			boolean holds = !mannequin.getMainHandItem().isEmpty();
+			if (agent.holding != holds) {
+				mannequin.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND,
+					agent.holding ? new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.HONEY_BOTTLE)
+						: net.minecraft.world.item.ItemStack.EMPTY);
+			}
+			// Faint typing from seated workers when you're close.
+			if (mod.state().online(agent.threadId) && agent.settled() && agent.zone == OfficeBrain.Zone.WORK && Math.random() < 0.05
+				&& minecraft.player.distanceToSqr(mannequin) < 12 * 12) {
+				level.playLocalSound(mannequin.getX(), mannequin.getY() + 0.8, mannequin.getZ(),
+					net.minecraft.sounds.SoundEvents.WOODEN_BUTTON_CLICK_ON, net.minecraft.sounds.SoundSource.NEUTRAL,
+					0.12F, 1.7F + (float) Math.random() * 0.4F, false);
+			}
+		}
+	}
+
+	/**
+	 * Sync the brain with the thread list, then the agents, desk laptops, props, whiteboards and lamps. Unpaired, the
+	 * office keeps its props and lamps and has no agents.
+	 */
+	private void sync(T3State.Snapshot snapshot, OfficeFrame frame, boolean paired) {
+		List<String> floors = mod.floors();
+		if (paired) syncResidents(snapshot, frame);
+		else if (!agents.isEmpty() || !brain.agents().isEmpty()) clearResidents();
+		laptops.sync(level, frame, paired ? brain.agents().values() : List.of(), Math.max(2, floors.size() * 2));
+		if (mod.office().building() || ticks < nextDecorationAttempt) return;
+		nextDecorationAttempt = ticks + 100;
+		// Retry after chunk reloads; never resend unchanged content on a timer.
+		// Each floor's whiteboard: who needs you and what for.
+		for (int floor = 0; floor < Math.max(2, floors.size() * 2); floor++) {
+			List<T3Office.Note> notes = brain.notes(floor, mod.state()::waitingDetail);
+			String key = notes.toString();
+			if (!OfficeSite.loaded(level, frame, T3Office.whiteboard(floor, notes))) { boards.remove(floor); continue; }
+			if (!key.equals(boards.get(floor))) {
+				int index = floor;
+				mod.office().send(frame, T3Office.whiteboard(floor, notes), () -> boards.put(index, key));
+			}
+		}
+		// Lamps follow this world's day/night cycle.
+		boolean dark = OfficeProps.night(level);
+		if (!OfficeSite.loaded(level, frame, T3Office.lamps(floors.size(), dark))) { night = null; return; }
+		if (night == null || night != dark) {
+			mod.office().send(frame, T3Office.lamps(floors.size(), dark), () -> night = dark);
+		}
+	}
+
+	/** The paired part of the office: one Mannequin per agent the brain seats. */
+	private void syncResidents(T3State.Snapshot snapshot, OfficeFrame frame) {
+		OfficeRoster.Preferences prefs = mod.officePreferences();
+		prefs.normalize();
+		Map<String, Integer> previousDesks = Map.copyOf(prefs.desks);
+		for (OfficeBrain.Agent gone : brain.sync(snapshot.threads(), mod.floorOwners(), prefs, snapshot.machines().stream().filter(T3State.MachineHealth::online).map(T3State.MachineHealth::owner).collect(java.util.stream.Collectors.toSet()))) {
+			Mannequin mannequin = agents.remove(gone.threadId);
+			if (mannequin != null) {
+				threadByEntity.remove(mannequin.getId());
+				level.removeEntity(mannequin.getId(), Entity.RemovalReason.DISCARDED);
+			}
+		}
+		if (!previousDesks.equals(prefs.desks)) mod.saveOfficePreferences();
+		for (OfficeBrain.Agent agent : brain.agents().values()) {
+			if (!level.isLoaded(frame.block((int) Math.floor(agent.x), (int) agent.y(), (int) Math.floor(agent.z)))) continue;
+			Mannequin mannequin = agents.get(agent.threadId);
+			if (mannequin == null || mannequin.isRemoved() || level.getEntity(mannequin.getId()) != mannequin) {
+				if (mannequin != null) threadByEntity.remove(mannequin.getId());
+				mannequin = EntityTypes.MANNEQUIN.create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+				mannequin.setId(nextId--);
+				mannequin.noPhysics = true;
+				mannequin.setSilent(true);
+				mannequin.setCustomNameVisible(true);
+				var at = frame.point(agent.x, agent.y(), agent.z);
+				mannequin.snapTo(at.x, at.y, at.z, 0, 0);
+				level.addEntity(mannequin);
+				agents.put(agent.threadId, mannequin);
+				threadByEntity.put(mannequin.getId(), agent.threadId);
+			}
+			T3State.ThreadRow row = row(snapshot, agent.threadId);
+			if (row != null) {
+				AgentAppearance.update(mannequin, row, mod.state().online(row.id()), mod.state().driverFor(row));
+			}
+		}
+	}
+
+	/** The thread a shared office agent or desk laptop stands for, if it is one of ours. */
+	private String threadForUuid(java.util.UUID uuid) {
+		for (T3State.ThreadRow row : mod.state().snapshot().threads()) {
+			if (OfficeBrain.villagerUuid(row.id()).equals(uuid) || DeskLaptops.uuid(row.id(), true).equals(uuid) || DeskLaptops.uuid(row.id(), false).equals(uuid)) return row.id();
+		}
+		return null;
+	}
+
+	/** The office brain, for the self-test. */
+	OfficeBrain brainForTest() {
+		return brain;
+	}
+
+	/** The Mannequin standing in for {@code threadId}, for the dev showcase; null when it is not in this world. */
+	Mannequin mannequinFor(String threadId) { return agents.get(threadId); }
+
+	/** Entity id → thread, for the self-test. */
+	Map<Integer, String> threadsByEntity() {
+		return Map.copyOf(threadByEntity);
+	}
+
+	void faceThread(String thread) { brain.face(thread); }
+
+	void clear() {
+		clearResidents();
+		laptops.clear();
+		boards.clear();
+		night = null;
+	}
+
+	/** Removes the agents (unpaired, or leaving the world); the office's props stay with {@link #laptops}. */
+	private void clearResidents() {
+		if (level != null) {
+			for (Mannequin mannequin : agents.values()) level.removeEntity(mannequin.getId(), Entity.RemovalReason.DISCARDED);
+		}
+		agents.clear();
+		threadByEntity.clear();
+		brain.clear();
+	}
+
+	private void effects(Mannequin mannequin, T3State.ThreadRow row) {
+		if (row == null || !mod.state().online(row.id())) return;
+		ParticleOptions particle = switch (row.status()) {
+			case WORKING -> ParticleTypes.ENCHANT;
+			case NEEDS_YOU -> ParticleTypes.NOTE;
+			case ERROR -> ParticleTypes.ANGRY_VILLAGER;
+			case DONE -> recentlyDone(row) ? ParticleTypes.HAPPY_VILLAGER : null;
+			case IDLE -> null;
+		};
+		if (particle == null) return;
+		for (int i = 0; i < (row.status() == T3State.Status.WORKING ? 3 : 1); i++) {
+			level.addParticle(particle, mannequin.getX() + (Math.random() - 0.5) * 0.8, mannequin.getY() + 2.2 + Math.random() * 0.3,
+				mannequin.getZ() + (Math.random() - 0.5) * 0.8, 0, 0.05, 0);
+		}
+	}
+
+	/** Recently finished threads sparkle for two minutes. */
+	static boolean recentlyDone(T3State.ThreadRow row) {
+		var turn = row.raw().get("latestTurn");
+		if (turn == null || !turn.isJsonObject() || !turn.getAsJsonObject().has("completedAt")
+			|| turn.getAsJsonObject().get("completedAt").isJsonNull()) return false;
+		return Instant.parse(turn.getAsJsonObject().get("completedAt").getAsString()).plus(Duration.ofMinutes(2)).isAfter(Instant.now());
+	}
+
+	private static T3State.ThreadRow row(T3State.Snapshot snapshot, String threadId) {
+		for (T3State.ThreadRow row : snapshot.threads()) if (row.id().equals(threadId)) return row;
+		return null;
+	}
+}

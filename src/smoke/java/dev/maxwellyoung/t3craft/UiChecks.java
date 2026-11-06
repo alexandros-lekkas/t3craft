@@ -158,6 +158,16 @@ public final class UiChecks {
 		check(selectAll.get("modifiers").getAsInt() == 4 && "selectAll".equals(selectAll.getAsJsonArray("commands").get(0).getAsString()), "Cmd+A selects all on macOS");
 		check(!Cdp.keyEvent("keyDown", Cdp.key(65), 2, false).has("commands"), "no mac editing commands elsewhere");
 		check(Cdp.key(290) == null && Cdp.key(256) == null, "F-keys and Esc are never forwarded");
+		var shiftDown = Cdp.keyEvent("keyDown", Cdp.key(340), 0, false);
+		check("Shift".equals(shiftDown.get("key").getAsString()) && "ShiftLeft".equals(shiftDown.get("code").getAsString())
+			&& shiftDown.get("windowsVirtualKeyCode").getAsInt() == 16 && shiftDown.get("location").getAsInt() == 1
+			&& shiftDown.get("modifiers").getAsInt() == 8 && !shiftDown.has("text"), "left Shift keydown carries its own modifier bit and location");
+		check(Cdp.keyEvent("keyUp", Cdp.key(344), 1, false).get("modifiers").getAsInt() == 0 && Cdp.key(344).location() == 2, "right Shift keyup clears its bit");
+		check("Control".equals(Cdp.key(341).key()) && Cdp.keyEvent("keyDown", Cdp.key(345), 0, false).get("modifiers").getAsInt() == 2, "Control keys map");
+		check("Alt".equals(Cdp.key(342).key()) && Cdp.keyEvent("keyDown", Cdp.key(342), 0, false).get("modifiers").getAsInt() == 1, "Alt keys map");
+		check("Meta".equals(Cdp.key(343).key()) && Cdp.key(343).windowsCode() == 91 && Cdp.key(347).windowsCode() == 93
+			&& Cdp.keyEvent("keyDown", Cdp.key(343), 0, true).get("modifiers").getAsInt() == 4 && !Cdp.keyEvent("keyDown", Cdp.key(343), 0, true).has("commands"), "Meta keys map without editing commands");
+		check(!Cdp.keyEvent("keyDown", Cdp.key(257), 0, false).has("location") && Cdp.keyEvent("keyDown", Cdp.key(65), 0, false).get("modifiers").getAsInt() == 0, "ordinary keys are unchanged");
 		check("{\"text\":\"héllo ✓\"}".equals(Cdp.insertText("héllo ✓").toString()), "text goes through insertText");
 		var local = new T3Web.Local("http://127.0.0.1:3773", "env-1", java.nio.file.Path.of("."));
 		check(local.threadUrl("t-1").equals("http://127.0.0.1:3773/env-1/t-1") && local.threadUrl(null).equals("http://127.0.0.1:3773/"), "deep link route");

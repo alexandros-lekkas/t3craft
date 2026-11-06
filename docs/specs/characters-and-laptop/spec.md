@@ -1,6 +1,6 @@
 > **Status:** implementation spec, 2026-11-05. Pictures and summary: `docs/design/characters-and-laptop.md`. The laptop assets referenced below are in this folder.
 
-> **Current direction:** the real T3 web UI is streamed in-game. The laptop opens the full app; clicking an agent opens its thread in a floating window. Native-panel designs below are earlier explorations and fallback references.
+> **Current direction:** the [simple native UI](../../design/native-ui.md): the laptop is a plain Minecraft screen and clicking an agent opens a small card beside it. The streamed web UI is opt-in (`webUi: true`). The designs below are earlier explorations.
 
 # T3 Craft: player-shaped agents and laptops (26.3 implementation spec)
 

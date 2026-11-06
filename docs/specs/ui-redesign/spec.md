@@ -1,6 +1,6 @@
 > **Status:** implementation spec, 2026-11-05. The owner override at the end (no Connections screen, auto-connect) wins over anything above it. Pictures: `docs/design/ui.md`. Open `mockup.html` locally for the interactive version.
 
-> **Current direction:** the real T3 web UI is streamed in-game. The laptop opens the full app; clicking an agent opens its thread in a floating window. Native-panel designs below are earlier explorations and fallback references.
+> **Current direction:** the [simple native UI](../../design/native-ui.md): the laptop is a plain Minecraft screen and clicking an agent opens a small card beside it. The streamed web UI is opt-in (`webUi: true`). The designs below are earlier explorations.
 
 # T3 panel redesign: implementation spec
 

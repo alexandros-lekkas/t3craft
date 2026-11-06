@@ -42,17 +42,17 @@ The product calls behind T3 Craft, newest first. Each one has the date, the deci
 
 ### 2026-11-06 · Nothing to pick, nothing to confirm, one line in chat
 
-**Decision:** No command ever asks the player to pick a thread first. With nothing chosen it talks to the thread that needs them, else the most recently active one, and with no threads at all it opens T3. The office builds where you stand without a confirmation step: terrain is replaced, and only your own storage and builds make it refuse (one red line naming the spot). A local pairing T3 stops accepting is dropped and made again by itself. On its own the mod says one line in chat per game, when T3 connects (*T3 connected · press ` to open*); everything else goes to the log, or to chat only on error. `/t3` prints two lines of help (open T3, office). Debug and admin subcommands (pairing, threads, village, books, pins, agent-build…) exist only with `"debug": true` in `config/t3craft.json`, so tab-complete shows players only what they need. Agent building is on by default.
+**Decision:** No command ever asks the player to pick a thread first. With nothing chosen it talks to the thread that needs them, else the most recently active one, and with no threads at all it opens T3. The office builds where you stand without a confirmation step: terrain is replaced, and only your own storage and builds make it refuse (one red line naming the spot). A local pairing T3 stops accepting is dropped and made again by itself. On its own the mod says one line in chat per game, when T3 connects (*T3 connected · press ` to open*); everything else goes to the log, or to chat only on error. `/t3` prints two lines of help (open T3, office). Debug and admin subcommands (unpair, threads, books, pins, agent-build…) exist only with `"debug": true` in `config/t3craft.json`, so tab-complete shows players only what they need. Agent building is on by default.
 **Why:** The owner's first session was a wall of chat and a *"Pick a thread first"* refusal. Every demand in chat is a place to get stuck, and a feature that needs instructions in chat isn't done clearly enough.
 
 ### 2026-11-05 · Simple features, no settings or machine UI
 
-**Decision:** Ship a small set of features and make each one obvious. The player never sees a Connections screen, machine management or a settings page. Overrides live only in `config/t3craft.json`.
+**Decision:** Ship a small set of features and make each one obvious. The player never sees a Connections screen, machine management or a settings page. Overrides live only in `config/t3craft.json`. *Done 2026-11-06:* the Connections screen and `/t3 connections` and `/t3 pair` are removed (`/t3 unpair` stays as a debug-only recovery tool).
 **Why:** The owner's words were *"we just want simple stuff but done super clearly and simply"*. When a feature needs a screen to explain it, cut the feature.
 
 ### 2026-11-05 · Zero setup: auto-connect to the local T3
 
-**Decision:** The mod finds T3 Code on the same computer and connects silently, with no pairing link and no `/t3 pair`. The world-creation flow drops its "Connect your agents" page.
+**Decision:** The mod finds T3 Code on the same computer and connects silently, with no pairing link and no `/t3 pair`. The world-creation flow drops its "Connect your agents" page. *Done 2026-11-06:* `T3AutoConnect` pairs the laptop, the agent card and the office; the opt-in streamed UI pairs its own browser.
 **Why:** The best setup is none. Every command the player has to type is a place they can get stuck.
 
 ### 2026-11-05 · No protections or confirmations
@@ -77,7 +77,7 @@ The product calls behind T3 Craft, newest first. Each one has the date, the deci
 
 ### 2026-11-05 · No villagers: agents are player characters
 
-**Decision:** Agents are human-shaped characters with skins, everywhere: office residents, the village and shared servers. No villagers.
+**Decision:** Agents are human-shaped characters with skins, everywhere: office residents and the shared server office. No villagers. *Done 2026-11-06:* the old village mode (`/t3 village`, `/t3village`) is removed; only the office remains.
 **Why:** Agents are your coworkers. They should look like people sitting at desks, not traders.
 
 ### 2026-11-05 · Calm UI, like the T3 desktop app

@@ -22,15 +22,29 @@ final class T3Hud implements HudElement {
 	}
 
 	static String label(T3State.Status status) {
-		return VillageLayout.label(status);
+		return switch (status) {
+			case WORKING -> "Working";
+			case NEEDS_YOU -> "Needs you";
+			case DONE -> "Done";
+			case ERROR -> "Failed";
+			case IDLE -> "Idle";
+		};
 	}
 
 	static int color(T3State.Status status) {
-		return VillageLayout.color(status);
+		return switch (status) {
+			case WORKING -> 0xFF5EA8FF;
+			case NEEDS_YOU -> 0xFFFFB02E;
+			case DONE -> 0xFF4ADE80;
+			case ERROR -> 0xFFF87171;
+			case IDLE -> 0xFF9CA3AF;
+		};
 	}
 
 	static String elapsed(Instant since) {
-		return VillageLayout.elapsed(since);
+		if (since == null) return "";
+		long seconds = Math.max(0, java.time.Duration.between(since, Instant.now()).getSeconds());
+		return seconds < 60 ? seconds + "s" : (seconds / 60) + "m " + (seconds % 60) + "s";
 	}
 
 	@Override

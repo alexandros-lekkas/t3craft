@@ -19,12 +19,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The shared office: the same building and brain as the client village, but the agents are real
+ * The shared office: the same building and brain as the client office, but the agents are real
  * server Mannequins. Bundled skins and furniture require the client resources. Moving them on
  * the server lets each client interpolate and animate the walk on its own.
  */
 final class ServerOffice {
 	static final String TAG = "t3craft_office";
+	/** The tag the removed shared village gave its agents. Tags match exactly, so the office's own tags never match it. */
+	static final String LEGACY_VILLAGE_TAG = "t3craft";
 
 	private final T3State state;
 	private final T3Config config;
@@ -84,7 +86,7 @@ final class ServerOffice {
 			source.sendFailure(net.minecraft.network.chat.Component.literal("The shared office belongs in the overworld.")); return 0;
 		}
 		if (!config.paired()) {
-			source.sendFailure(net.minecraft.network.chat.Component.literal("Pair the server first: /t3village pair <link>")); return 0;
+			source.sendFailure(net.minecraft.network.chat.Component.literal("Pair the server first: /t3office pair <link>")); return 0;
 		}
 		String requester = source.getTextName();
 		List<String> owners = config.environments.stream().map(e -> T3Config.ownerKey(e.baseUrl)).toList();
@@ -133,8 +135,12 @@ final class ServerOffice {
 		server.getCommands().performPrefixedCommand(quiet(server), "kill @e[tag=" + TAG + "]");
 	}
 
-	/** A tagged villager loaded from disk (an earlier run) that this office doesn't own: remove it. */
+	/** Agents left behind by the shared village (before 0.6): saved with their chunks and invulnerable, so they go as they load. */
+	static boolean legacyVillager(java.util.Set<String> tags) { return tags.contains(LEGACY_VILLAGE_TAG); }
+
+	/** A tagged agent loaded from disk (an earlier run) that this office doesn't own, or one from the old village: remove it. */
 	void onLoad(net.minecraft.world.entity.Entity entity) {
+		if (legacyVillager(entity.entityTags())) { entity.discard(); return; }
 		laptops.onLoad(entity);
         if (entity.entityTags().contains(TAG) && !villagers.containsValue(entity)) {
 			entity.discard();

@@ -1,13 +1,11 @@
 # Agents as people, and the T3 laptop
 
-> **Status:** designed 2026-11-05 · next for 0.6 · [full spec](../specs/characters-and-laptop/spec.md)
+> **Status:** designed 2026-11-05. Player-shaped agents and desk laptops shipped in [#8](https://github.com/alexandros-lekkas/t3craft/pull/8); the held, craftable laptop is still to come. · [full spec](../specs/characters-and-laptop/spec.md)
 
-Two small changes make the office feel like a real place. Agents look like **players**, and you open T3 from a **laptop** you can hold or click on any desk.
+Two small changes make the office feel like a real place. Agents look like **players**, and you open T3 from a **laptop** on any desk (and, later, one you can hold).
 
-<p align="center"><img src="../images/office-ground-floor.png" width="80%" alt="Office cutaway: residents at desks, the whiteboard and the lounge"></p>
-<p align="center"><sub>Today's residents are villager stand-ins. They become player-shaped characters at the same desks.</sub></p>
-
-<!-- TODO(screenshot): `agents-at-desks` and `agent-needs-you` once characters land (docs/SCREENSHOTS.md) -->
+<p align="center"><img src="office/needs-you.png" width="80%" alt="A waiting agent at the whiteboard turning toward the player, captured in the game"></p>
+<p align="center"><sub>Shipped: residents are player-shaped Mannequins with per-provider skins. Villagers are gone.</sub></p>
 
 ## Agents look like players
 
@@ -29,9 +27,8 @@ Right-click an agent to open a small card beside it ([the simple native UI](nati
 
 <p align="center"><img src="../images/laptop-texture.png" width="192" alt="T3 laptop texture: dark screen with mint code lines, slate keyboard"></p>
 
-- **You get one automatically** the first time you join a T3 world, so there's nothing to craft or type. You can also craft it: three glass panes on top, iron + redstone + iron in the middle, and three iron ingots on the bottom.
-- **Right-click it** anywhere to open the laptop screen ([see the UI](native-ui.md)). <kbd>`</kbd> still works.
-- **Every desk has a laptop.** Clicking one opens the thread of the agent sitting there. An empty desk starts a new thread.
+- **Every desk has a laptop** (shipped). Clicking one opens the thread of the agent sitting there; its screen shows idle, working or needs-you.
+- **A laptop you hold** (later): you'd get one automatically the first time you join a T3 world, or craft it (three glass panes on top, iron + redstone + iron in the middle, three iron ingots on the bottom), and right-click it anywhere to open the laptop screen ([see the UI](native-ui.md)). <kbd>`</kbd> does that today.
 - It's a vanilla paper item with a custom model, so T3 Craft can still join vanilla servers.
 
 Assets: [model](../specs/characters-and-laptop/laptop.model.json) · [texture](../specs/characters-and-laptop/laptop.png) · [recipe](../specs/characters-and-laptop/laptop.recipe.json) · [item](../specs/characters-and-laptop/laptop.item.json)

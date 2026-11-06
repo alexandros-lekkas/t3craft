@@ -38,18 +38,20 @@ On Windows or Linux, point `JAVA_HOME` at any JDK 25 (Temurin works well).
 Most checks run against **isolated fixtures**. They never touch a real T3 pairing or dispatch to a real agent.
 
 ```bash
-python3 scripts/feature-fixture.py --config "$PWD/run/feature-fixture.json" &   # legacy protocol, port 25680
-./gradlew officeCheck connectionCheck featureCheck reliabilityCheck
-# protocol 2: run the fixture with --protocol2 --port 25682, then add -PfixturePort=25682
+bash scripts/verify-ci.sh   # everything CI runs, in one go, on freshly allocated fixture ports
 
-bash scripts/verify-ci.sh   # everything CI runs, in one go
+# By hand: let the fixture pick free ports (--port 0) and pass them to Gradle, so parallel checkouts never collide.
+python3 scripts/feature-fixture.py --port 0 --port-file build/fixture-logs/legacy.port --config "$PWD/run/feature-fixture.json" &
+./gradlew officeCheck connectionCheck featureCheck reliabilityCheck -PfixturePort=$(cat build/fixture-logs/legacy.port)
+# protocol 2: the same with --protocol2, then mcpCheck too
 ```
 
-The full list of selftests (`-Pselftest=look|village|watch|…`) is in [docs/REFERENCE.md](docs/REFERENCE.md#build-and-develop).
+The full list of self-tests (`-Pselftest=look|office|watch|…`) is in [docs/REFERENCE.md](docs/REFERENCE.md#self-tests).
 
 ### House rules for test runs
 
 - **Mute test clients** (master volume 0) and use a **separate game directory**. Never write to a real `options.txt` or a real world.
+- **Never take a real game's MCP port.** Give a dev client `-PmcpPort=<n>` (or `mcpPort` in its `-Pconfig` file); it also moves to the next free port by itself.
 - Use staged demo threads in screenshots. Real thread titles never go in the repo.
 
 ## Pull requests

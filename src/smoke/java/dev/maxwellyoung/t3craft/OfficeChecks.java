@@ -14,6 +14,7 @@ public final class OfficeChecks {
   check(T3Office.WORK.length==8 && T3Office.WORK[0].x()==3 && T3Office.WORK[0].z()==2,"designer desk anchors parsed");
   check(OfficeSite.bounds(net.minecraft.core.BlockPos.ZERO,T3Office.blueprint(List.of("one machine"))).max().getY()>=17,"one machine always builds both floors and roof");
   check(T3Office.WIDTH==30 && T3Office.LENGTH==24,"roomier design footprint");
+  check(ServerOffice.legacyVillager(java.util.Set.of("t3craft")) && !ServerOffice.legacyVillager(java.util.Set.of(ServerOffice.TAG,"t3craft_agent","t3craft_laptop")),"leftover shared-village agents are discarded; office agents and laptops are kept");
   check(T3Office.FLOOR_HEIGHT==6 && T3Office.NEEDS_YOU[0].z()==15,"floor and whiteboard anchors match design A");
   for(int floors=1;floors<=6;floors++)check(OfficeDesign.template(floors).getAsJsonObject("anchors").getAsJsonArray("floors").size()==floors,"floor template count");
   check(AgentAppearance.provider("claudeAgent").equals("claude"),"driver alias maps to bundled Claude art");
@@ -154,6 +155,22 @@ public final class OfficeChecks {
 			if (file.getFileSystem().supportedFileAttributeViews().contains("posix")) check(Files.getPosixFilePermissions(file).equals(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")), "saved config is owner-only");
 		} finally { Files.deleteIfExists(file); Files.deleteIfExists(directory); }
 
+		// A pre-0.6 config: offices stay where they stood, plain villages are gone, and the old keys never come back.
+		var legacyDir = Files.createTempDirectory("t3craft-legacy-config-");
+		var legacy = legacyDir.resolve("config.json");
+		try {
+			Files.writeString(legacy, "{\"environments\":[{\"label\":\"Mac\",\"baseUrl\":\"" + a + "\",\"accessToken\":\"fixture-only\"}],"
+				+ "\"village\":[1,2,3],\"villages\":{\"save:one|minecraft:overworld\":[10,64,-20],\"save:two|minecraft:overworld\":[5,70,5],\"save:bad|minecraft:overworld\":[1]},"
+				+ "\"officeWorlds\":[\"save:one|minecraft:overworld\",\"save:bad|minecraft:overworld\",\"save:missing|minecraft:overworld\"],\"books\":false}");
+			T3Config migrated = T3Config.load(legacy);
+			check(migrated.offices.size() == 1 && java.util.Arrays.equals(migrated.offices.get("save:one|minecraft:overworld"), new int[] {10, 64, -20}), "office worlds migrate to offices; villages and malformed points are dropped");
+			check(migrated.villages == null && migrated.officeWorlds == null && migrated.mcpPort == T3Config.DEFAULT_MCP_PORT, "legacy keys cleared; new defaults present");
+			check(migrated.save(legacy) && !Files.readString(legacy).contains("villages") && !Files.readString(legacy).contains("officeWorlds") && Files.readString(legacy).contains("\"offices\""), "saved config carries only the office map");
+			Files.writeString(legacy, "{\"mcpPort\":70000}");
+			T3Config odd = T3Config.load(legacy);
+			check(odd.mcpPort == T3Config.DEFAULT_MCP_PORT, "out-of-range port falls back to the default");
+		} finally { Files.deleteIfExists(legacy); Files.deleteIfExists(legacyDir); }
+
 		int saved = prefs.desks.get(OfficeRoster.key(pin));
 		OfficeRoster.sync(List.of(), List.of(a, b), prefs);
 		check(prefs.desks.get(OfficeRoster.key(pin)) == saved, "empty reconnect snapshot retains pin identity");
@@ -172,7 +189,7 @@ public final class OfficeChecks {
 		for (int i = 0; i < 8; i++) waiting.add(row(a, i, T3State.Status.NEEDS_YOU));
 		brain.clear(); brain.sync(waiting, List.of(a), new OfficeRoster.Preferences());
 		check(brain.agents().values().stream().map(r -> r.goal).distinct().count() == 8, "eight waiting residents do not share a physical spot");
-		System.out.println("PASS plain-field/build occupancy, daytime lamps/signs, lit interior and terrace, shared command budget, malformed desks, unloaded-target cancellation, queue world/session binding, unavailable-owner retention, built floor persistence, stable desks, pinned/waiting/working priority, restart and reconnect persistence, distinct owners/projects, pin removal and shared/client isolation");
+		System.out.println("PASS legacy village config migration, plain-field/build occupancy, daytime lamps/signs, lit interior and terrace, shared command budget, malformed desks, unloaded-target cancellation, queue world/session binding, unavailable-owner retention, built floor persistence, stable desks, pinned/waiting/working priority, restart and reconnect persistence, distinct owners/projects, pin removal and shared/client isolation");
 	}
 	private static void checkPlacement() {
 		net.minecraft.SharedConstants.tryDetectVersion();

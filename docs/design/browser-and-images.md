@@ -1,6 +1,6 @@
 # Thread images and the agent's browser
 
-> **Current UI direction:** stream the real T3 web app in-game. The laptop opens the full app and agent clicks open floating thread windows. The custom rendering work below is exploratory fallback work.
+> **This page is research, not the shipped browser.** What ships is [the real T3 UI](real-t3-ui.md): T3 Code's own web app, streamed in-game from a hidden Chrome over CDP, in the laptop and the agent card. Images in threads are already visible there because it is T3's own page. The ideas below (mirroring the *agent's* browser tab, a native image viewer) are a later exploration.
 
 > **Status:** researched and prototyped 2026-11-05 · later · [full spec](../specs/images-and-browser.md)
 

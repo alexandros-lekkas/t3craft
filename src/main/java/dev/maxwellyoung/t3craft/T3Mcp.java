@@ -1,9 +1,7 @@
 package dev.maxwellyoung.t3craft;
 
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import net.minecraft.ChatFormatting;
@@ -18,9 +16,9 @@ import net.minecraft.world.phys.HitResult;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.BindException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Executors;
@@ -31,14 +29,21 @@ import java.util.function.BooleanSupplier;
  * A tiny MCP server (streamable HTTP, JSON responses only) on 127.0.0.1 so agents on this
  * machine can see the player's world and, when the player allows it, run commands in it.
  * Register with: {@code claude mcp add --transport http minecraft http://127.0.0.1:25590/mcp}
+ * The port comes from {@code mcpPort} in config/t3craft.json ({@code -Dt3craft.mcpPort} for dev runs); when it is
+ * taken, the next free port is used and logged, so a second game or a dev client still gets a server. The bound
+ * address is also written to {@code config/t3craft-mcp.json} ({@code {"url": …, "port": …, "pid": …}}) so tools never
+ * have to read the log; the file is removed when that game quits.
  */
 final class T3Mcp {
-	/** Override with {@code -Dt3craft.mcpPort=} so a dev client beside your real game does not take its port. */
-	static final int PORT = Integer.getInteger("t3craft.mcpPort", 25590);
-	private static final String PROTOCOL = "2025-06-18";
+	/** How many ports above the preferred one are tried before giving up. */
+	static final int PORT_ATTEMPTS = 10;
 
 	private final BooleanSupplier commandsAllowed;
+	private final int preferredPort;
+	private final java.nio.file.Path portFile;
 	private HttpServer server;
+	private volatile int port;
+	private final McpJsonRpc rpc = new McpJsonRpc(T3Mcp::tools, this::call);
 	// Server feedback lines ("Successfully filled 49 block(s)") collected while a command is in flight.
 	private final java.util.List<String> feedback = new java.util.concurrent.CopyOnWriteArrayList<>();
 	private volatile boolean collecting;
@@ -46,16 +51,30 @@ final class T3Mcp {
 	private final Object collectionLock = new Object();
 	private Object activeCall;
 
-	T3Mcp(BooleanSupplier commandsAllowed) {
+	/** {@code portFile}: where the bound address is published, or null to publish nothing. */
+	T3Mcp(BooleanSupplier commandsAllowed, int preferredPort, java.nio.file.Path portFile) {
 		this.commandsAllowed = commandsAllowed;
+		this.preferredPort = preferredPort;
+		this.portFile = portFile;
 	}
+
+	/** The configured port, with the {@code t3craft.mcpPort} system property winning for test and dev runs. */
+	static int preferredPort(T3Config config) {
+		Integer override = Integer.getInteger("t3craft.mcpPort");
+		int port = override != null ? override : config.mcpPort;
+		return port > 0 && port <= 65535 ? port : T3Config.DEFAULT_MCP_PORT;
+	}
+
+	/** The port actually bound, or 0 before {@link #start()} succeeded. */
+	int port() { return port; }
 
 	void start() {
 		net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
 			if (collecting && !overlay) feedback.add(message.getString());
 		});
 		try {
-			server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), PORT), 0);
+			server = bind(preferredPort, PORT_ATTEMPTS);
+			port = server.getAddress().getPort();
 			server.createContext("/mcp", this::handle);
 			server.setExecutor(Executors.newSingleThreadExecutor(runnable -> {
 				Thread thread = new Thread(runnable, "t3craft-mcp");
@@ -63,16 +82,71 @@ final class T3Mcp {
 				return thread;
 			}));
 			server.start();
-			net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(client -> server.stop(0));
-			T3CraftClient.LOGGER.info("Minecraft MCP server on http://127.0.0.1:{}/mcp", PORT);
+			long pid = ProcessHandle.current().pid();
+			net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+				server.stop(0);
+				if (portFile != null) clearPortFile(portFile, pid);
+			});
+			if (port != preferredPort) T3CraftClient.LOGGER.warn("Port {} is in use (another Minecraft?); the MCP server moved to {}", preferredPort, port);
+			T3CraftClient.LOGGER.info("Minecraft MCP server on {}", url(port));
+			if (portFile != null && !writePortFile(portFile, port, pid)) T3CraftClient.LOGGER.warn("Could not write {}; the MCP address is only in this log", portFile);
 		} catch (IOException e) {
-			T3CraftClient.LOGGER.warn("Could not start the Minecraft MCP server on port {}", PORT, e);
+			T3CraftClient.LOGGER.warn("Could not start the Minecraft MCP server on ports {}-{}; agents cannot reach this game", preferredPort, preferredPort + PORT_ATTEMPTS - 1, e);
+		}
+	}
+
+	/**
+	 * Binds 127.0.0.1 (the documented address, never the IPv6 loopback) on {@code preferred} or the first free port
+	 * after it. Only an address already in use moves on; any other failure is reported at once.
+	 */
+	static HttpServer bind(int preferred, int attempts) throws IOException {
+		InetAddress loopback = InetAddress.getByAddress("127.0.0.1", new byte[] {127, 0, 0, 1});
+		IOException last = null;
+		for (int candidate = preferred; candidate < preferred + attempts && candidate <= 65535; candidate++) {
+			try {
+				return HttpServer.create(new InetSocketAddress(loopback, candidate), 0);
+			} catch (BindException e) {
+				last = e;
+			}
+		}
+		throw last == null ? new IOException("No port to try") : last;
+	}
+
+	static String url(int port) { return "http://127.0.0.1:" + port + "/mcp"; }
+
+	/** Publishes the bound address for tooling. Written to a temporary file first, so a reader never sees half of it. */
+	static boolean writePortFile(java.nio.file.Path file, int port, long pid) {
+		JsonObject json = new JsonObject();
+		json.addProperty("url", url(port));
+		json.addProperty("port", port);
+		json.addProperty("pid", pid);
+		try {
+			java.nio.file.Path dir = file.toAbsolutePath().getParent();
+			java.nio.file.Files.createDirectories(dir);
+			java.nio.file.Path temporary = java.nio.file.Files.createTempFile(dir, ".t3craft-mcp-", ".tmp");
+			try {
+				java.nio.file.Files.writeString(temporary, json + "\n");
+				java.nio.file.Files.move(temporary, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+			} finally { java.nio.file.Files.deleteIfExists(temporary); }
+			return true;
+		} catch (IOException | RuntimeException e) {
+			return false;
+		}
+	}
+
+	/** Removes the address file on quit, unless another game has written its own since. */
+	static void clearPortFile(java.nio.file.Path file, long pid) {
+		try {
+			var json = com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(file)).getAsJsonObject();
+			if (json.has("pid") && json.get("pid").getAsLong() == pid) java.nio.file.Files.deleteIfExists(file);
+		} catch (IOException | RuntimeException ignored) {
+			// Missing or not ours: leave it.
 		}
 	}
 
 	private void handle(HttpExchange exchange) throws IOException {
 		try (exchange) {
-			if (!McpRequestPolicy.allows(exchange.getRequestHeaders(), PORT)) {
+			if (!McpRequestPolicy.allows(exchange.getRequestHeaders(), port)) {
 				exchange.sendResponseHeaders(403, -1);
 				return;
 			}
@@ -80,81 +154,22 @@ final class T3Mcp {
 				exchange.sendResponseHeaders(405, -1);
 				return;
 			}
-			JsonElement body;
+			McpJsonRpc.Response reply;
 			try (InputStream in = exchange.getRequestBody()) {
-				byte[] bytes = in.readNBytes(65537);
-				if (bytes.length > 65536) { exchange.sendResponseHeaders(413, -1); return; }
-				try { body = JsonParser.parseString(new String(bytes, StandardCharsets.UTF_8)); }
-				catch (RuntimeException e) { exchange.sendResponseHeaders(400, -1); return; }
+				byte[] bytes = in.readNBytes(McpJsonRpc.MAX_BODY + 1);
+				reply = rpc.handle(bytes, bytes.length > McpJsonRpc.MAX_BODY);
 			}
-			JsonElement reply;
-			try {
-				if (body.isJsonArray()) {
-					JsonArray replies = new JsonArray();
-					for (JsonElement message : body.getAsJsonArray()) {
-						JsonObject one = respond(message.getAsJsonObject());
-						if (one != null) replies.add(one);
-					}
-					reply = replies.isEmpty() ? null : replies;
-				} else {
-					reply = respond(body.getAsJsonObject());
-				}
-			} catch (RuntimeException e) { exchange.sendResponseHeaders(400, -1); return; }
-			if (reply == null) {
-				exchange.sendResponseHeaders(202, -1);
+			if (reply.body() == null) {
+				exchange.sendResponseHeaders(reply.status(), -1);
 				return;
 			}
-			byte[] bytes = reply.toString().getBytes(StandardCharsets.UTF_8);
+			byte[] bytes = reply.bytes();
 			exchange.getResponseHeaders().set("Content-Type", "application/json");
-			exchange.sendResponseHeaders(200, bytes.length);
+			exchange.sendResponseHeaders(reply.status(), bytes.length);
 			exchange.getResponseBody().write(bytes);
 		} catch (RuntimeException e) {
 			T3CraftClient.LOGGER.warn("MCP request failed", e);
 		}
-	}
-
-	/** One JSON-RPC message; null for notifications. */
-	private JsonObject respond(JsonObject message) {
-		if (!message.has("id")) return null;
-		String method = message.get("method").getAsString();
-		JsonObject params = message.has("params") && message.get("params").isJsonObject() ? message.getAsJsonObject("params") : new JsonObject();
-		JsonObject result = switch (method) {
-			case "initialize" -> {
-				JsonObject r = new JsonObject();
-				r.addProperty("protocolVersion", params.has("protocolVersion") ? params.get("protocolVersion").getAsString() : PROTOCOL);
-				JsonObject capabilities = new JsonObject();
-				capabilities.add("tools", new JsonObject());
-				r.add("capabilities", capabilities);
-				JsonObject info = new JsonObject();
-				info.addProperty("name", "minecraft");
-				info.addProperty("version", "0.1.0");
-				r.add("serverInfo", info);
-				r.addProperty("instructions", "The user's live Minecraft game. Use minecraft_status first to learn where they are. "
-					+ "Coordinates are absolute block positions. minecraft_run_command only works after the player enables it in game.");
-				yield r;
-			}
-			case "ping" -> new JsonObject();
-			case "tools/list" -> {
-				JsonObject r = new JsonObject();
-				r.add("tools", tools());
-				yield r;
-			}
-			case "tools/call" -> call(params.get("name").getAsString(),
-				params.has("arguments") && params.get("arguments").isJsonObject() ? params.getAsJsonObject("arguments") : new JsonObject());
-			default -> null;
-		};
-		JsonObject reply = new JsonObject();
-		reply.addProperty("jsonrpc", "2.0");
-		reply.add("id", message.get("id"));
-		if (result == null) {
-			JsonObject error = new JsonObject();
-			error.addProperty("code", -32601);
-			error.addProperty("message", "Method not found: " + method);
-			reply.add("error", error);
-		} else {
-			reply.add("result", result);
-		}
-		return reply;
 	}
 
 	private static JsonArray tools() {
@@ -177,19 +192,24 @@ final class T3Mcp {
 			String text = switch (name) {
 				case "minecraft_status" -> onGameThread(T3Mcp::status);
 				case "minecraft_nearby_blocks" -> {
-					int radius = args.has("radius") ? Math.max(1, Math.min(8, args.get("radius").getAsInt())) : 4;
+					int radius = args.has("radius") && args.get("radius").isJsonPrimitive() ? Math.max(1, Math.min(8, args.get("radius").getAsInt())) : 4;
 					yield onGameThread(() -> nearby(radius));
 				}
-				case "minecraft_say" -> onGameThread(() -> {
-					agentChat(Component.literal(args.get("message").getAsString()).withStyle(ChatFormatting.WHITE));
-					return "Shown in the player's chat.";
-				});
+				case "minecraft_say" -> {
+					String message = string(args, "message");
+					if (message == null) yield error("minecraft_say needs a \"message\" string.");
+					yield onGameThread(() -> {
+						agentChat(Component.literal(message).withStyle(ChatFormatting.WHITE));
+						return "Shown in the player's chat.";
+					});
+				}
 				case "minecraft_run_command" -> {
 					if (!commandsAllowed.getAsBoolean()) {
 						yield error("The player turned agent commands off. Ask them to run /t3 agent-build on in Minecraft.");
 					}
-					String command = args.get("command").getAsString().replaceFirst("^/", "").trim();
-					yield runCommand(command);
+					String command = string(args, "command");
+					if (command == null || command.replaceFirst("^/", "").isBlank()) yield error("minecraft_run_command needs a \"command\" string.");
+					yield runCommand(command.replaceFirst("^/", "").trim());
 				}
 				default -> error("Unknown tool " + name);
 			};
@@ -199,6 +219,11 @@ final class T3Mcp {
 			while (cause instanceof java.util.concurrent.ExecutionException && cause.getCause() != null) cause = cause.getCause();
 			return result("Minecraft did not respond: " + cause.getMessage(), true);
 		}
+	}
+
+	private static String string(JsonObject args, String key) {
+		var value = args.get(key);
+		return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString() ? value.getAsString() : null;
 	}
 
 	/** Sends the command, then waits briefly for the server's reply so the agent can check its work. */

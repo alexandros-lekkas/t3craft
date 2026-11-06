@@ -7,7 +7,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
-/** All waiting requests, independent of how many villagers fit in the office. */
+/** All waiting requests, independent of how many agents fit in the office. */
 final class T3Decisions {
 	record Entry(T3State.ThreadRow thread, String requestId, String kind, String detail, Instant requestedAt) {
 		String key() { return thread.id() + ":" + requestId; }

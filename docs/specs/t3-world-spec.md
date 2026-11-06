@@ -1,4 +1,4 @@
-> **Status:** design spec, 2026-11-05. Two later owner decisions supersede parts of it:
+> **Status:** design spec, 2026-11-05; implemented in [PR #9](https://github.com/alexandros-lekkas/t3craft/pull/9). What shipped is described in [docs/design/world.md](../design/world.md), which wins where the two differ. Two later owner decisions supersede parts of it:
 > - **Office design A (Scandi Studio)** replaces the Glasshouse design assumed below. Same 24×20 footprint and 6-block floor pitch. See [office-design-a/spec.md](office-design-a/spec.md).
 > - **Zero setup:** the mod auto-connects to the local T3, so page 2 ("Connect your agents") and the pairing steps are dropped. The default seed list is in [seeds-report.md](seeds-report.md).
 > - **No villagers:** residents are player-like characters. Wherever this spec says "villagers", read "agent characters".
@@ -431,7 +431,7 @@ Trigger: `pairEnvironment` succeeds with a new owner while in a world whose `T3W
    - append to `floors` and save.
    Lower floors and everything the player built around the office are untouched. **Roof edits are lost when the roof moves up.** Document it in the README, and in `/t3 office` output if the roof differs from its template. Optional later: capture the roof region into a temp template and re-place it.
 3. Cap: `floor.max` (8). Past the cap, the machine's residents use the lobby lounge and the decision board, with no desks, and chat says `Office is at 8 floors. This machine's agents share the lobby.`
-4. Singleplayer: the client runs this as `server.execute(() -> OfficePlacer.addFloor(...))`. Vanilla server: `OfficeCommands` sends only the new floor + roof commands. Dedicated with the mod: `ServerOffice` calls `OfficePlacer.addFloor` when `/t3village pair` adds an environment.
+4. Singleplayer: the client runs this as `server.execute(() -> OfficePlacer.addFloor(...))`. Vanilla server: `OfficeCommands` sends only the new floor + roof commands. Dedicated with the mod: `ServerOffice` calls `OfficePlacer.addFloor` when `/t3office pair` adds an environment.
 5. Removing a machine: its floor becomes `Vacant` (sign updated, residents leave). It never shrinks automatically. Order is stable: floors are keyed by owner and never re-sorted, which keeps the README promise that "re-pairing or renaming keeps floor order".
 
 ### 8.3 Client-only vs server

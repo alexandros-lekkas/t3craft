@@ -7,7 +7,6 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.Commands;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 
 import java.nio.file.Path;
@@ -15,14 +14,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Dedicated-server side: a shared village of the server's T3 threads that every player sees.
- * An operator pairs the server (/t3village pair <link>) and places it (/t3village here).
+ * Dedicated-server side: a shared office of the server's T3 threads that every player sees.
+ * An operator pairs the server (/t3office pair <link>) and builds it (/t3office build).
  */
 public final class T3CraftServer implements DedicatedServerModInitializer {
 	private final Path configPath = FabricLoader.getInstance().getConfigDir().resolve("t3craft.json");
 	private T3Config config;
 	private T3State state;
-	private ServerVillage village;
 	private ServerOffice office;
 
 	@Override
@@ -30,17 +28,11 @@ public final class T3CraftServer implements DedicatedServerModInitializer {
 		config = T3Config.load(configPath);
 		state = new T3State(event -> {});
 		connect();
-		village = new ServerVillage(state, config);
 		office = new ServerOffice(state, config, () -> config.save(configPath));
-		ServerTickEvents.END_SERVER_TICK.register(village::tick);
 		ServerTickEvents.END_SERVER_TICK.register(office::tick);
-		// Village and office villagers are saved with their chunks; ones from an earlier run are removed as they load.
-		ServerEntityEvents.ENTITY_LOAD.register((entity, level) -> {
-			village.onLoad(entity);
-			office.onLoad(entity);
-		});
+		// Office agents are saved with their chunks; ones from an earlier run are removed as they load.
+		ServerEntityEvents.ENTITY_LOAD.register((entity, level) -> office.onLoad(entity));
 
-		// The Silk office for everyone on the server (uses the same pairing as /t3village).
 		CommandRegistrationCallback.EVENT.register((dispatcher, registry, environment) -> dispatcher.register(
 			Commands.literal("t3office")
 				.requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
@@ -62,42 +54,19 @@ public final class T3CraftServer implements DedicatedServerModInitializer {
 					office.off(ctx.getSource().getServer());
 					ctx.getSource().sendSuccess(() -> Component.literal("Office agents sent home."), true);
 					return 1;
-				}))));
-		CommandRegistrationCallback.EVENT.register((dispatcher, registry, environment) -> dispatcher.register(
-			Commands.literal("t3village")
-				.requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
-				.then(Commands.literal("here").executes(ctx -> {
-					var source = ctx.getSource();
-					if (!config.paired()) {
-						source.sendFailure(Component.literal("Pair the server first: /t3village pair <link>"));
-						return 0;
-					}
-					var entity = source.getEntity();
-					BlockPos anchor = entity != null ? entity.blockPosition().relative(entity.getDirection(), 4) : BlockPos.containing(source.getPosition());
-					village.clear();
-					config.village = new int[] {anchor.getX(), anchor.getY(), anchor.getZ()};
-					config.save(configPath);
-					source.sendSuccess(() -> Component.literal("Shared village placed; everyone here can see your threads."), true);
-					return 1;
-				}))
-				.then(Commands.literal("off").executes(ctx -> {
-					config.village = null;
-					config.save(configPath);
-					village.clear();
-					ctx.getSource().sendSuccess(() -> Component.literal("Shared village removed."), true);
-					return 1;
 				}))
 				.then(Commands.literal("status").executes(ctx -> {
 					var snapshot = state.snapshot();
-					String where = config.village == null ? "not placed" : "at " + village.anchor().toShortString();
+					String where = office.origin() == null ? "not built" : "at " + office.origin().toShortString();
 					ctx.getSource().sendSuccess(() -> Component.literal("T3 " + (snapshot.connected() ? "connected" : "not connected")
-						+ ", " + snapshot.threads().size() + " threads; village " + where), false);
+						+ ", " + snapshot.threads().size() + " threads; office " + where), false);
 					return 1;
 				}))
+				// A dedicated server has no local T3 to find, so the operator pairs it once with a link.
 				.then(Commands.literal("pair").then(Commands.argument("link", StringArgumentType.greedyString()).executes(ctx -> {
 					String link = StringArgumentType.getString(ctx, "link");
 					var source = ctx.getSource();
-                    if (T3McpAuth.isMcp(link)) { source.sendFailure(Component.literal("The shared server needs a legacy pairing link from T3 Settings → Environments. MCP URLs authorize in a browser, so pair them from your client.")); return 0; }
+					if (T3McpAuth.isMcp(link)) { source.sendFailure(Component.literal("The shared server needs a legacy pairing link from T3 Settings → Environments. MCP URLs authorize in a browser, so they belong in a client's config file.")); return 0; }
 					Thread thread = new Thread(() -> {
 						try {
 							T3Api.Pairing pairing = T3Api.pair(link, "Minecraft server");
@@ -106,7 +75,7 @@ public final class T3CraftServer implements DedicatedServerModInitializer {
 								config.upsert(new T3Config.Environment(label, pairing.baseUrl(), pairing.accessToken()));
 								config.save(configPath);
 								connect();
-								source.sendSuccess(() -> Component.literal("Paired the server with " + label + ". Place the village with /t3village here."), true);
+								source.sendSuccess(() -> Component.literal("Paired the server with " + label + ". Build the office with /t3office build."), true);
 							});
 						} catch (Exception e) {
 							source.getServer().execute(() -> source.sendFailure(Component.literal("Pairing failed: " + e.getMessage())));

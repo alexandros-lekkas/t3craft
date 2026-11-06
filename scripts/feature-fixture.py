@@ -4,6 +4,7 @@
 Used by `featureCheck` and the `desk-review` Minecraft self-test.
 """
 import argparse
+import os
 import base64
 import hashlib
 import json
@@ -465,17 +466,49 @@ class Handler(BaseHTTPRequestHandler):
             if self.connection in self.server.connections: self.server.connections.remove(self.connection)
 
 
+def free_port_pair():
+    """Two adjacent free loopback ports (machine B always listens on A + 1), so concurrent checks never collide."""
+    for _ in range(200):
+        with socket.socket() as probe:
+            probe.bind(('127.0.0.1', 0))
+            first = probe.getsockname()[1]
+        if first + 1 > 65535: continue
+        try:
+            with socket.socket() as a, socket.socket() as b:
+                a.bind(('127.0.0.1', first)); b.bind(('127.0.0.1', first + 1))
+            return first
+        except OSError:
+            continue
+    raise SystemExit('No free port pair found')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--port', type=int, default=25680)
+    parser.add_argument('--port', type=int, default=int(os.environ.get('T3CRAFT_FIXTURE_PORT') or 25680), help='Machine A port; B is port + 1. 0 picks a free pair.')
+    parser.add_argument('--port-file', type=Path, help='Write the chosen machine A port here once both fixtures listen.')
     parser.add_argument('--config', type=Path)
     parser.add_argument('--protocol2', action='store_true')
     args = parser.parse_args()
-    servers = [Fixture(args.port, 'A', args.protocol2), Fixture(args.port + 1, 'B', args.protocol2)]
+    if args.port == 0:
+        # Probing and binding are two steps, so a neighbour can grab the pair in between: just pick another pair.
+        for attempt in range(50):
+            args.port = free_port_pair()
+            try:
+                servers = [Fixture(args.port, 'A', args.protocol2), Fixture(args.port + 1, 'B', args.protocol2)]
+                break
+            except OSError:
+                continue
+        else:
+            raise SystemExit('Could not bind a free port pair')
+    else:
+        servers = [Fixture(args.port, 'A', args.protocol2), Fixture(args.port + 1, 'B', args.protocol2)]
     if args.config:
         args.config.parent.mkdir(parents=True, exist_ok=True)
         args.config.write_text(json.dumps({'environments': [{'label': 'Fixture ' + s.machine, 'baseUrl': f'http://127.0.0.1:{s.server_port}', 'accessToken': 'fixture-only'} for s in servers], 'threadId': 'A-done-0', 'books': False}))
         args.config.chmod(0o600)
     for server in servers: threading.Thread(target=server.serve_forever, daemon=True).start()
+    if args.port_file:
+        args.port_file.parent.mkdir(parents=True, exist_ok=True)
+        args.port_file.write_text(str(args.port))
     print('Loopback T3 fixtures ready:', args.port, args.port + 1, flush=True)
     threading.Event().wait()

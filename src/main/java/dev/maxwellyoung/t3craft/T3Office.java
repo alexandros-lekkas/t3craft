@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * A long loft with one floor per paired machine, and where the agent
- * villagers go inside it. Pure layout (no client or server classes) so the client village and the
+ * agents go inside it. Pure layout (no client or server classes) so the client office and the
  * shared server office both use it.
  *
  * Coordinates are relative to the office origin (inside floor corner of the ground floor). A floor
@@ -20,7 +20,7 @@ final class T3Office {
 	static final int FLOOR_HEIGHT = HEIGHT + 1;
 
 	/**
-	 * Where a villager ends up: cell, how far it sinks in (seats), and which way it faces
+	 * Where an agent ends up: cell, how far it sinks in (seats), and which way it faces
 	 * (NaN = toward the player).
 	 */
 	record Spot(int x, int z, double sink, float yaw) {
@@ -98,7 +98,7 @@ final class T3Office {
 
 	/**
 	 * What's written on a floor's whiteboard: the first waiting thread and what it's asking
-	 * (the command or question), on two birch signs above the villagers waiting there.
+	 * (the command or question), on two birch signs above the agents waiting there.
 	 * An empty list wipes the board.
 	 */
 	static List<String> whiteboard(int floor, List<Note> notes) {

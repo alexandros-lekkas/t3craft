@@ -29,7 +29,7 @@
 
 # T3 Craft
 
-**Status: in active development — some features shown are in progress.** The office images are design renders; a real demo will replace them.
+**Status: in active development.** The screenshots are real in-game captures unless a caption says otherwise.
 
 ### Your coding agents, living in your Minecraft world.
 
@@ -57,7 +57,7 @@ Walk up to one, click it, and answer it. You never alt-tab, and there's **nothin
 2. **Open T3 Code**, then press **Play** on *T3 Craft*.
 3. **Click _T3 World_.** You spawn facing your office, and your agents are already at their desks. <a href="docs/design/world.md">How it works →</a>
 
-No pairing links, no commands, no settings screens. T3 Craft finds T3 Code on your computer and connects by itself.
+No pairing links, no setup commands, no settings screens. T3 Craft finds T3 Code on your computer and connects by itself. Already have a world? Run `/t3 office` and the office goes up in front of you.
 
 <sub>Already run Fabric? Drop `t3craft-x.y.z.jar` and Fabric API into `mods/`. Needs Minecraft Java 26.3, Fabric Loader 0.19.5+ and Java 25+.</sub>
 
@@ -71,8 +71,8 @@ No pairing links, no commands, no settings screens. T3 Craft finds T3 Code on yo
 <b>Click an agent to talk.</b> A small card opens beside it: the last message or the request it is waiting on, one input box, and Approve / Deny when it needs you. The laptop (or <kbd>`</kbd>) shows your active threads and the selected one, in plain Minecraft. <a href="docs/design/native-ui.md">See the UI →</a>
 </td>
 <td width="50%" valign="top">
-<img src="docs/images/office-ground-floor.png" alt="Ground-floor cutaway: agents at the bench, one at the whiteboard">
-<b>An office that shows the status.</b> Working agents sit at the bench. Agents that need you wait at the whiteboard. Finished ones head to the lounge.
+<img src="docs/design/office/interior.png" alt="Inside the office: agents at their desks, captured in the game">
+<b>An office that shows the status.</b> Working agents sit and type at their desks. Agents that need you wait at the whiteboard. Finished ones head to the lounge. <a href="docs/design/office.md">The office →</a>
 </td>
 </tr>
 <tr>
@@ -90,7 +90,7 @@ No pairing links, no commands, no settings screens. T3 Craft finds T3 Code on yo
 <p align="center"><img src="docs/images/agents-lineup.png" alt="Agent skins: Claude, Codex, Muse, Grok, Cursor, OpenCode and a fallback" width="100%"><br>
 <sub>Agents look like players, not villagers. Each provider has its own outfits.</sub></p>
 
-**Also in the box:** a T3 laptop you right-click for your threads · real checkpoint diffs · report books when work is done · snoozed and finished threads stay out of the way, just like in T3 Code · a light Vanilla+ pack (Sodium, Lithium, AppleSkin, Mouse Tweaks…) with no shaders and no bloat.
+**Also in the box:** desk laptops you right-click for that agent's thread · Decisions (<kbd>J</kbd>) for every pending approval · real checkpoint diffs · report books when work is done · snoozed and finished threads stay out of the way, just like in T3 Code · a light Vanilla+ pack (Sodium, Lithium, AppleSkin, Mouse Tweaks…) with no shaders and no bloat. The full command list is in the [reference](docs/REFERENCE.md#commands).
 
 ## 🧠 How it works
 
@@ -108,10 +108,10 @@ flowchart LR
     M --> O
     M --> U
   end
-  T3 <-- "local MCP<br/>auto-connect" --> M
+  T3 <-- "local T3 · pairs by itself" --> M
 ```
 
-T3 Craft talks to the T3 Code already running on your machine over T3's public MCP. Your code, keys and prompts never go through a Minecraft server. Every thread becomes a character, and its state picks where the character stands. [Architecture →](docs/ARCHITECTURE.md)
+T3 Craft talks to the T3 Code already running on your machine: it pairs itself, then shows your threads in plain Minecraft screens and as characters in the office, and pings you when an agent finishes or needs you. (T3's own web app can be streamed in instead, opt-in with `webUi: true`.) Your code, keys and prompts never go through a Minecraft server. Every thread becomes a character, and its state picks where the character stands. [Architecture →](docs/ARCHITECTURE.md)
 
 ## ❓ FAQ
 
@@ -127,7 +127,7 @@ Anything T3 Code runs: Claude Code, Codex, Cursor, OpenCode and more. Each provi
 
 <details><summary><b>Does it work in multiplayer?</b></summary>
 
-The mod is client-side, so you can use it on any server and your prompts stay private. Install it on the server too to get a shared village that everyone sees.
+The mod is client-side, so you can use it on any server and your prompts stay private. Install it on the server too to get a shared office that everyone sees.
 </details>
 
 <details><summary><b>Is it safe? Can agents touch my world?</b></summary>
@@ -137,7 +137,7 @@ Agents act only through T3 Code, with the permissions you already gave them ther
 
 <details><summary><b>Will it slow my game down?</b></summary>
 
-It shouldn't. The pack ships Sodium and Lithium and no shaders, and the office is ordinary blocks and a handful of characters.
+It shouldn't. The pack ships Sodium and Lithium, and the office is ordinary blocks and a handful of characters.
 </details>
 
 <details><summary><b>Mac, Windows, Linux?</b></summary>

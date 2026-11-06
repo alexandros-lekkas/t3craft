@@ -44,6 +44,7 @@ loom {
 				if (project.hasProperty('config')) vmArg "-Dt3craft.config=${project.property('config')}"
 				if (project.hasProperty('expectedDesk')) vmArg "-Dt3craft.expectedDesk=${project.property('expectedDesk')}"
 				if (project.hasProperty('focus')) vmArg "-Dt3craft.focus=${project.property('focus')}"
+				if (project.hasProperty('fixturePort')) vmArg "-Dt3craft.fixturePort=${project.property('fixturePort')}"
 				if(project.hasProperty("world")) programArgs "--quickPlaySingleplayer", project.property("world")
 				else programArgs "--quickPlayMultiplayer", (project.findProperty('join') ?: 'localhost:25565')
 			}
@@ -92,6 +93,9 @@ java {
 	targetCompatibility = JavaVersion.VERSION_25
 }
 
+// Fixture-backed checks: -PfixturePort wins, then T3CRAFT_FIXTURE_PORT (what verify-ci.sh allocates), then the old default.
+def fixturePort() { project.findProperty('fixturePort') ?: System.getenv('T3CRAFT_FIXTURE_PORT') ?: '25680' }
+
 tasks.register('smoke', JavaExec) {
 	description = 'Pair, dispatch, and poll against a live T3 server: -Pt3url=<pairing url>'
 	classpath = sourceSets.smoke.runtimeClasspath
@@ -104,14 +108,14 @@ tasks.register('featureCheck', JavaExec) {
 	description = 'Decision routing and checkpoint review against scripts/feature-fixture.py (loopback only).'
 	classpath = sourceSets.smoke.runtimeClasspath
 	mainClass = 'dev.maxwellyoung.t3craft.FeatureChecks'
-	args = [project.findProperty('fixturePort') ?: '25680']
+	args = [fixturePort()]
 }
 
 tasks.register('reliabilityCheck', JavaExec) {
 	description = 'MCP request boundary and connection recovery against the isolated T3 fixture.'
 	classpath = sourceSets.smoke.runtimeClasspath
 	mainClass = 'dev.maxwellyoung.t3craft.ReliabilityChecks'
-	args = [project.findProperty('fixturePort') ?: '25680']
+	args = [fixturePort()]
 }
 
 tasks.register('reviewProbe', JavaExec) {
@@ -138,7 +142,7 @@ tasks.register('connectionCheck', JavaExec) {
 	description = 'Private pairing errors, per-machine changes and cached peer continuity against loopback fixtures.'
 	classpath = sourceSets.smoke.runtimeClasspath
 	mainClass = 'dev.maxwellyoung.t3craft.ConnectionChecks'
-	args = [project.findProperty('fixturePort') ?: '25680']
+	args = [fixturePort()]
 }
 
 tasks.register('worldCheck', JavaExec) {
@@ -186,7 +190,7 @@ tasks.register('mcpCheck', JavaExec) {
 	description = 'Public MCP transport, OAuth, incremental history, visibility and per-leg fallback checks.'
 	classpath = sourceSets.smoke.runtimeClasspath
 	mainClass = 'dev.maxwellyoung.t3craft.McpChecks'
-	args = [project.findProperty('fixturePort') ?: '25680']
+	args = [fixturePort()]
 }
 
 tasks.register('webProbe', JavaExec) {

@@ -13,7 +13,7 @@ The real in-game shots the docs need. When a feature lands, the implementing PR 
 
 ## Shots
 
-### World and office (Create T3 World, design A)
+### World and office (T3 World, design A)
 
 | ✓ | Shot | Scene setup | Camera | GUI |
 |:-:|:--|:--|:--|:--|

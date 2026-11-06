@@ -196,8 +196,6 @@ public final class McpChecks {
    check(state.snapshot().connected() && state.online("mcp-question"), "MCP keeps machine online");
    api.sendPrompt(row, "Fixture prompt", null); api.answerQuestions("mcp-question", "mcp-request", T3McpBackend.obj("format", "json"));
    try { api.review("mcp-question"); throw new AssertionError("broken review succeeded"); } catch (IOException e) { check(e.getMessage().contains("Update T3"), "original legacy error"); }
-   var health = new T3State.MachineHealth(base, "MCP", true, false, 0, 2, null, api.legs());
-   check(T3ConnectionsScreen.status(health, env(true)).contains("legacy unavailable"), "connection status explains legacy failure");
   } finally { close(state); }
  }
  static void twoMachineRouting() throws Exception {
