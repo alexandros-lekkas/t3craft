@@ -25,6 +25,26 @@ final class T3AutoConnect {
 	private T3AutoConnect() {}
 
 	/**
+	 * Spacing for pairing again after T3 refuses a pairing: the first re-pair is immediate, each one after waits
+	 * twice as long as the last (15 s up to five minutes) until a pairing works again.
+	 */
+	static final class Backoff {
+		private long notBefore;
+		private long delay = RETRY_MS;
+
+		boolean ready(long now) { return now >= notBefore; }
+
+		void attempted(long now) {
+			notBefore = now + delay;
+			delay = Math.min(delay * 2, MAX_RETRY_MS);
+		}
+
+		void reset() { notBefore = 0; delay = RETRY_MS; }
+
+		long delayForTest() { return delay; }
+	}
+
+	/**
 	 * One attempt: null when no T3 runs on this computer; throws when it runs but pairing fails. The protocol is
 	 * checked before any credential is minted, so an incompatible T3 costs one HTTP request, not a CLI run.
 	 */

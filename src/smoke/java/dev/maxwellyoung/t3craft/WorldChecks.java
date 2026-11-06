@@ -21,6 +21,8 @@ public final class WorldChecks {
 		checkMarker();
 		checkPlacement();
 		checkFrame();
+		checkAdoption();
+		checkArrival();
 		System.out.println("WorldChecks passed");
 	}
 
@@ -58,6 +60,19 @@ public final class WorldChecks {
 		T3WorldData random = new T3WorldData("Any", null, 42L, false, List.of());
 		T3WorldData.write(save, random);
 		check(T3WorldData.read(save).seedId == null, "Surprise me keeps no seed id");
+		// Adoption is remembered in the save: a new save under an old name starts unadopted.
+		check(!T3WorldData.read(save).adopted, "a new marker has not had its office adopted");
+		random.adopted = true;
+		T3WorldData.write(save, random);
+		check(T3WorldData.read(save).adopted, "adoption round-trips");
+		// Markers from before the flag: entered once (welcomed) means adopted then.
+		var legacy = new net.minecraft.nbt.CompoundTag();
+		var fields = (net.minecraft.nbt.CompoundTag) T3WorldData.CODEC.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, random).getOrThrow();
+		fields.remove("adopted");
+		fields.putBoolean("welcomed", true);
+		check(T3WorldData.CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, fields).getOrThrow().adopted, "a welcomed pre-flag marker counts as adopted");
+		fields.putBoolean("welcomed", false);
+		check(!T3WorldData.CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, fields).getOrThrow().adopted, "an unwelcomed pre-flag marker is adopted on entry");
 	}
 
 	private static void checkPlacement() {
@@ -113,6 +128,39 @@ public final class WorldChecks {
 			var cell = frame.block(25, 0, 2);
 			check(Math.abs(centre.x - (cell.getX() + 0.5)) < 1e-9 && Math.abs(centre.z - (cell.getZ() + 0.5)) < 1e-9, rotation + ": a cell centre lands in the centre of the turned cell");
 		}
+	}
+
+	/** Entering a T3 World: what happens to the office the config holds under the save's name. */
+	private static void checkAdoption() {
+		var a = new BlockPos(8, 65, -2);
+		var b = new BlockPos(-120, 70, 44);
+		int[] recordedA = {8, 65, -2};
+		// A save deleted and created again under the same name: its new office replaces the old one's entry.
+		check(T3CraftClient.OfficeAdoption.decide(true, recordedA, "counterclockwise_90", b, Rotation.CLOCKWISE_90) == T3CraftClient.OfficeAdoption.ADOPT, "recreated save adopts its new origin");
+		check(T3CraftClient.OfficeAdoption.decide(true, recordedA, null, a, Rotation.CLOCKWISE_90) == T3CraftClient.OfficeAdoption.ADOPT, "same origin, new turn: adopt");
+		check(T3CraftClient.OfficeAdoption.decide(true, recordedA, "counterclockwise_90", a, Rotation.COUNTERCLOCKWISE_90) == T3CraftClient.OfficeAdoption.KEEP, "same seed and site: nothing to change");
+		check(T3CraftClient.OfficeAdoption.decide(true, null, null, a, Rotation.NONE) == T3CraftClient.OfficeAdoption.ADOPT, "first entry adopts");
+		check(T3CraftClient.OfficeAdoption.decide(true, recordedA, null, null, Rotation.NONE) == T3CraftClient.OfficeAdoption.FORGET, "a new save with no office forgets the old one's");
+		// Adopted once: a later /t3 office build elsewhere is the player's choice and stays.
+		check(T3CraftClient.OfficeAdoption.decide(false, new int[] {200, 70, 0}, null, a, Rotation.COUNTERCLOCKWISE_90) == T3CraftClient.OfficeAdoption.KEEP, "a later rebuild is respected");
+		check(T3CraftClient.OfficeAdoption.decide(false, null, null, a, Rotation.NONE) == T3CraftClient.OfficeAdoption.ADOPT, "a missing entry is filled in");
+	}
+
+	/** The arrival spot: dry, firm ground, never a pond or the top of a tree. */
+	private static void checkArrival() {
+		var air = Blocks.AIR.defaultBlockState();
+		check(OfficePlacement.standable(Blocks.GRASS_BLOCK.defaultBlockState(), air, air), "grass with room above is standable");
+		check(OfficePlacement.standable(Blocks.STONE.defaultBlockState(), Blocks.SHORT_GRASS.defaultBlockState(), air), "plants at the feet are fine");
+		check(!OfficePlacement.standable(Blocks.WATER.defaultBlockState(), air, air), "not on water");
+		check(!OfficePlacement.standable(Blocks.SAND.defaultBlockState(), Blocks.WATER.defaultBlockState(), air), "not standing in a pond");
+		check(!OfficePlacement.standable(Blocks.OAK_LOG.defaultBlockState(), air, air), "not on a trunk");
+		check(!OfficePlacement.standable(Blocks.OAK_LEAVES.defaultBlockState(), air, air), "not on a canopy");
+		check(!OfficePlacement.standable(Blocks.GRASS_BLOCK.defaultBlockState(), Blocks.STONE.defaultBlockState(), air), "not inside a hill");
+		// Lawn: bare dirt or stone under open air gets its grass back; anything else is left alone.
+		check(OfficePlacement.bareLawn(Blocks.DIRT.defaultBlockState(), air) && OfficePlacement.bareLawn(Blocks.STONE.defaultBlockState(), air), "bare dirt and stone become lawn");
+		check(!OfficePlacement.bareLawn(Blocks.GRASS_BLOCK.defaultBlockState(), air), "grass stays grass");
+		check(!OfficePlacement.bareLawn(Blocks.DIRT.defaultBlockState(), Blocks.OAK_PLANKS.defaultBlockState()), "covered dirt is not lawn");
+		check(!OfficePlacement.bareLawn(Blocks.SAND.defaultBlockState(), air), "sand is left as it is");
 	}
 
 	private static void check(boolean ok, String message) { if (!ok) throw new AssertionError(message); }

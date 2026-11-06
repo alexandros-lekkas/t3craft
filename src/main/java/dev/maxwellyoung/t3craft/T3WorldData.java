@@ -44,7 +44,8 @@ final class T3WorldData extends SavedData {
 		Codec.FLOAT.optionalFieldOf("spawnPitch", 0f).forGetter(d -> d.spawnPitch),
 		Codec.BOOL.optionalFieldOf("arrived", false).forGetter(d -> d.arrived),
 		Codec.BOOL.optionalFieldOf("welcomed", false).forGetter(d -> d.welcomed),
-		Codec.LONG.optionalFieldOf("createdAt", 0L).forGetter(d -> d.createdAt)
+		Codec.LONG.optionalFieldOf("createdAt", 0L).forGetter(d -> d.createdAt),
+		Codec.BOOL.optionalFieldOf("adopted").forGetter(d -> Optional.of(d.adopted))
 	).apply(instance, T3WorldData::new));
 
 	/**
@@ -78,6 +79,11 @@ final class T3WorldData extends SavedData {
 	boolean arrived;
 	/** The welcome toast was shown. */
 	boolean welcomed;
+	/**
+	 * The client recorded this save's office as the world's office. Kept in the save, not inferred from the client
+	 * config: a save deleted and created again under the same name has the same config key but a new office.
+	 */
+	boolean adopted;
 	long createdAt;
 
 	T3WorldData(String name, String seedId, long seed, boolean creative, List<String> floors) {
@@ -90,7 +96,8 @@ final class T3WorldData extends SavedData {
 	}
 
 	private T3WorldData(String name, Optional<String> seedId, long seed, boolean creative, List<String> floors, boolean setupDone,
-		Optional<BlockPos> origin, Rotation rotation, Optional<BlockPos> spawn, float spawnYaw, float spawnPitch, boolean arrived, boolean welcomed, long createdAt) {
+		Optional<BlockPos> origin, Rotation rotation, Optional<BlockPos> spawn, float spawnYaw, float spawnPitch, boolean arrived, boolean welcomed, long createdAt,
+		Optional<Boolean> adopted) {
 		this(name, seedId.orElse(null), seed, creative, floors);
 		this.setupDone = setupDone;
 		this.origin = origin.orElse(null);
@@ -101,6 +108,8 @@ final class T3WorldData extends SavedData {
 		this.arrived = arrived;
 		this.welcomed = welcomed;
 		this.createdAt = createdAt;
+		// Markers from before the flag: a world already entered once (welcomed) had its office adopted then.
+		this.adopted = adopted.orElse(welcomed);
 	}
 
 	boolean officePlaced() {

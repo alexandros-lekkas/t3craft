@@ -14,7 +14,7 @@ import net.minecraft.world.entity.decoration.Mannequin;
  * pairs the dev server and builds its shared office. Never active in normal play.
  */
 final class SelfTest {
-	private enum Step { HIDDEN_DECISION, HIDDEN_CARD, HIDDEN_SETTLED, ACTIVITY_OPEN, ACTIVITY_CHECK, ACTIVITY_RETURN, ACTIVITY_REVIEW, ACTIVITY_NEXT, ACTIVITY_BACK, ACTIVITY_OFFLINE, ACTIVITY_OFFLINE_BACK, STABLE_SITE, STABLE_CHURN, STABLE_CAPTURE, STABLE_OFFLINE, STABLE_RECOVER, STABLE_RESTORE, STABLE_ARCHIVE, SHARED_STABLE, SHARED_CHURN, SHARED_TARGET, SHARED_OPEN, SHARED_UNPIN, AUTH_ERROR, AUTH_RECOVER, PROTOCOL_ERROR, PROTOCOL_RECOVER, RELEASE_SITE, RELEASE_OPEN, RELEASE_CHECK, RELEASE_FEEDBACK, DESK_SITE, DESK_OPEN, DESK_REQUEST, DESK_ANSWERED, DESK_REVIEW_OPEN, DESK_REVIEW, DESK_DIFF, DESK_FEEDBACK, DESK_SIDEBAR, SILK_WORLD, OFFICE_SITE, OFFICE, FLOW_SEND, FLOW_WAIT, FLOW_CLICK, FLOW_DONE, OFFICE_SHARED_PAIR, OFFICE_SHARED_BUILD, OFFICE_SHARED_CHECK, THREADS, PREP, DONE_PANEL, WAIT_WORLD, OPEN, SEND, ASK_WAIT, ASK_ANSWERED, LOOK, WATCH, WAIT_WORKING, WAIT_APPROVAL_OR_DONE, WAIT_DONE, CLOSE, HUD, FINISH, DONE }
+	private enum Step { HIDDEN_DECISION, HIDDEN_CARD, HIDDEN_SETTLED, STABLE_SITE, STABLE_CHURN, STABLE_CAPTURE, STABLE_OFFLINE, STABLE_RECOVER, STABLE_RESTORE, STABLE_ARCHIVE, SHARED_STABLE, SHARED_CHURN, SHARED_TARGET, SHARED_OPEN, SHARED_UNPIN, AUTH_ERROR, AUTH_RECOVER, PROTOCOL_ERROR, PROTOCOL_RECOVER, RELEASE_SITE, RELEASE_OPEN, RELEASE_CHECK, RELEASE_FEEDBACK, DESK_SITE, DESK_OPEN, DESK_REQUEST, DESK_ANSWERED, DESK_REVIEW_OPEN, DESK_REVIEW, DESK_DIFF, DESK_FEEDBACK, DESK_SIDEBAR, SILK_WORLD, OFFICE_SITE, OFFICE, FLOW_SEND, FLOW_WAIT, FLOW_CLICK, FLOW_DONE, OFFICE_SHARED_PAIR, OFFICE_SHARED_BUILD, OFFICE_SHARED_CHECK, THREADS, PREP, DONE_PANEL, WAIT_WORLD, OPEN, SEND, ASK_WAIT, ASK_ANSWERED, LOOK, WATCH, WAIT_WORKING, WAIT_APPROVAL_OR_DONE, WAIT_DONE, CLOSE, HUD, FINISH, DONE }
 
 	private final T3CraftClient mod;
 	private final String prompt;
@@ -262,14 +262,14 @@ final class SelfTest {
 				if (pin == null || !mod.residents().brainForTest().agents().containsKey("A-waiting") || !mod.residents().brainForTest().agents().containsKey("B-waiting")) {
 					finish(minecraft, "FAIL pinned/waiting residents missing"); return;
 				}
-				pinnedDesk = pin.desk; pinnedGoal = pin.goal; targetEntity = villagerFor(minecraft, "A-done-0").getId();
+				pinnedDesk = pin.desk; pinnedGoal = pin.goal; targetEntity = mannequinFor(minecraft, "A-done-0").getId();
 				fixtureControl(minecraft, "churn"); advance(Step.STABLE_CHURN, "six newer threads arrived");
 			}
 			case STABLE_CHURN -> {
 				if (ticks < 60 || snapshot.threads().size() != 32) return;
 				OfficeBrain.Agent pin = mod.residents().brainForTest().agents().get("A-done-0");
-				if (pin == null || pin.desk != pinnedDesk || !pin.goal.equals(pinnedGoal) || villagerFor(minecraft, "A-done-0").getId() != targetEntity) {
-					finish(minecraft, "FAIL churn moved pinned desk or replaced villager"); return;
+				if (pin == null || pin.desk != pinnedDesk || !pin.goal.equals(pinnedGoal) || mannequinFor(minecraft, "A-done-0").getId() != targetEntity) {
+					finish(minecraft, "FAIL churn moved pinned desk or replaced mannequin"); return;
 				}
 				T3Screen screen = (T3Screen) minecraft.gui.screen();
 				// The simple laptop has no project filter; the list shows every active thread.
@@ -285,7 +285,7 @@ final class SelfTest {
 			}
 			case STABLE_OFFLINE -> {
 				if (ticks < 60 || mod.state().online("A-done-0")) return;
-				Mannequin pin = villagerFor(minecraft, "A-done-0");
+				Mannequin pin = mannequinFor(minecraft, "A-done-0");
 				if (pin == null || pin.getId() != targetEntity || pin.getCustomName() == null || !pin.getCustomName().getString().startsWith("Offline")) {
 					finish(minecraft, "FAIL offline pinned resident identity/label"); return;
 				}
@@ -295,7 +295,7 @@ final class SelfTest {
 			case STABLE_RECOVER -> {
 				if (ticks < 40 || !mod.state().online("A-done-0")) return;
 				OfficeBrain.Agent pin = mod.residents().brainForTest().agents().get("A-done-0");
-				if (pin == null || pin.desk != pinnedDesk || villagerFor(minecraft, "A-done-0").getId() != targetEntity || !(minecraft.gui.screen() instanceof T3Screen screen) || !"Office QA draft".equals(screen.composerValueForTest())) {
+				if (pin == null || pin.desk != pinnedDesk || mannequinFor(minecraft, "A-done-0").getId() != targetEntity || !(minecraft.gui.screen() instanceof T3Screen screen) || !"Office QA draft".equals(screen.composerValueForTest())) {
 					finish(minecraft, "FAIL reconnect changed pinned desk/entity or draft"); return;
 				}
 				T3CraftClient.LOGGER.info("SELFTEST saved pinned desk {}", pinnedDesk);
@@ -349,11 +349,11 @@ final class SelfTest {
 					if (ticks > 140) { shot(minecraft, "shared-resident-target-failure"); finish(minecraft, "FAIL shared resident ray"); } return;
 				}
 				net.minecraft.client.KeyMapping.click(minecraft.options.keyUse.getDefaultKey());
-				advance(Step.SHARED_OPEN, "physical shared villager click");
+				advance(Step.SHARED_OPEN, "physical shared mannequin click");
 			}
 			case SHARED_OPEN -> {
 				if (ticks < 30) return;
-				if (!(minecraft.gui.screen() instanceof T3Screen) || !"A-done-0".equals(mod.state().focusedThreadId())) { finish(minecraft, "FAIL shared villager interaction without local anchor"); return; }
+				if (!(minecraft.gui.screen() instanceof T3Screen) || !"A-done-0".equals(mod.state().focusedThreadId())) { finish(minecraft, "FAIL shared mannequin interaction without local anchor"); return; }
 				shot(minecraft, "shared-resident-panel"); minecraft.gui.setScreen(null);
 				ClientCommands.send("t3office unpin A-done-0");
 				advance(Step.SHARED_UNPIN, "shared resident opened its owned thread");
@@ -389,64 +389,6 @@ final class SelfTest {
 					finish(minecraft, "FAIL recovery lost draft"); return;
 				}
 				finish(minecraft, "PASS connection recovery: per-machine auth and protocol guidance, healthy peer, reconnect and preserved draft");
-			}
-
-			case ACTIVITY_OPEN -> {
-				if (ticks < 20 || !(minecraft.gui.screen() instanceof T3Screen screen)) return;
-				press(screen, "Activity"); advance(Step.ACTIVITY_CHECK, "opened activity through the real button");
-			}
-			case ACTIVITY_CHECK -> {
-				if (ticks < 30 || !(minecraft.gui.screen() instanceof T3ActivityScreen screen)) return;
-				if (screen.entriesForTest().stream().noneMatch(e -> "command_execution".equals(e.kind()) && e.detail() != null && e.detail().contains("Exit code:"))) {
-					finish(minecraft, "FAIL command receipt missing in activity view"); return;
-				}
-				if ("activity-review".equals(prompt)) shot(minecraft, "activity-fixture-receipts");
-				press(screen, "Back to chat"); advance(Step.ACTIVITY_RETURN, "returning with unsent draft");
-			}
-			case ACTIVITY_RETURN -> {
-				if (ticks < 20 || !(minecraft.gui.screen() instanceof T3Screen screen)) return;
-				if (!"Activity QA draft".equals(screen.composerValueForTest())) { finish(minecraft, "FAIL activity lost draft"); return; }
-				press(screen, "Review"); advance(Step.ACTIVITY_REVIEW, "opening checkpoint navigation");
-			}
-			case ACTIVITY_REVIEW -> {
-				if (ticks < 40 || !(minecraft.gui.screen() instanceof T3ReviewScreen screen) || screen.reviewForTest() == null) return;
-				click(screen, 30, 83);
-				var hunks = T3Diff.hunks(screen.filesForTest().getFirst());
-				if (hunks.isEmpty() || "activity-review".equals(prompt) && hunks.size() != 2) { finish(minecraft, "FAIL checkpoint changes missing"); return; }
-				press(screen, "Next");
-				if (screen.scrollForTest() != hunks.getFirst()) { finish(minecraft, "FAIL first change navigation"); return; }
-				if ("activity-review".equals(prompt)) press(screen, "Next");
-				advance(Step.ACTIVITY_NEXT, "navigated actual change controls");
-			}
-			case ACTIVITY_NEXT -> {
-				if (ticks < 30 || !(minecraft.gui.screen() instanceof T3ReviewScreen screen)) return;
-				var hunks = T3Diff.hunks(screen.filesForTest().getFirst());
-				if ("activity-review".equals(prompt)) {
-					if (screen.scrollForTest() != hunks.getLast()) { finish(minecraft, "FAIL last change navigation"); return; }
-					shot(minecraft, "numbered-checkpoint-changes");
-					press(screen, "Prev");
-					if (screen.scrollForTest() != hunks.getFirst()) { finish(minecraft, "FAIL previous change navigation"); return; }
-					screen.keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_RIGHT, 0, 0));
-				}
-				press(screen, "Give feedback"); advance(Step.ACTIVITY_BACK, "returning checkpoint feedback to existing draft");
-			}
-			case ACTIVITY_BACK -> {
-				if (ticks < 20 || !(minecraft.gui.screen() instanceof T3Screen screen)) return;
-				if (!"Activity QA draft".equals(screen.composerValueForTest())) { finish(minecraft, "FAIL review lost activity draft"); return; }
-				if ("activity-live".equals(prompt)) { finish(minecraft, "PASS actual T3 command receipts, checkpoint navigation and preserved draft; read-only, no dispatch"); return; }
-				press(screen, "Activity"); fixtureControl(minecraft, "offline"); advance(Step.ACTIVITY_OFFLINE, "disconnecting only fixture owner A");
-			}
-			case ACTIVITY_OFFLINE -> {
-				if (ticks < 60 || mod.state().online("A-done-0")) return;
-				if (!(minecraft.gui.screen() instanceof T3ActivityScreen screen) || screen.entriesForTest().isEmpty() || !mod.state().online("B-done-0")) {
-					finish(minecraft, "FAIL offline cache or healthy peer"); return;
-				}
-				shot(minecraft, "activity-offline-cache"); press(screen, "Back to chat"); advance(Step.ACTIVITY_OFFLINE_BACK, "returning from cached activity");
-			}
-			case ACTIVITY_OFFLINE_BACK -> {
-				if (ticks < 20 || !(minecraft.gui.screen() instanceof T3Screen screen)) return;
-				if (!"Activity QA draft".equals(screen.composerValueForTest())) { finish(minecraft, "FAIL offline draft"); return; }
-				finish(minecraft, "PASS packaged activity: failed-command receipt, unknown item, numbered multi-hunk next/previous, feedback draft, offline cache and healthy peer");
 			}
 
 			case RELEASE_SITE -> {
@@ -732,18 +674,18 @@ final class SelfTest {
 				if (ticks == 30) shot(minecraft, "flow-whiteboard");
 				if (ticks == 35) {
 					// Look at the waiting agent and right-click it like a player would.
-					var villager = villagerFor(minecraft, row.id());
-					if (villager == null) {
+					var mannequin = mannequinFor(minecraft, row.id());
+					if (mannequin == null) {
 						finish(minecraft, "FAIL no agent for the waiting thread");
 						return;
 					}
 					minecraft.player.getAbilities().flying = false;
 					minecraft.player.onUpdateAbilities();
-					ClientCommands.send("tp @s " + (villager.getX() + 2) + " " + (villager.getY() - villager.getY() % 1) + " " + villager.getZ());
+					ClientCommands.send("tp @s " + (mannequin.getX() + 2) + " " + (mannequin.getY() - mannequin.getY() % 1) + " " + mannequin.getZ());
 				}
 				if (ticks == 42) {
-					var villager = villagerFor(minecraft, row.id());
-					minecraft.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, villager.getEyePosition());
+					var mannequin = mannequinFor(minecraft, row.id());
+					minecraft.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, mannequin.getEyePosition());
 				}
 				if (ticks == 50) net.minecraft.client.KeyMapping.click(minecraft.options.keyUse.getDefaultKey());
 				if (ticks == 70) {
@@ -818,18 +760,18 @@ final class SelfTest {
 					var names = new java.util.ArrayList<String>();
 					Mannequin target = null;
 					for (var entity : minecraft.level.entitiesForRendering()) {
-						if (entity instanceof Mannequin villager && villager.getId() > 0 && villager.getCustomName() != null) {
-							names.add(villager.getCustomName().getString());
-							if (target == null || villager.distanceTo(minecraft.player) < target.distanceTo(minecraft.player)) target = villager;
+						if (entity instanceof Mannequin mannequin && mannequin.getId() > 0 && mannequin.getCustomName() != null) {
+							names.add(mannequin.getCustomName().getString());
+							if (target == null || mannequin.distanceTo(minecraft.player) < target.distanceTo(minecraft.player)) target = mannequin;
 						}
 					}
-					T3CraftClient.LOGGER.info("SELFTEST shared office server villagers: {}", names);
+					T3CraftClient.LOGGER.info("SELFTEST shared office server agents: {}", names);
 					if (target == null) {
-						finish(minecraft, "FAIL no server-side office villagers visible");
+						finish(minecraft, "FAIL no server-side office agents visible");
 						return;
 					}
 					targetEntity = target.getId();
-					// Empty hand (a held book would open instead), walk up, then right-click the real villager.
+					// Empty hand (a held book would open instead), walk up, then right-click the real mannequin.
 					minecraft.player.getInventory().setSelectedSlot(8);
 					ClientCommands.send("tp @s " + (target.getX() + 1.5) + " " + target.getY() + " " + target.getZ());
 				}
@@ -841,10 +783,10 @@ final class SelfTest {
 					String name = minecraft.level.getEntity(targetEntity) instanceof Mannequin target ? target.getCustomName().getString() : "?";
 					var focused = snapshot.focusedRow();
 					boolean ok = minecraft.gui.screen() instanceof T3Screen && focused != null
-						&& minecraft.level.getEntity(targetEntity) instanceof Mannequin target && OfficeBrain.villagerUuid(focused.id()).equals(target.getUUID());
+						&& minecraft.level.getEntity(targetEntity) instanceof Mannequin target && OfficeBrain.agentUuid(focused.id()).equals(target.getUUID());
 					shot(minecraft, "shared-panel");
 					T3CraftClient.LOGGER.info("SELFTEST shared click on '{}' opened panel for '{}'", name, focused == null ? null : focused.title());
-					if (!ok) finish(minecraft, "FAIL right-click on a server villager did not open its thread");
+					if (!ok) finish(minecraft, "FAIL right-click on a server mannequin did not open its thread");
 				}
 				if (ticks == 90) finish(minecraft, "PASS (shared office)");
 			}
@@ -898,13 +840,6 @@ final class SelfTest {
 					mod.state().setPanelOpen(true);
 					advance(Step.HIDDEN_DECISION, "loading hidden child fixture"); return;
 				}
-				if ("activity-review".equals(prompt) || "activity-live".equals(prompt)) {
-					if (minecraft.player == null || ticks < 600 || snapshot.focus() == null || !snapshot.connected()) return;
-					if ("activity-review".equals(prompt) && !"A-done-0".equals(snapshot.focusedId())) { finish(minecraft, "FAIL requires isolated fixture focus"); return; }
-					mod.openPanel(); ((T3Screen)minecraft.gui.screen()).setComposerForTest("Activity QA draft");
-					advance(Step.ACTIVITY_OPEN, "read-only activity workflow; no prompt submission"); return;
-				}
-
 				if (minecraft.player != null && snapshot.connected() && !snapshot.threads().isEmpty() && ticks > 100 && prompt.startsWith("new:")) {
 					advance(Step.PREP, "world ready; clearing a view for the build");
 				} else if (minecraft.player != null && snapshot.connected() && !snapshot.threads().isEmpty() && ticks > 100) {
@@ -1160,14 +1095,14 @@ final class SelfTest {
 			new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 0)), false);
 	}
 	private static Mannequin sharedMannequin(Minecraft minecraft, String thread) {
-		for (var entity : minecraft.level.entitiesForRendering()) if (entity instanceof Mannequin v && OfficeBrain.villagerUuid(thread).equals(v.getUUID())) return v;
+		for (var entity : minecraft.level.entitiesForRendering()) if (entity instanceof Mannequin v && OfficeBrain.agentUuid(thread).equals(v.getUUID())) return v;
 		return null;
 	}
 
-	private Mannequin villagerFor(Minecraft minecraft, String threadId) {
+	private Mannequin mannequinFor(Minecraft minecraft, String threadId) {
 		// The client-side Mannequin standing in for a thread in this world's office.
 		for (var entry : mod.residents().threadsByEntity().entrySet()) {
-			if (entry.getValue().equals(threadId) && minecraft.level.getEntity(entry.getKey()) instanceof Mannequin villager) return villager;
+			if (entry.getValue().equals(threadId) && minecraft.level.getEntity(entry.getKey()) instanceof Mannequin mannequin) return mannequin;
 		}
 		return null;
 	}

@@ -46,15 +46,18 @@ final class OfficeSite {
 		return true;
 	}
 
-	/** Whether {@link #blocker} finds anything: terrain never counts, only the player's storage and builds. */
-	static boolean occupied(Level level, Bounds bounds, BlockPos oldOrigin, List<String> oldBlueprint) {
-		return blocker(level, bounds, oldOrigin, oldBlueprint) != null;
+	/**
+	 * Whether {@link #blocker} finds anything: terrain never counts, only the player's storage and builds.
+	 * {@code old} is the office already standing (with its turn), or null; its own blocks never count.
+	 */
+	static boolean occupied(Level level, Bounds bounds, OfficeFrame old, List<String> oldBlueprint) {
+		return blocker(level, bounds, old, oldBlueprint) != null;
 	}
 
-	static boolean occupied(Bounds bounds, BlockPos oldOrigin, List<String> oldBlueprint,
+	static boolean occupied(Bounds bounds, OfficeFrame old, List<String> oldBlueprint,
 		java.util.function.Function<BlockPos, net.minecraft.world.level.block.state.BlockState> blocks,
 		java.util.function.Function<BlockPos, net.minecraft.world.level.block.entity.BlockEntity> entities) {
-		return blocker(bounds, oldOrigin, oldBlueprint, blocks, entities) != null;
+		return blocker(bounds, old, oldBlueprint, blocks, entities) != null;
 	}
 
 	/** Block entities world generation leaves in the open: wild bee nests, suspicious sand and gravel, creaking hearts. */
@@ -64,8 +67,8 @@ final class OfficeSite {
 			|| entity instanceof net.minecraft.world.level.block.entity.CreakingHeartBlockEntity;
 	}
 
-	static BlockPos blocker(Level level, Bounds bounds, BlockPos oldOrigin, List<String> oldBlueprint) {
-		return blocker(bounds, oldOrigin, oldBlueprint, level::getBlockState, level::getBlockEntity);
+	static BlockPos blocker(Level level, Bounds bounds, OfficeFrame old, List<String> oldBlueprint) {
+		return blocker(bounds, old, oldBlueprint, level::getBlockState, level::getBlockEntity);
 	}
 
 	/**
@@ -101,36 +104,10 @@ final class OfficeSite {
 	 * book, any block entity that is not the office's own (chests, furnaces, signs, beds…), or a crafted block that is
 	 * not the office's own. The plaza layer and everything natural are replaceable.
 	 */
-	static BlockPos blocker(Bounds bounds, BlockPos oldOrigin, List<String> oldBlueprint,
+	static BlockPos blocker(Bounds bounds, OfficeFrame old, List<String> oldBlueprint,
 		java.util.function.Function<BlockPos, net.minecraft.world.level.block.state.BlockState> blocks,
 		java.util.function.Function<BlockPos, net.minecraft.world.level.block.entity.BlockEntity> entities) {
-		Map<BlockPos, String> existing = new HashMap<>();
-		if (oldOrigin != null) for (String command : oldBlueprint) {
-			String[] parts = command.split(" ");
-			boolean fill = parts[0].equals("fill");
-			Bounds area = bounds(oldOrigin, List.of(command));
-			String block = parts[fill ? 7 : 4].split("[\\[{]", 2)[0];
-			if (!block.contains(":")) block = "minecraft:" + block;
-			boolean hollow = command.endsWith(" hollow");
-			for (BlockPos pos : BlockPos.betweenClosed(area.min(), area.max())) {
-				boolean inside = hollow && pos.getX() > area.min().getX() && pos.getX() < area.max().getX()
-					&& pos.getY() > area.min().getY() && pos.getY() < area.max().getY()
-					&& pos.getZ() > area.min().getZ() && pos.getZ() < area.max().getZ();
-				existing.put(pos.immutable(), inside ? "minecraft:air" : block);
-			}
-		}
-		// Dynamic office furnishings are still office blocks at these exact positions.
-		if (oldOrigin != null) {
-
-   int floors = Math.max(2, (bounds(oldOrigin, oldBlueprint).max().getY() - oldOrigin.getY() + 1) / T3Office.FLOOR_HEIGHT - 1);
-   for(boolean night:new boolean[]{false,true})for(String command:OfficeDesign.lamps(floors,night)){
-    String[] parts=command.split(" ");BlockPos pos=oldOrigin.offset(Integer.parseInt(parts[1]),Integer.parseInt(parts[2]),Integer.parseInt(parts[3]));
-    String expected="minecraft:"+parts[4].split("\\[")[0];String actual=BuiltInRegistries.BLOCK.getKey(blocks.apply(pos).getBlock()).toString();
-    if(actual.equals(expected))existing.put(pos,actual);
-   }
-   for(int floor=0;floor<floors;floor++)for(int z:new int[]{14,15,16})existing.put(oldOrigin.offset(1,floor*T3Office.FLOOR_HEIGHT+2,z),"minecraft:birch_wall_sign");
-
-		}
+		Map<BlockPos, String> existing = old == null ? Map.of() : existing(old, oldBlueprint, blocks);
 		for (BlockPos pos : BlockPos.betweenClosed(bounds.min(), bounds.max())) {
 			var state = blocks.apply(pos);
 			var entity = entities.apply(pos);
@@ -142,5 +119,46 @@ final class OfficeSite {
 			if (playerMade(state)) return pos.immutable();
 		}
 		return null;
+	}
+
+	/**
+	 * The standing office's own blocks, cell by cell, through its frame: a turned office (most T3 Worlds) is
+	 * matched where its blocks really are, not where an unturned one would stand.
+	 */
+	static Map<BlockPos, String> existing(OfficeFrame old, List<String> blueprint,
+		java.util.function.Function<BlockPos, net.minecraft.world.level.block.state.BlockState> blocks) {
+		Map<BlockPos, String> existing = new HashMap<>();
+		for (String relative : blueprint) {
+			String command = old.command(relative);
+			String[] parts = command.split(" ");
+			boolean fill = parts[0].equals("fill");
+			Bounds area = bounds(BlockPos.ZERO, List.of(command));
+			String block = blockId(parts[fill ? 7 : 4]);
+			boolean hollow = command.endsWith(" hollow");
+			for (BlockPos pos : BlockPos.betweenClosed(area.min(), area.max())) {
+				boolean inside = hollow && pos.getX() > area.min().getX() && pos.getX() < area.max().getX()
+					&& pos.getY() > area.min().getY() && pos.getY() < area.max().getY()
+					&& pos.getZ() > area.min().getZ() && pos.getZ() < area.max().getZ();
+				existing.put(pos.immutable(), inside ? "minecraft:air" : block);
+			}
+		}
+		// Dynamic office furnishings are still office blocks at these exact positions: both lamp states and the whiteboards.
+		int floors = Math.max(2, (bounds(BlockPos.ZERO, blueprint).max().getY() + 1) / T3Office.FLOOR_HEIGHT - 1);
+		for (boolean night : new boolean[] {false, true}) for (String relative : OfficeDesign.lamps(floors, night)) {
+			String[] parts = old.command(relative).split(" ");
+			BlockPos pos = new BlockPos(Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+			String expected = blockId(parts[4]);
+			String actual = BuiltInRegistries.BLOCK.getKey(blocks.apply(pos).getBlock()).toString();
+			if (actual.equals(expected)) existing.put(pos, actual);
+		}
+		for (int floor = 0; floor < floors; floor++) for (int z : new int[] {14, 15, 16})
+			existing.put(old.block(1, floor * T3Office.FLOOR_HEIGHT + 2, z), "minecraft:birch_wall_sign");
+		return existing;
+	}
+
+	/** "birch_wall_sign[facing=east]{…}" or "minecraft:stone" → "minecraft:birch_wall_sign" / "minecraft:stone". */
+	private static String blockId(String state) {
+		String block = state.split("[\\[{]", 2)[0];
+		return block.contains(":") ? block : "minecraft:" + block;
 	}
 }

@@ -102,6 +102,14 @@ public final class ReliabilityChecks {
 			check(java.nio.file.Files.exists(file), "another game's port file is left alone on quit");
 			T3Mcp.clearPortFile(file, 42);
 			check(!java.nio.file.Files.exists(file), "the game's own port file is removed on quit");
+			// Two games: the last one started quits first and takes the file with it; the one still running puts its own back.
+			check(T3Mcp.reclaimPortFile(file, 25590, 7, owner -> true) && java.nio.file.Files.exists(file), "a running game reclaims a removed port file");
+			check(!T3Mcp.reclaimPortFile(file, 25590, 7, owner -> true), "the game's own port file is left as it is");
+			T3Mcp.writePortFile(file, 25593, 42);
+			check(!T3Mcp.reclaimPortFile(file, 25590, 7, owner -> owner == 42), "a live other game's port file is left alone");
+			check(T3Mcp.reclaimPortFile(file, 25590, 7, owner -> false), "a crashed game's stale port file is replaced");
+			var reclaimed = com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(file)).getAsJsonObject();
+			check(reclaimed.get("pid").getAsLong() == 7 && reclaimed.get("port").getAsInt() == 25590, "the reclaimed file names the running game");
 		} finally {
 			java.nio.file.Files.deleteIfExists(file);
 			try (var left = java.nio.file.Files.list(dir)) { check(left.findAny().isEmpty(), "no temporary port file left behind"); }

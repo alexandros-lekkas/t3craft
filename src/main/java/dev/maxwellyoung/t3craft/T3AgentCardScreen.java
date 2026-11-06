@@ -17,8 +17,8 @@ import java.util.List;
 /**
  * Clicking an agent in the office: a small card beside it over the lightly dimmed world. The agent's name
  * and provider, its status, the last message (or the request it is waiting on), one input box, Approve / Deny
- * when needed, and "Open on laptop" for the whole thread. Enter sends and returns to the world; Esc, the
- * panel key or a click outside the card close it.
+ * when needed, and "Open on laptop" for the whole thread. Enter in the box sends and returns to the world (on a
+ * focused button it presses that button); Esc, the panel key (unless it is a letter) or a click outside close it.
  */
 final class T3AgentCardScreen extends Screen {
 	private static final int WIDTH = 190;
@@ -26,6 +26,8 @@ final class T3AgentCardScreen extends Screen {
 	private static final int BUTTON = 18;
 	private static final int INPUT = 18;
 	private static final int MAX_LINES = 6;
+	/** The card shows the start of the last message; parsing more than this only to drop it is wasted work. */
+	private static final int MAX_BODY_CHARS = 2000;
 
 	private final T3CraftClient mod;
 	private final String threadId;
@@ -43,6 +45,11 @@ final class T3AgentCardScreen extends Screen {
 	private String bodyLabel = "";
 	private int bodyLabelColor = T3Ui.MUTED;
 	private List<FormattedCharSequence> body = List.of();
+	/** The wrapped body for one focus snapshot and width: layout runs every tick and frame, the snapshot changes far less. */
+	private T3State.Focus cachedFocus;
+	private int cachedWidth = -1;
+	private boolean cachedLoaded;
+	private List<FormattedCharSequence> cachedLines = List.of();
 
 	T3AgentCardScreen(T3CraftClient mod, String threadId) {
 		super(Component.literal("T3 agent"));
@@ -106,34 +113,29 @@ final class T3AgentCardScreen extends Screen {
 		int textWidth = cardWidth() - 2 * PAD;
 
 		approval = focus == null || focus.approvals().isEmpty() ? null : focus.approvals().getFirst();
-		List<FormattedCharSequence> lines;
 		if (approval != null) {
 			bodyLabel = "Approve " + approval.kind() + "?";
 			bodyLabelColor = T3Ui.NEEDS_YOU;
-			lines = font.split(Component.literal(approval.detail() == null ? "" : approval.detail()), textWidth);
 		} else if (focus != null && focus.needsInput()) {
 			T3State.Question question = focus.userInputs().getFirst().questions().getFirst();
 			bodyLabel = question.header() == null ? "Question" : question.header();
 			bodyLabelColor = T3Ui.NEEDS_YOU;
-			lines = font.split(Component.literal((question.question() == null ? "" : question.question()) + "  (answer on the laptop)"), textWidth);
 		} else if (focus != null && !focus.messages().isEmpty()) {
-			T3State.Message last = focus.messages().getLast();
-			boolean user = "user".equals(last.role());
-			bodyLabel = user ? "You" : row == null ? "Agent" : T3Ui.provider(mod, row);
+			bodyLabel = "user".equals(focus.messages().getLast().role()) ? "You" : row == null ? "Agent" : T3Ui.provider(mod, row);
 			bodyLabelColor = T3Ui.MUTED;
-			List<T3Markdown.Line> rendered = new ArrayList<>();
-			T3Markdown.render(font, last.text() + (last.streaming() ? " ▍" : ""), textWidth, T3Ui.TEXT, T3Ui.CODE, rendered);
-			lines = rendered.stream().filter(l -> l.kind() != T3Markdown.Kind.GAP).map(T3Markdown.Line::text).toList();
 		} else {
 			bodyLabel = focus == null ? "Loading…" : row != null && row.status() == T3State.Status.WORKING ? "Working…" : "No messages yet.";
 			bodyLabelColor = T3Ui.MUTED;
-			lines = List.of();
 		}
-		body = lines.size() > MAX_LINES ? lines.subList(0, MAX_LINES) : lines;
+		List<FormattedCharSequence> lines = bodyLines(focus, textWidth);
 
-		int cardHeight = PAD + font.lineHeight + 2 + font.lineHeight + 5
-			+ font.lineHeight + body.size() * font.lineHeight + 5
+		// Short windows (GUI scale 5–6 at 720p) drop body lines before the buttons fall off the screen.
+		int chrome = PAD + font.lineHeight + 2 + font.lineHeight + 5 + font.lineHeight + 5
 			+ INPUT + 4 + (approval != null ? BUTTON + 4 : 0) + BUTTON + PAD;
+		int maxLines = Math.max(0, Math.min(MAX_LINES, (height - 12 - chrome) / font.lineHeight));
+		body = lines.size() > maxLines ? lines.subList(0, maxLines) : lines;
+
+		int cardHeight = chrome + body.size() * font.lineHeight;
 		int cardWidth = cardWidth();
 		x0 = Math.min(width / 2 + 12, width - 6 - cardWidth);
 		x1 = x0 + cardWidth;
@@ -146,7 +148,8 @@ final class T3AgentCardScreen extends Screen {
 		input.setWidth(cardWidth - 2 * PAD);
 		y += INPUT + 4;
 		approve.visible = deny.visible = approval != null;
-		approve.active = deny.active = online;
+		// Inert while an answer is on its way, so a double click can't answer the next queued request unseen.
+		approve.active = deny.active = online && !mod.approvalInFlight(focus);
 		if (approval != null) {
 			int half = (cardWidth - 2 * PAD - 4) / 2;
 			approve.setX(x0 + PAD); approve.setY(y); approve.setWidth(half);
@@ -158,15 +161,54 @@ final class T3AgentCardScreen extends Screen {
 		open.setWidth(cardWidth - 2 * PAD);
 	}
 
+	/** The body text for this focus and width, wrapped once per snapshot rather than on every tick and frame. */
+	private List<FormattedCharSequence> bodyLines(T3State.Focus focus, int textWidth) {
+		if (cachedLoaded && focus == cachedFocus && textWidth == cachedWidth) return cachedLines;
+		List<FormattedCharSequence> lines;
+		T3State.Approval first = focus == null || focus.approvals().isEmpty() ? null : focus.approvals().getFirst();
+		if (first != null) {
+			lines = font.split(Component.literal(first.detail() == null ? "" : clip(first.detail())), textWidth);
+		} else if (focus != null && focus.needsInput()) {
+			T3State.Question question = focus.userInputs().getFirst().questions().getFirst();
+			lines = font.split(Component.literal((question.question() == null ? "" : clip(question.question())) + "  (answer on the laptop)"), textWidth);
+		} else if (focus != null && !focus.messages().isEmpty()) {
+			T3State.Message last = focus.messages().getLast();
+			List<T3Markdown.Line> rendered = new ArrayList<>();
+			T3Markdown.render(font, clip(last.text()) + (last.streaming() ? " ▍" : ""), textWidth, T3Ui.TEXT, T3Ui.CODE, rendered);
+			lines = rendered.stream().filter(l -> l.kind() != T3Markdown.Kind.GAP).map(T3Markdown.Line::text).limit(MAX_LINES).toList();
+		} else {
+			lines = List.of();
+		}
+		cachedFocus = focus;
+		cachedWidth = textWidth;
+		cachedLoaded = true;
+		cachedLines = lines.size() > MAX_LINES ? lines.subList(0, MAX_LINES) : lines;
+		return cachedLines;
+	}
+
+	private static String clip(String text) {
+		return text == null || text.length() <= MAX_BODY_CHARS ? text : text.substring(0, MAX_BODY_CHARS) + "…";
+	}
+
 	private void answer(String decision) {
-		if (approval != null && mod.state().online(threadId)) mod.respond(threadId, approval, decision);
+		if (approval != null && approve.visible && approve.active) mod.respond(threadId, approval, decision);
+		setFocused(input);
+	}
+
+	/** A failed send's text, back in this box when the card is for that thread; false leaves it to the saved draft. */
+	boolean restoreFailedSend(String key, String text) {
+		if (!threadId.equals(key)) return false;
+		input.setValue(T3CraftClient.joinDraft(text, input.getValue()));
+		return true;
 	}
 
 	private void send() {
 		String text = input.getValue().trim();
 		if (text.isEmpty()) return;
 		mod.focus(threadId);
-		if (!mod.sendTo(threadId, text, () -> mod.saveDraft(threadId, text))) return;
+		T3CraftClient client = mod;
+		String key = threadId;
+		if (!mod.sendTo(threadId, text, () -> client.restoreFailedSend(key, text))) return;
 		draft.sent(mod::saveDraft);
 		input.setValue("");
 		onClose();
@@ -176,11 +218,14 @@ final class T3AgentCardScreen extends Screen {
 	void setInputForTest(String text) { input.setValue(text); }
 	String inputValueForTest() { return input.getValue(); }
 	boolean approvalVisibleForTest() { return approval != null; }
+	boolean approvalActiveForTest() { return approve.visible && approve.active; }
+	int bottomForTest() { return y1; }
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
 		boolean empty = input.getValue().isEmpty();
-		if (event.isConfirmation()) { send(); return true; }
+		// Enter sends from the box; on a Tab-focused button it presses that button instead.
+		if (event.isConfirmation() && (getFocused() == input || getFocused() == null)) { send(); return true; }
 		// Y/N only when you are not typing: "yes, but…" in the reply box must never approve on its first letter.
 		boolean typing = input.isFocused();
 		boolean chord = event.hasControlDown() || event.hasAltDown() || (event.modifiers() & 0x8) != 0;
@@ -188,7 +233,7 @@ final class T3AgentCardScreen extends Screen {
 			answer(event.key() == InputConstants.KEY_Y ? "accept" : "decline");
 			return true;
 		}
-		if (empty && mod.openKey().matches(event) && System.currentTimeMillis() - openedAt > 250) { onClose(); return true; }
+		if (empty && mod.openKeyCloses() && mod.openKey().matches(event) && System.currentTimeMillis() - openedAt > 250) { onClose(); return true; }
 		return super.keyPressed(event);
 	}
 
@@ -196,7 +241,7 @@ final class T3AgentCardScreen extends Screen {
 	public boolean charTyped(CharacterEvent event) {
 		if (input.getValue().isEmpty()) {
 			int c = event.codepoint();
-			if (mod.openKeyName().equalsIgnoreCase(Character.toString(c))) return true;
+			if (mod.openKeyCloses() && mod.openKeyName().equalsIgnoreCase(Character.toString(c))) return true;
 			if (approval != null && !input.isFocused() && (c == 'y' || c == 'n' || c == 'Y' || c == 'N')) return true;
 		}
 		return super.charTyped(event);

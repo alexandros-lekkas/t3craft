@@ -28,6 +28,12 @@ final class WorldSelfTest {
 	private BlockPos arrivedAt;
 	private float arrivedYaw, arrivedPitch;
 	private OfficeFrame frame;
+	/** The marker as last copied on the server thread (SavedData belongs to it), and a copy on its way. */
+	private Marker marker;
+	private java.util.concurrent.CompletableFuture<Marker> reading;
+
+	private record Marker(String name, long seed, boolean setupDone, BlockPos origin, net.minecraft.world.level.block.Rotation rotation,
+		BlockPos spawn, float spawnYaw, float spawnPitch) {}
 
 	private WorldSelfTest(T3CraftClient mod, String place) {
 		this.mod = mod;
@@ -71,15 +77,16 @@ final class WorldSelfTest {
 					if (minecraft.level == null || minecraft.player == null || screen != null) { wait = 0; return; }
 					if (++wait < 50) return;
 					var player = minecraft.player;
-					arrivedAt = player.blockPosition();
-					arrivedYaw = player.getYRot();
-					arrivedPitch = player.getXRot();
-					T3CraftClient.LOGGER.info("WORLDTEST arrived at {} yaw {} pitch {}", arrivedAt.toShortString(), arrivedYaw, arrivedPitch);
-					shot(minecraft, "arrival");
-					var server = minecraft.getSingleplayerServer();
-					T3WorldData data = server == null ? null : T3WorldData.get(server);
-					if (data == null || data.origin == null) { finish(minecraft, "FAIL no office in the T3 World data"); return; }
-					frame = new OfficeFrame(data.origin, data.rotation);
+					if (arrivedAt == null) {
+						arrivedAt = player.blockPosition();
+						arrivedYaw = player.getYRot();
+						arrivedPitch = player.getXRot();
+						T3CraftClient.LOGGER.info("WORLDTEST arrived at {} yaw {} pitch {}", arrivedAt.toShortString(), arrivedYaw, arrivedPitch);
+						shot(minecraft, "arrival");
+					}
+					if (!readMarker(minecraft)) return;
+					if (marker == null || marker.origin() == null) { finish(minecraft, "FAIL no office in the T3 World data"); return; }
+					frame = new OfficeFrame(marker.origin(), marker.rotation());
 					step = Step.OUTSIDE; wait = 0;
 				}
 				case OUTSIDE -> {
@@ -105,18 +112,17 @@ final class WorldSelfTest {
 					step = Step.LOOK; wait = 0;
 				}
 				case LOOK -> {
-					if (++wait < 30) return;
+					if (++wait < 30 || !readMarker(minecraft)) return;
 					hud(minecraft, true);
-					var server = minecraft.getSingleplayerServer();
-					T3WorldData data = server == null ? null : T3WorldData.get(server);
-					if (data == null || !data.setupDone) { finish(minecraft, "FAIL no T3 World data on the integrated server"); return; }
-					boolean onPlaza = data.spawn != null && arrivedAt != null && arrivedAt.distManhattan(data.spawn) <= 2;
+					Marker data = marker;
+					if (data == null || !data.setupDone()) { finish(minecraft, "FAIL no T3 World data on the integrated server"); return; }
+					boolean onPlaza = data.spawn() != null && arrivedAt != null && arrivedAt.distManhattan(data.spawn()) <= 2;
 					int workers = workers(), seated = settledAtDesks();
 					boolean paired = !mod.state().snapshot().threads().isEmpty();
 					boolean desks = !paired || (workers > 0 && seated == workers);
-					finish(minecraft, (onPlaza && desks ? "PASS" : "FAIL") + " T3 World '" + data.name + "' place " + place + " seed " + data.seed
-						+ " office " + data.origin.toShortString() + " rotation " + data.rotation + " spawn " + data.spawn.toShortString()
-						+ " yaw " + data.spawnYaw + " pitch " + data.spawnPitch + " arrived " + arrivedAt.toShortString()
+					finish(minecraft, (onPlaza && desks ? "PASS" : "FAIL") + " T3 World '" + data.name() + "' place " + place + " seed " + data.seed()
+						+ " office " + data.origin().toShortString() + " rotation " + data.rotation() + " spawn " + data.spawn().toShortString()
+						+ " yaw " + data.spawnYaw() + " pitch " + data.spawnPitch() + " arrived " + arrivedAt.toShortString()
 						+ " agents " + mod.residents().brainForTest().agents().size() + " working " + workers + " at desks " + seated + (paired ? "" : " (unpaired)"));
 				}
 				default -> {}
@@ -125,6 +131,26 @@ final class WorldSelfTest {
 			T3CraftClient.LOGGER.error("WORLDTEST error", e);
 			finish(minecraft, "FAIL " + e);
 		}
+	}
+
+	/**
+	 * Copies the marker on the server thread; true once a fresh copy is in {@link #marker} (null for no marker).
+	 * Called again on later ticks until the copy has arrived, so the client thread never touches SavedData.
+	 */
+	private boolean readMarker(Minecraft minecraft) {
+		if (reading == null) {
+			var server = minecraft.getSingleplayerServer();
+			if (server == null) { marker = null; return true; }
+			reading = server.submit(() -> {
+				T3WorldData d = T3WorldData.get(server);
+				return d == null ? null : new Marker(d.name, d.seed, d.setupDone, d.origin, d.rotation, d.spawn, d.spawnYaw, d.spawnPitch);
+			});
+			return false;
+		}
+		if (!reading.isDone()) return false;
+		marker = reading.join();
+		reading = null;
+		return true;
 	}
 
 	private int workers() {
@@ -136,12 +162,12 @@ final class WorldSelfTest {
 		int count = 0;
 		for (OfficeBrain.Agent agent : mod.residents().brainForTest().agents().values()) {
 			if (agent.zone != OfficeBrain.Zone.WORK || !agent.settled()) continue;
-			var villager = mod.residents().mannequinFor(agent.threadId);
-			if (villager == null) continue;
+			var mannequin = mod.residents().mannequinFor(agent.threadId);
+			if (mannequin == null) continue;
 			Vec3 expected = frame.point(agent.goal.x() + 0.5, agent.y(), agent.goal.z() + 0.5);
-			double off = villager.position().distanceTo(expected);
+			double off = mannequin.position().distanceTo(expected);
 			if (off < 0.6) count++;
-			else T3CraftClient.LOGGER.warn("WORLDTEST agent {} is {} blocks from its desk ({} vs {})", agent.threadId, String.format(Locale.ROOT, "%.2f", off), villager.position(), expected);
+			else T3CraftClient.LOGGER.warn("WORLDTEST agent {} is {} blocks from its desk ({} vs {})", agent.threadId, String.format(Locale.ROOT, "%.2f", off), mannequin.position(), expected);
 		}
 		return count;
 	}

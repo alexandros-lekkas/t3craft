@@ -206,20 +206,12 @@ final class T3Screen extends Screen {
 		composerDraft.park(draftKey(), composer.getValue(), mod::draft, mod::saveDraft);
 	}
 
-	/** A send failed after the composer was cleared: the text goes back in front of whatever is there now. */
-	private static void restoreFailedSend(T3CraftClient mod, String key, String text) {
-		if (net.minecraft.client.Minecraft.getInstance().gui.screen() instanceof T3Screen open) {
-			if ("new".equals(key) && !open.newThread && open.composer.getValue().isBlank()) open.switchDraft(() -> open.newThread = true);
-			if (java.util.Objects.equals(key, open.draftKey())) {
-				open.composer.setValue(joinDraft(text, open.composer.getValue()));
-				return;
-			}
-		}
-		mod.saveDraft(key, joinDraft(text, mod.draft(key)));
-	}
-
-	private static String joinDraft(String restored, String current) {
-		return current.isBlank() || current.equals(restored) ? restored : restored + " " + current;
+	/** A failed send's text, back in this composer when it shows that draft; false leaves it to the saved draft. */
+	boolean restoreFailedSend(String key, String text) {
+		if ("new".equals(key) && !newThread && composer.getValue().isBlank()) switchDraft(() -> newThread = true);
+		if (!java.util.Objects.equals(key, draftKey())) return false;
+		composer.setValue(T3CraftClient.joinDraft(text, composer.getValue()));
+		return true;
 	}
 
 	private void updateHint() {
@@ -258,7 +250,9 @@ final class T3Screen extends Screen {
 	private void answer(String decision) {
 		T3State.Focus focus = shownFocus;
 		T3State.Approval approval = currentApproval();
-		if (approval != null && mod.state().online(focus.threadId())) mod.respond(focus.threadId(), approval, decision);
+		// Inert while an answer is on its way: a second press must not answer the next queued request unseen.
+		if (approval != null && approve.visible && approve.active) mod.respond(focus.threadId(), approval, decision);
+		setFocused(composer);
 	}
 
 	private T3State.UserInput currentInput() {
@@ -383,7 +377,8 @@ final class T3Screen extends Screen {
 		if (text.isEmpty()) return;
 		String key = draftKey();
 		// Nothing was sent (no thread to send to): keep the text and the panel.
-		if (!mod.send(text, newThread, null, () -> restoreFailedSend(mod, key, text))) return;
+		T3CraftClient client = mod;
+		if (!mod.send(text, newThread, null, () -> client.restoreFailedSend(key, text))) return;
 		composerDraft.sent(mod::saveDraft);
 		composer.setValue("");
 		newThread = false;
@@ -431,7 +426,7 @@ final class T3Screen extends Screen {
 			answer(event.key() == InputConstants.KEY_Y ? "accept" : "decline");
 			return true;
 		}
-		if (composerEmpty && openKeyCloses() && mod.openKey().matches(event) && System.currentTimeMillis() - openedAt > 250) {
+		if (composerEmpty && mod.openKeyCloses() && mod.openKey().matches(event) && System.currentTimeMillis() - openedAt > 250) {
 			onClose();
 			return true;
 		}
@@ -453,13 +448,7 @@ final class T3Screen extends Screen {
 
 	/** Whether this character is what the open key types, so pressing it to open or close never lands in the composer. */
 	private boolean typesOpenKey(int codepoint) {
-		return openKeyCloses() && mod.openKeyName().equalsIgnoreCase(Character.toString(codepoint));
-	}
-
-	/** Bound to a letter or digit, the open key would eat the first character of a prompt, so then only Esc closes. */
-	private boolean openKeyCloses() {
-		String name = mod.openKeyName();
-		return name.codePointCount(0, name.length()) != 1 || !Character.isLetterOrDigit(name.codePointAt(0));
+		return mod.openKeyCloses() && mod.openKeyName().equalsIgnoreCase(Character.toString(codepoint));
 	}
 
 	@Override
@@ -489,6 +478,21 @@ final class T3Screen extends Screen {
 
 	// ----- Drawing -----
 
+	/** How the answer options sit: rows per column, one or two columns, and how many of them fit on screen. */
+	record OptionGrid(int rows, int columns, int shown) {}
+
+	/**
+	 * One column while every option fits in {@code height}, else two; past that, as many as fit (always at least
+	 * one row). At GUI scale 5–6 nine options never run over the title bar or off the panel.
+	 */
+	static OptionGrid optionGrid(int count, int height, int rowHeight) {
+		if (count <= 0) return new OptionGrid(0, 1, 0);
+		int fit = Math.max(1, height / rowHeight);
+		if (count <= fit) return new OptionGrid(count, 1, count);
+		int rows = Math.min(fit, (count + 1) / 2);
+		return new OptionGrid(rows, 2, Math.min(count, rows * 2));
+	}
+
 	/** Places the request block (approval or question) above the composer and sets every widget's visibility. */
 	private void layout(T3State.Snapshot snapshot) {
 		shownFocus = snapshot.focus();
@@ -503,7 +507,7 @@ final class T3Screen extends Screen {
 		shownApproval = newThread ? null : currentApproval();
 		shownQuestion = newThread || shownApproval != null ? null : currentQuestion();
 		approve.visible = deny.visible = shownApproval != null;
-		approve.active = deny.active = online;
+		approve.active = deny.active = online && !mod.approvalInFlight(shownFocus);
 		for (Button option : options) option.visible = false;
 		stop.visible = row != null && row.status() == T3State.Status.WORKING && online && !newThread;
 		send.active = online || newThread;
@@ -521,20 +525,36 @@ final class T3Screen extends Screen {
 			top -= 3 + approvalDetail.size() * font.lineHeight + font.lineHeight + 2;
 		} else if (shownQuestion != null) {
 			int count = Math.min(shownQuestion.options().size(), MAX_OPTIONS);
+			// The header and one line of the question always show. Options take two columns before the conversation
+			// gives up rows, and the conversation keeps one row before options go (they still answer to 1–9).
+			int header = 2 + font.lineHeight + font.lineHeight + 2;
+			int limit = roomTop;
+			OptionGrid grid = optionGrid(count, top - header - limit, BUTTON + 2);
+			if (grid.shown() < count) {
+				limit = mainTop() + font.lineHeight;
+				grid = optionGrid(count, top - header - limit, BUTTON + 2);
+			}
 			List<FormattedCharSequence> text = font.split(Component.literal(shownQuestion.question() == null ? "" : shownQuestion.question()), width);
-			int roomRows = Math.max(1, (composerY - 4 - count * (BUTTON + 2) - font.lineHeight - roomTop) / font.lineHeight);
+			int optionsHeight = grid.rows() * (BUTTON + 2);
+			int roomRows = Math.max(1, (top - optionsHeight - header + font.lineHeight - limit) / font.lineHeight);
 			questionText = text.subList(0, Math.min(text.size(), Math.min(3, roomRows)));
-			for (int i = count - 1; i >= 0; i--) {
-				top -= BUTTON + 2;
+			int columnWidth = grid.columns() == 1 ? width : (width - 4) / 2;
+			int optionsTop = top - optionsHeight;
+			for (int i = 0; i < count; i++) {
 				Button option = options.get(i);
+				if (i >= grid.shown()) continue; // Still picked with its number key; the hint says so.
+				int column = grid.columns() == 1 ? 0 : i / grid.rows();
+				int rowIndex = grid.columns() == 1 ? i : i % grid.rows();
 				T3State.Option choice = shownQuestion.options().get(i);
 				String prefix = (i + 1) + "  " + (shownQuestion.multiSelect() ? (multiPicked.contains(choice.value()) ? "[x] " : "[ ] ") : "");
-				option.setMessage(Component.literal(T3Hud.ellipsize(font, prefix + choice.label(), width - 12)));
-				option.setY(top);
+				option.setMessage(Component.literal(T3Hud.ellipsize(font, prefix + choice.label(), columnWidth - 12)));
+				option.setX(column == 0 ? x0 : x1 - columnWidth);
+				option.setWidth(columnWidth);
+				option.setY(optionsTop + rowIndex * (BUTTON + 2));
 				option.visible = true;
 				option.active = online;
 			}
-			top -= 2 + questionText.size() * font.lineHeight + font.lineHeight + 2;
+			top = optionsTop - (2 + questionText.size() * font.lineHeight + font.lineHeight + 2);
 		}
 		blockTop = top;
 	}

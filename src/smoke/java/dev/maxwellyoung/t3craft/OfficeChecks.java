@@ -234,7 +234,7 @@ public final class OfficeChecks {
 		blocks.put(lamp, net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace("white_wool")).defaultBlockState());
 		blocks.put(sign, net.minecraft.world.level.block.Blocks.BIRCH_WALL_SIGN.defaultBlockState());
 		var signEntity = new net.minecraft.world.level.block.entity.SignBlockEntity(sign, blocks.get(sign));
-		check(!OfficeSite.occupied(bounds, origin, blueprint, read, pos -> pos.equals(sign) ? signEntity : null), "daytime lamps and office whiteboards are rebuildable");
+		check(!OfficeSite.occupied(bounds, OfficeFrame.at(origin), blueprint, read, pos -> pos.equals(sign) ? signEntity : null), "daytime lamps and office whiteboards are rebuildable");
 		// Use the blueprint coordinate so this protects the office's own container exemption.
 		String shulkerCommand = blueprint.stream().filter(command -> command.contains("white_shulker_box")).findFirst().orElseThrow();
 		String[] coordinates = shulkerCommand.split(" ");
@@ -242,11 +242,39 @@ public final class OfficeChecks {
 		var shulkerState = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace("white_shulker_box")).defaultBlockState();
 		var shulker = new net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity(shulkerPos, shulkerState);
 		blocks.put(shulkerPos, shulkerState);
-		check(!OfficeSite.occupied(bounds, origin, blueprint, read, pos -> pos.equals(shulkerPos) ? shulker : null), "empty office shulker permits rebuild");
+		check(!OfficeSite.occupied(bounds, OfficeFrame.at(origin), blueprint, read, pos -> pos.equals(shulkerPos) ? shulker : null), "empty office shulker permits rebuild");
 		shulker.setItem(0, new net.minecraft.world.item.ItemStack(net.minecraft.core.Holder.direct(net.minecraft.world.item.Items.DIAMOND, net.minecraft.core.component.DataComponentMap.EMPTY)));
-		check(OfficeSite.occupied(bounds, origin, blueprint, read, pos -> pos.equals(shulkerPos) ? shulker : null), "non-empty office shulker requires confirmation");
+		check(OfficeSite.occupied(bounds, OfficeFrame.at(origin), blueprint, read, pos -> pos.equals(shulkerPos) ? shulker : null), "non-empty office shulker requires confirmation");
 		shulker.clearContent();
 		check(OfficeSite.occupied(bounds, null, List.of(), read, pos -> pos.equals(shulkerPos) ? shulker : null), "unowned empty shulker remains protected");
+		turnedRebuild();
+	}
+
+	/**
+	 * A T3 World office is usually turned. Rebuilding over it must see its own blocks where they really stand, not
+	 * where an unturned office would: the old check called them "your Planks" and refused, and missed a shed in the
+	 * imaginary footprint.
+	 */
+	private static void turnedRebuild() {
+		var labels = List.of("Machine");
+		var blueprint = T3Office.blueprint(labels);
+		var turned = new OfficeFrame(new net.minecraft.core.BlockPos(40, 64, -20), net.minecraft.world.level.block.Rotation.COUNTERCLOCKWISE_90);
+		var blocks = new java.util.HashMap<net.minecraft.core.BlockPos, net.minecraft.world.level.block.state.BlockState>();
+		for (var entry : OfficeSite.existing(turned, blueprint, pos -> net.minecraft.world.level.block.Blocks.AIR.defaultBlockState()).entrySet()) {
+			var block = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.parse(entry.getValue()));
+			blocks.put(entry.getKey(), block.defaultBlockState());
+		}
+		java.util.function.Function<net.minecraft.core.BlockPos, net.minecraft.world.level.block.state.BlockState> read =
+			pos -> blocks.getOrDefault(pos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+		List<String> absolute = blueprint.stream().map(turned::command).toList();
+		var site = OfficeSite.bounds(net.minecraft.core.BlockPos.ZERO, absolute);
+		check(OfficeSite.blocker(site, turned, blueprint, read, pos -> null) == null, "rebuilding over a turned office sees its own blocks");
+		check(OfficeSite.blocker(site, OfficeFrame.at(turned.origin()), blueprint, read, pos -> null) != null, "(the unturned footprint would have refused: the check above means something)");
+		// A player's shed beside the turned office, in the footprint an unturned one would have had, still stops the build.
+		var shed = site.min().above(2);
+		while (blocks.containsKey(shed) && !blocks.get(shed).isAir()) shed = shed.east();
+		blocks.put(shed, net.minecraft.world.level.block.Blocks.OAK_PLANKS.defaultBlockState());
+		check(shed.equals(OfficeSite.blocker(site, turned, blueprint, read, pos -> null)), "a player build inside the turned office's bounds is still found");
 	}
 
 	/**

@@ -16,12 +16,27 @@ public final class FirstRunChecks {
 		chatBudget();
 		help();
 		configMigration();
+		repairBackoff();
 		autoConnect(Integer.parseInt(args[0]));
-		System.out.println("PASS default thread (chosen while listed, else needs-you, else most recent, else none), one connect line per game, player-only help, agent-build migration, auto-pairing with the local T3 through the fixture (probe before mint, no credential in errors)");
+		System.out.println("PASS default thread (chosen while listed, else needs-you, else most recent, else none), one connect line per game, player-only help, agent-build migration, re-pair backoff, auto-pairing with the local T3 through the fixture (probe before mint, no credential in errors)");
 	}
 
 	private static T3State.ThreadRow row(String id, T3State.Status status) {
 		return new T3State.ThreadRow(id, "Thread " + id, "Project", "Studio", "http://127.0.0.1:1", status, null, null, new JsonObject());
+	}
+
+	/** A fresh token T3 refuses again waits 15 s, then twice as long each time, up to five minutes; a working pairing resets it. */
+	private static void repairBackoff() {
+		var backoff = new T3AutoConnect.Backoff();
+		check(backoff.ready(0), "the first re-pair after a revoke is immediate");
+		backoff.attempted(0);
+		check(!backoff.ready(14_999) && backoff.ready(15_000), "a second refusal waits 15 s");
+		backoff.attempted(15_000);
+		check(!backoff.ready(44_999) && backoff.ready(45_000), "then 30 s");
+		for (int i = 0; i < 10; i++) backoff.attempted(45_000);
+		check(backoff.delayForTest() == 5 * 60_000, "capped at five minutes");
+		backoff.reset();
+		check(backoff.ready(45_001) && backoff.delayForTest() == 15_000, "a working pairing resets the backoff");
 	}
 
 	private static void defaultThread() {

@@ -160,11 +160,72 @@ final class OfficePlacement {
 			for (int cz = ((int) box.minZ) >> 4; cz <= ((int) box.maxZ) >> 4; cz++) level.getChunk(cx, cz);
 		foundation(level, placement.frame());
 		place(level, placement.frame(), labels);
-		// The arrival spot is a few blocks beyond the plaza edge, on natural ground: stand on it, not in it.
-		BlockPos spawn = placement.spawn();
-		int ground = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, spawn.getX(), spawn.getZ());
-		if (ground != spawn.getY()) placement = new Placement(placement.frame(), facing, placement.door(), new BlockPos(spawn.getX(), ground, spawn.getZ()), placement.spawnYaw(), placement.spawnPitch());
+		lawn(level, placement.frame());
+		BlockPos spawn = arrival(level, placement.frame());
+		if (!spawn.equals(placement.spawn())) placement = new Placement(placement.frame(), facing, placement.door(), spawn, placement.spawnYaw(), placement.spawnPitch());
 		return placement;
+	}
+
+	/**
+	 * The arrival spot is a few blocks beyond the plaza edge, on natural ground: stand on it, not in it. A pond,
+	 * a tree or a cliff there moves it toward the door, down to the plaza cell just outside it, which is always dry.
+	 */
+	private static BlockPos arrival(ServerLevel level, OfficeFrame frame) {
+		int[] outside = OfficeDesign.doorOutside();
+		for (int back = SPAWN_DISTANCE; back > 0; back--) {
+			BlockPos column = frame.block(outside[0], 0, outside[1] - back);
+			int ground = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, column.getX(), column.getZ());
+			BlockPos feet = new BlockPos(column.getX(), ground, column.getZ());
+			if (Math.abs(ground - frame.origin().getY()) <= MAX_ARRIVAL_STEP
+				&& standable(level.getBlockState(feet.below()), level.getBlockState(feet), level.getBlockState(feet.above()))) return feet;
+		}
+		return frame.block(outside[0], 0, outside[1]);
+	}
+
+	/** How far above or below the office floor the arrival may stand before it counts as a cliff or a hole. */
+	private static final int MAX_ARRIVAL_STEP = 4;
+
+	/** Firm, dry ground with room to stand: not water, not the top of a trunk or a canopy. */
+	static boolean standable(BlockState below, BlockState feet, BlockState head) {
+		if (!below.getFluidState().isEmpty() || !feet.getFluidState().isEmpty() || !head.getFluidState().isEmpty()) return false;
+		if (tree(below) || below.isAir() || below.canBeReplaced()) return false;
+		return (feet.isAir() || feet.canBeReplaced()) && (head.isAir() || head.canBeReplaced());
+	}
+
+	/** Trunks and canopies, by tag in a world and by kind or name where tags are not loaded (the headless checks). */
+	private static boolean tree(BlockState state) {
+		if (state.is(BlockTags.LOGS) || state.is(BlockTags.LEAVES) || state.getBlock() instanceof net.minecraft.world.level.block.LeavesBlock) return true;
+		String key = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+		return key.endsWith("_log") || key.endsWith("_wood") || key.endsWith("_stem") || key.endsWith("_hyphae");
+	}
+
+	/**
+	 * Grass on every open lawn cell. The clear strips what stood above the office floor, so where the ground rose
+	 * above the plaza it leaves the dirt (or stone) under the old surface bare; give it its grass back.
+	 */
+	private static void lawn(ServerLevel level, OfficeFrame frame) {
+		BlockState grass = Blocks.GRASS_BLOCK.defaultBlockState();
+		java.util.Set<Long> paved = pavedColumns();
+		int[] e = OfficeDesign.EXTENT;
+		for (int x = e[0]; x <= e[1]; x++) {
+			for (int z = e[2]; z <= e[3]; z++) {
+				if (paved.contains(((long) x << 32) ^ (z & 0xffffffffL))) continue;
+				BlockPos top = frame.block(x, OfficeDesign.GROUND, z);
+				if (bareLawn(level.getBlockState(top), level.getBlockState(top.above()))) level.setBlock(top, grass, 2);
+			}
+		}
+	}
+
+	/** A lawn cell whose surface is exposed dirt or stone under open air. */
+	static boolean bareLawn(BlockState surface, BlockState above) {
+		if (!above.isAir()) return false;
+		return surface.is(Blocks.DIRT) || surface.is(Blocks.COARSE_DIRT) || surface.is(Blocks.ROOTED_DIRT) || surface.is(Blocks.STONE) || surface.is(BlockTags.BASE_STONE_OVERWORLD);
+	}
+
+	private static java.util.Set<Long> pavedColumns() {
+		java.util.Set<Long> paved = new java.util.HashSet<>();
+		for (int[] column : OfficeDesign.plaza()) paved.add(((long) column[0] << 32) ^ (column[1] & 0xffffffffL));
+		return paved;
 	}
 
 	/**
@@ -174,8 +235,7 @@ final class OfficePlacement {
 	 */
 	private static void foundation(ServerLevel level, OfficeFrame frame) {
 		BlockState dirt = Blocks.DIRT.defaultBlockState(), grass = Blocks.GRASS_BLOCK.defaultBlockState();
-		java.util.Set<Long> paved = new java.util.HashSet<>();
-		for (int[] column : OfficeDesign.plaza()) paved.add(((long) column[0] << 32) ^ (column[1] & 0xffffffffL));
+		java.util.Set<Long> paved = pavedColumns();
 		int[] e = OfficeDesign.EXTENT;
 		for (int x = e[0]; x <= e[1]; x++) {
 			for (int z = e[2]; z <= e[3]; z++) {

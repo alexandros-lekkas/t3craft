@@ -176,7 +176,7 @@ final class OfficeBrain {
 	}
 
 	/** A shared-office agent's entity UUID, derived from its thread so any client can tell whose it is. */
-	static java.util.UUID villagerUuid(String threadId) {
+	static java.util.UUID agentUuid(String threadId) {
 		return java.util.UUID.nameUUIDFromBytes(("t3craft-office:" + threadId).getBytes(java.nio.charset.StandardCharsets.UTF_8));
 	}
 }

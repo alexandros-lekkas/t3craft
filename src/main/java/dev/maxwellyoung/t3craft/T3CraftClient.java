@@ -85,6 +85,15 @@ public final class T3CraftClient implements ClientModInitializer {
 	/** What the open key is bound to, for hints ("`" by default). */
 	String openKeyName() { return openKey.getTranslatedKeyMessage().getString(); }
 
+	/** Bound to a letter or digit, the open key would eat the first character of a reply, so then only Esc closes a screen. */
+	boolean openKeyCloses() {
+		return openKeyCloses(openKeyName());
+	}
+
+	static boolean openKeyCloses(String name) {
+		return name.codePointCount(0, name.length()) != 1 || !Character.isLetterOrDigit(name.codePointAt(0));
+	}
+
 	@Override
 	public void onInitializeClient() {
 		instance = this;
@@ -168,9 +177,9 @@ public final class T3CraftClient implements ClientModInitializer {
 	}
 
 	/**
-	 * Entering a T3 World: adopt the office the server built as this world's office (once, so a
-	 * later rebuild is respected), and show the one welcome toast. After that, bare /t3 office
-	 * takes you to the door instead of building a second office.
+	 * Entering a T3 World: adopt the office the server built as this world's office (once per save, so a
+	 * later rebuild is respected, and again for a new save that reuses an old name), and show the one
+	 * welcome toast. After that, bare /t3 office takes you to the door instead of building a second office.
 	 */
 	private void trackWorld(Minecraft minecraft) {
 		if (minecraft.level == t3WorldLevel) return;
@@ -183,30 +192,65 @@ public final class T3CraftClient implements ClientModInitializer {
 			if (data == null) return;
 			boolean welcome = data.setupDone && !data.welcomed;
 			if (welcome) { data.welcomed = true; data.setDirty(); }
+			// Copied here: the marker belongs to the server thread.
+			boolean setupDone = data.setupDone;
+			boolean fresh = setupDone && !data.adopted;
 			var origin = data.origin;
 			var rotation = data.rotation;
+			String name = data.name;
 			minecraft.execute(() -> {
 				if (minecraft.level != level) return;
-				if (origin != null) adoptOffice(origin, rotation);
+				if (setupDone && adoptOffice(origin, rotation, fresh) && fresh)
+					server.execute(() -> { data.adopted = true; data.setDirty(); });
 				if (!welcome) return;
-				SystemToast.addOrUpdate(minecraft.gui.toastManager(), TOAST, Component.literal("Welcome to " + data.name),
+				SystemToast.addOrUpdate(minecraft.gui.toastManager(), TOAST, Component.literal("Welcome to " + name),
 					Component.literal(origin != null ? "Your office is ready. Press " + openKeyName() + " to talk to your agents."
 						: "No flat spot for the office. Stand somewhere and run /t3 office."));
 			});
 		});
 	}
 
-	/** Records a server-built office for the overworld of this save unless the world already has an office. */
-	private void adoptOffice(net.minecraft.core.BlockPos origin, net.minecraft.world.level.block.Rotation rotation) {
+	/**
+	 * Records a server-built office for the overworld of this save. A save seen for the first time ({@code fresh})
+	 * replaces whatever the config holds under its name, which can only be a deleted save's office; after that a
+	 * recorded office (a later /t3 office build) is kept. True when the save's office is now the recorded one.
+	 */
+	private boolean adoptOffice(net.minecraft.core.BlockPos origin, net.minecraft.world.level.block.Rotation rotation, boolean fresh) {
 		Minecraft minecraft = Minecraft.getInstance();
-		if (minecraft.level == null || minecraft.level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return;
+		if (minecraft.level == null || minecraft.level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return false;
 		String world = worldKey();
-		if (world == null || config.offices.containsKey(world)) return;
-		config.offices.put(world, new int[] {origin.getX(), origin.getY(), origin.getZ()});
-		if (rotation != net.minecraft.world.level.block.Rotation.NONE) config.officeRotations.put(world, rotation.getSerializedName());
-		else config.officeRotations.remove(world);
-		saveConfig();
-		LOGGER.info("Adopted the T3 World office at {} ({}) for {}", origin.toShortString(), rotation, world);
+		if (world == null) return false;
+		var change = OfficeAdoption.decide(fresh, config.offices.get(world), config.officeRotations.get(world), origin, rotation);
+		switch (change) {
+			case KEEP -> { return true; }
+			case FORGET -> { config.offices.remove(world); config.officeRotations.remove(world); }
+			case ADOPT -> {
+				config.offices.put(world, new int[] {origin.getX(), origin.getY(), origin.getZ()});
+				if (rotation != net.minecraft.world.level.block.Rotation.NONE) config.officeRotations.put(world, rotation.getSerializedName());
+				else config.officeRotations.remove(world);
+			}
+		}
+		if (!config.save(configPath)) {
+			chat(Component.literal("Could not save settings; changes apply for this session only. Check Minecraft's config folder permissions."));
+			return false;
+		}
+		residents.clear();
+		LOGGER.info(change == OfficeAdoption.FORGET ? "This T3 World has no office; forgot an older office recorded under {}" : "Adopted the T3 World office at {} for {}",
+			change == OfficeAdoption.FORGET ? world : origin.toShortString() + " (" + rotation + ")", world);
+		return true;
+	}
+
+	/** What entering a T3 World does to the office recorded under its config key. */
+	enum OfficeAdoption {
+		KEEP, ADOPT, FORGET;
+
+		static OfficeAdoption decide(boolean fresh, int[] recorded, String recordedRotation, net.minecraft.core.BlockPos origin, net.minecraft.world.level.block.Rotation rotation) {
+			if (!fresh) return recorded == null && origin != null ? ADOPT : KEEP;
+			if (origin == null) return recorded == null ? KEEP : FORGET;
+			boolean same = recorded != null && recorded.length == 3 && recorded[0] == origin.getX() && recorded[1] == origin.getY() && recorded[2] == origin.getZ()
+				&& java.util.Objects.equals(recordedRotation, rotation == net.minecraft.world.level.block.Rotation.NONE ? null : rotation.getSerializedName());
+			return same ? KEEP : ADOPT;
+		}
 	}
 
 	/** How this world's office is turned, from the config; the design's own orientation when nothing is recorded. */
@@ -373,7 +417,7 @@ public final class T3CraftClient implements ClientModInitializer {
 			chat(Component.literal("The whole office site must be loaded and inside the world's height limits.").withStyle(ChatFormatting.RED)); return;
 		}
 		// Terrain is replaced without a word; the player's storage and builds are not. This is a refusal, not a confirmation.
-		var blocker = OfficeSite.blocker(minecraft.level, bounds, officeOrigin(), T3Office.blueprint(floors()));
+		var blocker = OfficeSite.blocker(minecraft.level, bounds, officeFrame(), T3Office.blueprint(floors()));
 		if (blocker != null) {
 			String what = minecraft.level.getBlockState(blocker).getBlock().getName().getString();
 			chat(Component.literal("The office would cover your " + what + " at " + blocker.toShortString()
@@ -440,13 +484,32 @@ public final class T3CraftClient implements ClientModInitializer {
 	 * again silently, so the fix is never a hand-edited config file.
 	 */
 	private void recoverLocalPairing() {
-		for (String owner : state.authFailedOwners()) {
+		long now = System.currentTimeMillis();
+		List<String> refused = state.authFailedOwners();
+		// A local pairing that works again (or is gone) resets the backoff and the one-time warning.
+		if (refused.stream().noneMatch(T3Web::loopback)) {
+			if (state.snapshot().connected()) repairBackoff.reset();
+			repairSaveWarned = false;
+		}
+		for (String owner : refused) {
 			if (!T3Web.loopback(owner)) continue;
-			if (removeEnvironment(owner)) LOGGER.info("The local T3 no longer accepts its pairing; pairing again");
-			else LOGGER.warn("The local T3 no longer accepts its pairing and the config could not be saved; still trying with it");
+			// A fresh token refused again (a scope T3 no longer grants, say) waits 15 s, then longer, up to five
+			// minutes, instead of minting a new T3 session every few seconds.
+			if (!repairBackoff.ready(now)) continue;
+			if (removeEnvironment(owner, true)) {
+				repairBackoff.attempted(now);
+				repairSaveWarned = false;
+				LOGGER.info("The local T3 no longer accepts its pairing; pairing again");
+			} else if (!repairSaveWarned) {
+				repairSaveWarned = true;
+				LOGGER.warn("The local T3 no longer accepts its pairing and the config could not be saved; still trying with it");
+			}
 		}
 		startAutoConnect();
 	}
+
+	private final T3AutoConnect.Backoff repairBackoff = new T3AutoConnect.Backoff();
+	private boolean repairSaveWarned;
 
 	/** Auto-connect paired the local T3 in the background: keep it, unless the player paired something meanwhile. */
 	private void adoptLocal(T3Config.Environment env) {
@@ -459,13 +522,17 @@ public final class T3CraftClient implements ClientModInitializer {
 	}
 	List<T3Config.Environment> environments() { return List.copyOf(config.environments); }
 
-	/** Forgets one paired machine (the local T3 when it stops accepting its pairing); false when the config could not be saved. */
-	boolean removeEnvironment(String owner) {
+	/**
+	 * Forgets one paired machine (the local T3 when it stops accepting its pairing); false when the config could not
+	 * be saved. {@code repairing} keeps the player's thread choice: the same T3 is paired again at once, and its
+	 * thread ids survive a revoked token (a thread that is really gone is simply not picked).
+	 */
+	boolean removeEnvironment(String owner, boolean repairing) {
 		connectionRevision++;
 		var previous = new java.util.ArrayList<>(config.environments);
 		String previousFocus = config.threadId;
 		var row = state.snapshot().focusedRow();
-		if (row != null && owner.equals(row.ownerKey()) || config.environments.size() == 1) config.threadId = null;
+		if (!repairing && (row != null && owner.equals(row.ownerKey()) || config.environments.size() == 1)) config.threadId = null;
 		config.environments.removeIf(e -> T3Config.ownerKey(e.baseUrl).equals(owner));
 		if (!config.save(configPath)) { config.environments = previous; config.threadId = previousFocus; return false; }
 		state.reconfigure(connections(), config.threadId); return true;
@@ -590,10 +657,6 @@ public final class T3CraftClient implements ClientModInitializer {
 	}
 
 	/**
-	 * {@code model} overrides the thread's model for this turn (and the thread from then on); null keeps it.
-	 * Returns false when nothing was sent; {@code onFailure} runs on the game thread if the request later fails.
-	 */
-	/**
 	 * Sends to a specific thread, never to whatever is focused: the focus snapshot can lag a click on another agent.
 	 * Returns false (and says so) while that thread hasn't loaded yet.
 	 */
@@ -611,6 +674,10 @@ public final class T3CraftClient implements ClientModInitializer {
 		return true;
 	}
 
+	/**
+	 * {@code model} overrides the thread's model for this turn (and the thread from then on); null keeps it.
+	 * Returns false when nothing was sent; {@code onFailure} runs on the game thread if the request later fails.
+	 */
 	public boolean send(String text, boolean newThread, com.google.gson.JsonObject model, Runnable onFailure) {
 		// Nothing to pick first: the chosen thread, else the one that needs you, else the most recent one
 		// (a new thread only borrows its project and settings). With no threads at all, T3 itself is where to start one.
@@ -640,8 +707,40 @@ public final class T3CraftClient implements ClientModInitializer {
 	}
 
 	void respond(String threadId, T3State.Approval approval, String decision) {
-		state.respond(threadId, approval.requestId(), decision, null, this::reportError);
+		// A double click, a held Y or Enter on the still-focused button answers once: the same request is never sent twice.
+		String key = threadId + ":" + approval.requestId();
+		if (answeredApprovals.putIfAbsent(key, System.currentTimeMillis()) != null) return;
+		state.respond(threadId, approval.requestId(), decision, null, e -> {
+			reportError(e);
+			Minecraft.getInstance().execute(() -> answeredApprovals.remove(key));
+		});
 	}
+
+	/** Approvals answered and not yet gone from T3 ("thread:request" → when), from any thread (MCP answers too). */
+	private final java.util.Map<String, Long> answeredApprovals = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/**
+	 * Whether an answer to one of this thread's approvals is still on its way. Screens keep Approve / Deny inert
+	 * meanwhile, so a second press can't hit the next queued request before the player has seen it.
+	 */
+	boolean approvalInFlight(T3State.Focus focus) {
+		return focus != null && approvalInFlight(answeredApprovals, focus.threadId(), focus.approvals().stream().map(T3State.Approval::requestId).toList(), System.currentTimeMillis());
+	}
+
+	/**
+	 * Drops answers T3 has settled (gone from the request list, after a short grace so the next request never
+	 * appears under a double click) and stale ones, then says whether any of this thread's answers remain.
+	 */
+	static boolean approvalInFlight(java.util.Map<String, Long> answered, String threadId, List<String> pending, long now) {
+		String prefix = threadId + ":";
+		answered.entrySet().removeIf(e -> now - e.getValue() > APPROVAL_STALE_MS
+			|| e.getKey().startsWith(prefix) && now - e.getValue() > APPROVAL_GRACE_MS && !pending.contains(e.getKey().substring(prefix.length())));
+		for (String key : answered.keySet()) if (key.startsWith(prefix)) return true;
+		return false;
+	}
+
+	static final long APPROVAL_GRACE_MS = 400;
+	static final long APPROVAL_STALE_MS = 30_000;
 
 	public void answer(T3State.UserInput input, com.google.gson.JsonObject answers) {
 		var focus = state.snapshot().focus();
@@ -669,6 +768,22 @@ public final class T3CraftClient implements ClientModInitializer {
 		if (key == null) return;
 		if (text == null || text.isBlank()) drafts.remove(key);
 		else drafts.put(key, text);
+	}
+
+	/**
+	 * A send failed after its box was cleared: the text goes back in front of whatever is there now. Into the open
+	 * laptop or card when it shows that draft (so closing it can't park its own box over the restored text), else
+	 * into the saved draft.
+	 */
+	void restoreFailedSend(String key, String text) {
+		var screen = Minecraft.getInstance().gui.screen();
+		if (screen instanceof T3Screen laptop && laptop.restoreFailedSend(key, text)) return;
+		if (screen instanceof T3AgentCardScreen card && card.restoreFailedSend(key, text)) return;
+		saveDraft(key, joinDraft(text, draft(key)));
+	}
+
+	static String joinDraft(String restored, String current) {
+		return current == null || current.isBlank() || current.equals(restored) ? restored : restored + " " + current;
 	}
 
 	public void interrupt() {

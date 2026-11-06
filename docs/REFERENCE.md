@@ -104,7 +104,7 @@ Tools don't have to read the log: while the game runs, the bound address is in `
 {"url":"http://127.0.0.1:25591/mcp","port":25591,"pid":12345}
 ```
 
-With two games open, the file belongs to the one started last.
+With two games open, the file belongs to the one started last. When that one quits (or crashes), the one still running writes its own address back within about ten seconds. If you read the file while a game may have just crashed, check that its `pid` is still running.
 
 It listens on `127.0.0.1` only and refuses requests that carry an `Origin` header or a Host that isn't the exact loopback host and port. Requests over 1 MiB are refused. Malformed requests get JSON-RPC errors (`-32700` parse error, `-32600` invalid request, `-32601` method not found, `-32602` invalid params); tool failures come back as tool results with `isError`. It offers four tools:
 
@@ -179,7 +179,6 @@ Dev-client options, all through `-P` properties:
 | `office-a` | Design A: structure, residents per floor, laptop click, `/t3 office go` from far away (fixture: `scripts/office/fixture.py`) |
 | `silkworld` | One-time showcase world with the office at spawn |
 | `desk-review` · `release-review` | Whiteboard → Decisions, exact approval, lectern → Review, patch clicks, preserved feedback draft |
-| `activity-review` · `activity-live` | Activity view, numbered checkpoint hunks, offline cache |
 | `stable-office` · `stable-office-restore` · `stable-shared` | Pinned desk identity through churn, reconnect and restart; operator pins |
 | `connection-errors` | Per-machine auth and protocol guidance, reconnect, preserved draft |
 | `hidden-decisions` | Hidden subagent requests still reach Decisions |

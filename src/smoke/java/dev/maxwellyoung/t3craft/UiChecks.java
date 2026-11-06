@@ -13,7 +13,9 @@ public final class UiChecks {
 		composerDrafts();
 		webViewport();
 		cdpMessages();
-		System.out.println("PASS diff headers inside hunks, table cells with empties/escapes, code-point-safe ellipsize, composer drafts survive a send, web viewport is 1:1 and never stretched, CDP messages");
+		nativeUi();
+		System.out.println("PASS diff headers inside hunks, table cells with empties/escapes, code-point-safe ellipsize, composer drafts survive a send, web viewport is 1:1 and never stretched, CDP messages, "
+			+ "native UI open-key letter guard, approval in-flight guard, failed-send restore and question option grid");
 	}
 
 	private static void diffHeaders() {
@@ -191,6 +193,36 @@ public final class UiChecks {
 		check(!T3Web.deepLink(true, "t-1", "t-1", false), "reopening on the same thread keeps the laptop's place");
 		check(T3Web.deepLink(true, "t-1", "t-2", false), "a new focused thread deep-links");
 		check(T3Web.deepLink(true, "t-1", "t-1", true), "a ping jump deep-links even to the same thread");
+	}
+
+	/** The laptop and the card: what the review follow-ups pinned down without a running game. */
+	private static void nativeUi() {
+		// A letter or digit open key never closes a screen (it would eat the first character of a reply).
+		check(T3CraftClient.openKeyCloses("`") && T3CraftClient.openKeyCloses("F6") && T3CraftClient.openKeyCloses("Right Shift"), "symbol and named open keys close");
+		check(!T3CraftClient.openKeyCloses("T") && !T3CraftClient.openKeyCloses("7"), "letter and digit open keys never close");
+
+		// An answered approval stays in flight until T3 drops it, never less than the grace, and never forever.
+		var answered = new java.util.HashMap<String, Long>();
+		answered.put("t1:r1", 1_000L);
+		check(T3CraftClient.approvalInFlight(answered, "t1", List.of("r1", "r2"), 1_100), "still listed: in flight, so a double click can't reach r2");
+		check(T3CraftClient.approvalInFlight(answered, "t1", List.of("r2"), 1_000 + T3CraftClient.APPROVAL_GRACE_MS - 1), "dropped but inside the grace: still in flight");
+		check(!T3CraftClient.approvalInFlight(answered, "t1", List.of("r2"), 1_000 + T3CraftClient.APPROVAL_GRACE_MS + 1) && answered.isEmpty(), "dropped after the grace: the next request is live");
+		answered.put("t1:r1", 1_000L);
+		check(!T3CraftClient.approvalInFlight(answered, "t2", List.of(), 1_100) && answered.containsKey("t1:r1"), "another thread's answer doesn't block this one");
+		check(!T3CraftClient.approvalInFlight(answered, "t1", List.of("r1"), 1_000 + T3CraftClient.APPROVAL_STALE_MS + 1), "a stuck answer frees the buttons eventually");
+
+		// A failed send's text goes in front of what was typed since, once.
+		check(T3CraftClient.joinDraft("fix it", "").equals("fix it") && T3CraftClient.joinDraft("fix it", null).equals("fix it"), "restore into an empty box");
+		check(T3CraftClient.joinDraft("fix it", "and test").equals("fix it and test"), "restore keeps what was typed since");
+		check(T3CraftClient.joinDraft("fix it", "fix it").equals("fix it"), "restore never doubles the text");
+
+		// Options: one column while they fit, two before any is hidden, never more rows than fit.
+		check(T3Screen.optionGrid(3, 200, 20).equals(new T3Screen.OptionGrid(3, 1, 3)), "few options: one column");
+		check(T3Screen.optionGrid(7, 89, 20).equals(new T3Screen.OptionGrid(4, 2, 7)), "GUI scale 6, seven options: two columns of four");
+		check(T3Screen.optionGrid(9, 89, 20).equals(new T3Screen.OptionGrid(4, 2, 8)), "nine options in four rows: eight shown, the ninth by its key");
+		check(T3Screen.optionGrid(9, 116, 20).equals(new T3Screen.OptionGrid(5, 2, 9)), "with the conversation down to one row all nine fit");
+		check(T3Screen.optionGrid(4, 5, 20).rows() == 1, "a tiny window still shows one row");
+		check(T3Screen.optionGrid(0, 100, 20).shown() == 0, "no options, no rows");
 	}
 
 	private static void check(boolean ok, String message) { if (!ok) throw new AssertionError(message); }

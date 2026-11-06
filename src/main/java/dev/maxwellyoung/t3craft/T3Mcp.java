@@ -83,13 +83,27 @@ final class T3Mcp {
 			}));
 			server.start();
 			long pid = ProcessHandle.current().pid();
+			// With two games open, the one started last owns the file. When it quits (or crashed), this one takes it back.
+			var keeper = portFile == null ? null : Executors.newSingleThreadScheduledExecutor(runnable -> {
+				Thread thread = new Thread(runnable, "t3craft-mcp-port");
+				thread.setDaemon(true);
+				return thread;
+			});
 			net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
 				server.stop(0);
-				if (portFile != null) clearPortFile(portFile, pid);
+				if (keeper == null) return;
+				// Stop reclaiming first, so the file is not written back after it was removed.
+				keeper.shutdownNow();
+				try { keeper.awaitTermination(1, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+				clearPortFile(portFile, pid);
 			});
 			if (port != preferredPort) T3CraftClient.LOGGER.warn("Port {} is in use (another Minecraft?); the MCP server moved to {}", preferredPort, port);
 			T3CraftClient.LOGGER.info("Minecraft MCP server on {}", url(port));
 			if (portFile != null && !writePortFile(portFile, port, pid)) T3CraftClient.LOGGER.warn("Could not write {}; the MCP address is only in this log", portFile);
+			if (keeper != null) {
+				int bound = port;
+				keeper.scheduleWithFixedDelay(() -> reclaimPortFile(portFile, bound, pid, T3Mcp::alive), PORT_FILE_CHECK_S, PORT_FILE_CHECK_S, TimeUnit.SECONDS);
+			}
 		} catch (IOException e) {
 			T3CraftClient.LOGGER.warn("Could not start the Minecraft MCP server on ports {}-{}; agents cannot reach this game", preferredPort, preferredPort + PORT_ATTEMPTS - 1, e);
 		}
@@ -132,6 +146,28 @@ final class T3Mcp {
 		} catch (IOException | RuntimeException e) {
 			return false;
 		}
+	}
+
+	private static final long PORT_FILE_CHECK_S = 10;
+
+	private static boolean alive(long pid) {
+		return ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
+	}
+
+	/**
+	 * Writes this game's address back when the file is gone (the game that owned it quit), unreadable, or names a
+	 * game that is no longer running (it crashed). True when it wrote. A live other game's file is left alone.
+	 */
+	static boolean reclaimPortFile(java.nio.file.Path file, int port, long pid, java.util.function.LongPredicate alive) {
+		Long owner = null;
+		try {
+			var json = com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(file)).getAsJsonObject();
+			if (json.has("pid")) owner = json.get("pid").getAsLong();
+		} catch (IOException | RuntimeException missingOrBroken) {
+			owner = null;
+		}
+		if (owner != null && (owner == pid || alive.test(owner))) return false;
+		return writePortFile(file, port, pid);
 	}
 
 	/** Removes the address file on quit, unless another game has written its own since. */

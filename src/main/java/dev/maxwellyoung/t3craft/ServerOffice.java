@@ -32,7 +32,7 @@ final class ServerOffice {
 	private final T3Config config;
 	private final Runnable save;
 	private final OfficeBrain brain = new OfficeBrain();
-	private final Map<String, Mannequin> villagers = new HashMap<>();
+	private final Map<String, Mannequin> mannequins = new HashMap<>();
 	private final Map<Integer, String> boards = new HashMap<>();
 	private Boolean night;
  private final DeskLaptops laptops=new DeskLaptops();
@@ -101,7 +101,7 @@ final class ServerOffice {
 			pending.remove(requester);
 			source.sendFailure(net.minecraft.network.chat.Component.literal("The entire site must be loaded and inside the world's height limits.")); return 0;
 		}
-		if (!confirm && OfficeSite.occupied(server.overworld(), bounds, origin(), T3Office.blueprint(floors()))) {
+		if (!confirm && OfficeSite.occupied(server.overworld(), bounds, frame(), T3Office.blueprint(floors()))) {
 			pending.put(requester, request);
 			source.sendFailure(net.minecraft.network.chat.Component.literal("This site contains existing blocks. Run /t3office build confirm to replace them at these exact bounds.")); return 0;
 		}
@@ -113,7 +113,7 @@ final class ServerOffice {
 		save.run();
 		OfficePlacement.place(server.overworld(),origin,request.labels());
 		int litter=OfficePlacement.sweep(server.overworld(),origin,Math.max(2,request.labels().size()*2));
-		if(litter>0)T3CraftClient.LOGGER.warn("Office rebuild swept {} dropped items",litter);
+		if(litter>0)T3Log.LOGGER.warn("Office rebuild swept {} dropped items",litter);
 		source.sendSuccess(() -> net.minecraft.network.chat.Component.literal("Suite 408 is up; the agents are walking in."), true);
 		return 1;
 	}
@@ -125,10 +125,10 @@ final class ServerOffice {
 		save.run();
 	}
 
-	/** Removes this office's villagers (and any left over from a previous run). */
+	/** Removes this office's mannequins (and any left over from a previous run). */
 	void clear(MinecraftServer server) {
-		for (Mannequin villager : villagers.values()) villager.discard();
-		villagers.clear(); laptops.clear();
+		for (Mannequin mannequin : mannequins.values()) mannequin.discard();
+		mannequins.clear(); laptops.clear();
 		brain.clear();
 		boards.clear();
 		night = null;
@@ -142,7 +142,7 @@ final class ServerOffice {
 	void onLoad(net.minecraft.world.entity.Entity entity) {
 		if (legacyVillager(entity.entityTags())) { entity.discard(); return; }
 		laptops.onLoad(entity);
-        if (entity.entityTags().contains(TAG) && !villagers.containsValue(entity)) {
+        if (entity.entityTags().contains(TAG) && !mannequins.containsValue(entity)) {
 			entity.discard();
 		}
 	}
@@ -157,22 +157,22 @@ final class ServerOffice {
 		if (ticks % 10 == 0) sync(server, level, frame);
 		brain.tick();
 		for (OfficeBrain.Agent agent : brain.agents().values()) {
-			Mannequin villager = villagers.get(agent.threadId);
-			if (villager == null || villager.isRemoved()) continue;
-			villager.setPos(frame.point(agent.x, agent.y(), agent.z));
+			Mannequin mannequin = mannequins.get(agent.threadId);
+			if (mannequin == null || mannequin.isRemoved()) continue;
+			mannequin.setPos(frame.point(agent.x, agent.y(), agent.z));
 			float yaw = frame.yaw(agent.yaw);
-			villager.setYRot(yaw);
-			villager.setYBodyRot(yaw);
+			mannequin.setYRot(yaw);
+			mannequin.setYBodyRot(yaw);
 
-   var player=level.getNearestPlayer(villager,agent.faceHold>0?32:3);
-   if(player!=null){if(player.distanceToSqr(villager)<9)agent.faceHold=Math.max(agent.faceHold,8);AgentPose.face(villager,player);}else AgentPose.rest(villager);
-   AgentPose.set(villager,agent.settled()&&agent.goal.seat());
-			boolean holds = !villager.getMainHandItem().isEmpty();
+   var player=level.getNearestPlayer(mannequin,agent.faceHold>0?32:3);
+   if(player!=null){if(player.distanceToSqr(mannequin)<9)agent.faceHold=Math.max(agent.faceHold,8);AgentPose.face(mannequin,player);}else AgentPose.rest(mannequin);
+   AgentPose.set(mannequin,agent.settled()&&agent.goal.seat());
+			boolean holds = !mannequin.getMainHandItem().isEmpty();
 			if (agent.holding != holds) {
-				villager.setItemSlot(EquipmentSlot.MAINHAND, agent.holding ? new ItemStack(Items.HONEY_BOTTLE) : ItemStack.EMPTY);
+				mannequin.setItemSlot(EquipmentSlot.MAINHAND, agent.holding ? new ItemStack(Items.HONEY_BOTTLE) : ItemStack.EMPTY);
 			}
 			if (state.online(agent.threadId) && agent.settled() && agent.zone == OfficeBrain.Zone.WORK && Math.random() < 0.05) {
-				level.playSound(null, villager.blockPosition(), SoundEvents.WOODEN_BUTTON_CLICK_ON, SoundSource.NEUTRAL,
+				level.playSound(null, mannequin.blockPosition(), SoundEvents.WOODEN_BUTTON_CLICK_ON, SoundSource.NEUTRAL,
 					0.12F, 1.7F + (float) Math.random() * 0.4F);
 			}
 		}
@@ -185,34 +185,34 @@ final class ServerOffice {
 		config.sharedOfficePreferences.normalize();
 		Map<String, Integer> previousDesks = Map.copyOf(config.sharedOfficePreferences.desks);
 		for (OfficeBrain.Agent gone : brain.sync(snapshot.threads(), owners(), config.sharedOfficePreferences, snapshot.machines().stream().filter(T3State.MachineHealth::online).map(T3State.MachineHealth::owner).collect(java.util.stream.Collectors.toSet()))) {
-			Mannequin villager = villagers.remove(gone.threadId);
-			if (villager != null) villager.discard();
+			Mannequin mannequin = mannequins.remove(gone.threadId);
+			if (mannequin != null) mannequin.discard();
 		}
 		if (!previousDesks.equals(config.sharedOfficePreferences.desks)) save.run();
 		for (OfficeBrain.Agent agent : brain.agents().values()) {
-			Mannequin villager = villagers.get(agent.threadId);
-			if (villager == null || villager.isRemoved()) {
-				villager = EntityTypes.MANNEQUIN.create(level, EntitySpawnReason.COMMAND);
-				if (villager == null) continue;
-				villager.setSilent(true);
-				villager.setNoGravity(true);
-				villager.setPermanentlyInvulnerable(true);
-				villager.addTag(TAG);
-				villager.setCustomNameVisible(true);
+			Mannequin mannequin = mannequins.get(agent.threadId);
+			if (mannequin == null || mannequin.isRemoved()) {
+				mannequin = EntityTypes.MANNEQUIN.create(level, EntitySpawnReason.COMMAND);
+				if (mannequin == null) continue;
+				mannequin.setSilent(true);
+				mannequin.setNoGravity(true);
+				mannequin.setPermanentlyInvulnerable(true);
+				mannequin.addTag(TAG);
+				mannequin.setCustomNameVisible(true);
 				var at = frame.point(agent.x, agent.y(), agent.z);
-				villager.snapTo(at.x, at.y, at.z, 0, 0);
-				villager.setUUID(OfficeBrain.villagerUuid(agent.threadId));
-				villagers.put(agent.threadId, villager);
-				if (!level.addFreshEntity(villager)) {
+				mannequin.snapTo(at.x, at.y, at.z, 0, 0);
+				mannequin.setUUID(OfficeBrain.agentUuid(agent.threadId));
+				mannequins.put(agent.threadId, mannequin);
+				if (!level.addFreshEntity(mannequin)) {
 					// A stale copy with this UUID is still in the world; it is discarded on load, so retry next sync.
-					villagers.remove(agent.threadId);
-					if (level.getEntity(villager.getUUID()) instanceof Mannequin stale) stale.discard();
+					mannequins.remove(agent.threadId);
+					if (level.getEntity(mannequin.getUUID()) instanceof Mannequin stale) stale.discard();
 					continue;
 				}
 			}
 			T3State.ThreadRow row = state.snapshot().threads().stream().filter(r -> r.id().equals(agent.threadId)).findFirst().orElse(null);
 			if (row != null) {
-				AgentAppearance.update(villager, row, state.online(row.id()), state.driverFor(row));
+				AgentAppearance.update(mannequin, row, state.online(row.id()), state.driverFor(row));
 			}
 		}
 		laptops.sync(level,frame,brain.agents().values(),Math.max(2,floors.size()*2));

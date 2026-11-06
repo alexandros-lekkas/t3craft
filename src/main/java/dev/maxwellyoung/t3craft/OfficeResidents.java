@@ -196,7 +196,7 @@ final class OfficeResidents {
 	/** The thread a shared office agent or desk laptop stands for, if it is one of ours. */
 	private String threadForUuid(java.util.UUID uuid) {
 		for (T3State.ThreadRow row : mod.state().snapshot().threads()) {
-			if (OfficeBrain.villagerUuid(row.id()).equals(uuid) || DeskLaptops.uuid(row.id(), true).equals(uuid) || DeskLaptops.uuid(row.id(), false).equals(uuid)) return row.id();
+			if (OfficeBrain.agentUuid(row.id()).equals(uuid) || DeskLaptops.uuid(row.id(), true).equals(uuid) || DeskLaptops.uuid(row.id(), false).equals(uuid)) return row.id();
 		}
 		return null;
 	}

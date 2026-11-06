@@ -83,7 +83,7 @@ Everything is in GUI pixels, so the layout follows the GUI scale like vanilla sc
 
 ## What was left out on purpose
 
-No tabs for activity, review, diff, pins or connections on the laptop. No model picker, no machine or project filters, no *+ New* button. The code for Decisions, Review, Activity and Pins is still there behind the `/t3` commands, and the streamed web UI is still there behind `webUi: true`, but none of it is on the screen.
+No tabs for activity, review, diff, pins or connections on the laptop. No model picker, no machine or project filters, no *+ New* button. Decisions, Review and Pins are still there behind the debug `/t3` commands, and the streamed web UI is still there behind `webUi: true`, but none of it is on the screen. The separate Activity screen is gone: the commands and file changes it listed show inline in the conversation.
 
 ## How it is built
 
