@@ -7,4 +7,5 @@
 # Fix: edit credits/credits.json, then run  python3 -I credits/generate.py
 set -euo pipefail
 cd "$(dirname "$0")/.."
+python3 -I credits/test_generate.py
 exec python3 -I credits/generate.py --check "$@"

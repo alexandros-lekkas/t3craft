@@ -255,7 +255,11 @@ class Credits:
         # A pack is only "present" when its packwiz metadata is; a folder holding just the
         # generated CREDITS.md doesn't count.
         self.has_pack = (self.modpack / "pack.toml").is_file()
-        self.files = list_files(self.repo)
+        # Generated documents must never activate a credit or match a directory glob.
+        # Keep list_files unfiltered: stale attribution cleanup still needs to see them.
+        generated = {"CREDITS.md", "THIRD_PARTY_LICENSES.md", "modpack/CREDITS.md", CREDITS_JSON_OUT}
+        self.files = [f for f in list_files(self.repo)
+                      if f not in generated and Path(f).name != "ATTRIBUTION.md"]
         self.entries: list[dict] = list(self.cfg.get("credits", []))
         for ing in self.cfg.get("ingest", []):
             src = self.repo / ing["path"]
