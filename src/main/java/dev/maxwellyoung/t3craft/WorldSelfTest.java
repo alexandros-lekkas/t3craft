@@ -14,12 +14,12 @@ import java.util.Locale;
  * Dev-only walkthrough, enabled with {@code -Dt3craft.worldtest=<place>} (a Place label such as
  * {@code Lakeside} or {@code River Bend}): from the title screen, press T3 World, pick the place,
  * screenshot the New T3 World screen, press Create, screenshot the arrival, then look at the
- * office from outside and in. Paired with the office fixture ({@code -Pconfig=run/config/office-fixture.json})
+ * office from outside and in, and the usage board on its wall by day and by night. Paired with the office fixture ({@code -Pconfig=run/config/office-fixture.json})
  * it also waits for the agents to sit down and checks that every working agent is at its desk,
  * in the world, wherever the office was turned. Drives the real screens through their buttons, then quits.
  */
 final class WorldSelfTest {
-	private enum Step { TITLE, FORM, ARRIVE, OUTSIDE, DESKS, LOOK, DONE }
+	private enum Step { TITLE, FORM, ARRIVE, OUTSIDE, DESKS, BOARD, LOOK, DONE }
 
 	private final T3CraftClient mod;
 	private final String place;
@@ -28,6 +28,7 @@ final class WorldSelfTest {
 	private BlockPos arrivedAt;
 	private float arrivedYaw, arrivedPitch;
 	private OfficeFrame frame;
+	private int boardFrames;
 	/** The marker as last copied on the server thread (SavedData belongs to it), and a copy on its way. */
 	private Marker marker;
 	private java.util.concurrent.CompletableFuture<Marker> reading;
@@ -109,6 +110,21 @@ final class WorldSelfTest {
 					int settled = settledAtDesks();
 					if (wait < 100 || (paired && settled < workers() && wait < 20 * 45)) return;
 					shot(minecraft, "desks");
+					step = Step.BOARD; wait = 0;
+				}
+				case BOARD -> {
+					// The usage limits board, from the room six blocks in front of it: by day, then at night (glow frames stay lit).
+					var anchor = UsageBoardLayout.ANCHOR.getAsJsonArray("topLeft");
+					double x = anchor.get(0).getAsInt() + .5 - 5.5, z = anchor.get(2).getAsInt() + UsageBoardLayout.COLUMNS / 2.0;
+					if (++wait == 1) { hud(minecraft, false); minecraft.player.connection.sendCommand("time set 1000"); }
+					if (wait == 2 || wait == 60) look(minecraft, x, 0, z, -90, -8);
+					if (wait == 40) shot(minecraft, "board-day");
+					if (wait == 50) minecraft.player.connection.sendCommand("time set 18000");
+					// Lamps follow the night on the office's 100-tick decoration timer.
+					if (wait == 200) shot(minecraft, "board-night");
+					if (wait < 210) return;
+					minecraft.player.connection.sendCommand("time set 1000");
+					boardFrames = mod.residents().usageBoardForTest().framesForTest().size();
 					step = Step.LOOK; wait = 0;
 				}
 				case LOOK -> {
@@ -120,10 +136,11 @@ final class WorldSelfTest {
 					int workers = workers(), seated = settledAtDesks();
 					boolean paired = !mod.state().snapshot().threads().isEmpty();
 					boolean desks = !paired || (workers > 0 && seated == workers);
-					finish(minecraft, (onPlaza && desks ? "PASS" : "FAIL") + " T3 World '" + data.name() + "' place " + place + " seed " + data.seed()
+					boolean board = boardFrames == UsageBoardLayout.COLUMNS * UsageBoardLayout.ROWS;
+					finish(minecraft, (onPlaza && desks && board ? "PASS" : "FAIL") + " T3 World '" + data.name() + "' place " + place + " seed " + data.seed()
 						+ " office " + data.origin().toShortString() + " rotation " + data.rotation() + " spawn " + data.spawn().toShortString()
 						+ " yaw " + data.spawnYaw() + " pitch " + data.spawnPitch() + " arrived " + arrivedAt.toShortString()
-						+ " agents " + mod.residents().brainForTest().agents().size() + " working " + workers + " at desks " + seated + (paired ? "" : " (unpaired)"));
+						+ " usage board frames " + boardFrames + " agents " + mod.residents().brainForTest().agents().size() + " working " + workers + " at desks " + seated + (paired ? "" : " (unpaired)"));
 				}
 				default -> {}
 			}

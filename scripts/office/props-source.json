@@ -1452,11 +1452,11 @@
    "item": "wall_clock",
    "pos": [
     22,
-    2.75,
-    8.5
+    3.6,
+    9.5
    ],
    "yaw": -90,
-   "mount": "east wall interior face x=22, beside the floor sign (21,2,9)",
+   "mount": "east wall interior face x=22, above the floor sign (21,2,9), clear of the usage board",
    "viewRange": 0.8,
    "world": {
     "pos": [

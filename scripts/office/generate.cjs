@@ -17,7 +17,11 @@ for(let n=1;n<=2;n++){
  for(let xx=X(x);xx<(stretch?X(x+1):X(x)+1);xx++)for(let zz=Z(z);zz<(stretch?Z(z+1):Z(z)+1);zz++)blocks.set([xx,y,zz].join(','),state);
  }
  lighting.apply(blocks,n);
- fs.writeFileSync(`${out}/scandi-${n}.json`,JSON.stringify({blocks:[...blocks].map(([p,state])=>({pos:p.split(',').map(Number),state})),anchors:anchor(d.anchors),lamps:anchor(d.lamps)}));
+ const anchors=anchor(d.anchors);
+ // The usage limits board: 6 x 3 maps on the ground floor's east wall (white concrete at x=30, z=7..12), facing into
+ // the room beside the stair and arrival spot. topLeft is the frame cell of the top-left map; columns run south (+z).
+ anchors.floors[0].usage_board={topLeft:[29,3,7],facing:'west',columns:6,rows:3};
+ fs.writeFileSync(`${out}/scandi-${n}.json`,JSON.stringify({blocks:[...blocks].map(([p,state])=>({pos:p.split(',').map(Number),state})),anchors,lamps:anchor(d.lamps)}));
 }
 // Same mapping for the original prop placement sheet.
 const source=__dirname+'/props-source.json';if(fs.existsSync(source)){

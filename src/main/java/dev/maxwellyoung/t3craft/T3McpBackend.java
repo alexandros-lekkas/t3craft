@@ -94,6 +94,7 @@ final class T3McpBackend implements T3Backend {
 		if (legacy == null) throw new IOException(LEGACY_REQUIRED);
 		return viaLegacy(() -> legacy.openSocket(closed));
 	}
+	public JsonObject usageConfig() throws IOException { if(legacy==null)throw new IOException(LEGACY_REQUIRED);return legacy.usageConfig(); }
 	private JsonObject rpc(String method, JsonObject params, boolean notification) throws IOException, InterruptedException {
 		if (token == null || token.isBlank() || expiresAt > 0 && System.currentTimeMillis() >= expiresAt)
 			throw failure(AUTH, true, AUTH_MESSAGE);

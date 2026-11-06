@@ -16,6 +16,7 @@ public interface T3Backend {
 	JsonObject shell() throws IOException, InterruptedException;
 	JsonObject thread(String id, int turns) throws IOException, InterruptedException;
 	List<T3Api.Provider> providers(T3Socket socket) throws IOException, InterruptedException;
+	JsonObject usageConfig() throws IOException;
 	void sendPrompt(JsonObject thread, String text, JsonObject model) throws IOException, InterruptedException;
 	String startThread(JsonObject template, String text, JsonObject model) throws IOException, InterruptedException;
 	void interrupt(String id) throws IOException, InterruptedException;

@@ -138,6 +138,12 @@ tasks.register('officeCheck', JavaExec) {
 	mainClass = 'dev.maxwellyoung.t3craft.OfficeChecks'
 }
 
+tasks.register('usageBoardCheck', JavaExec) {
+	description = 'Parses sanitized T3 and Muse usage fixtures for the office board.'
+	classpath = sourceSets.smoke.runtimeClasspath
+	mainClass = 'dev.maxwellyoung.t3craft.UsageBoardChecks'
+}
+
 tasks.register('connectionCheck', JavaExec) {
 	description = 'Private pairing errors, per-machine changes and cached peer continuity against loopback fixtures.'
 	classpath = sourceSets.smoke.runtimeClasspath

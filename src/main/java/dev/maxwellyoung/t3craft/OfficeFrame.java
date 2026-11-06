@@ -3,6 +3,7 @@ package dev.maxwellyoung.t3craft;
 import com.mojang.brigadier.StringReader;
 import net.minecraft.commands.arguments.blocks.BlockStateParser;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.Mirror;
@@ -46,6 +47,11 @@ record OfficeFrame(BlockPos origin, Rotation rotation) {
 	/** A design yaw turned with the office (NaN, "face the player", stays NaN). */
 	float yaw(float local) {
 		return Float.isNaN(local) ? local : Mth.wrapDegrees(local + degrees());
+	}
+
+	/** A design direction (a wall facing) turned with the office; up and down stay as they are. */
+	Direction direction(Direction local) {
+		return rotation.rotate(local);
 	}
 
 	/** A block state turned with the office. */

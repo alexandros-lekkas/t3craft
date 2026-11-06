@@ -152,6 +152,17 @@ public final class T3Api implements T3Backend {
 		return T3Socket.connect(HTTP, uri, onClose);
 	}
 
+	/**
+	 * Raw provider snapshot for the usage board, on its own short-lived socket: the shared one is replaced by
+	 * every prompt and review, so borrowing it would leave the board polling a closed connection.
+	 */
+	public JsonObject usageConfig() throws IOException {
+		T3Socket socket;
+		try { socket = openSocket(reason -> {}); }
+		catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IOException("Interrupted while connecting for provider usage", e); }
+		try { return socket.call("server.getConfig", new JsonObject(), 20); } finally { socket.close(); }
+	}
+
 	/** Ready providers and their models. Only exposed over RPC (`server.getConfig`). */
 	public List<Provider> providers(T3Socket socket) throws IOException {
 		JsonObject config = socket.call("server.getConfig", new JsonObject(), 20);

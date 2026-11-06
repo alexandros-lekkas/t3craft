@@ -36,9 +36,11 @@ final class OfficeResidents {
 	private final Map<Integer, String> boards = new HashMap<>();
 	private Boolean night;
 	private final DeskLaptops laptops = new DeskLaptops();
+	private final UsageBoardWall usageBoard;
 
 	OfficeResidents(T3CraftClient mod) {
 		this.mod = mod;
+		this.usageBoard = new UsageBoardWall(new UsageBoardSource(mod.state()));
 	}
 
 	/** Runs at the start of the client tick so a right-click on an agent is claimed before vanilla sees it. */
@@ -84,7 +86,7 @@ final class OfficeResidents {
 
 		T3State.Snapshot snapshot = mod.state().snapshot();
 		if (mod.office().building()) return;
-		if (ticks % 10 == 0) sync(snapshot, frame, paired);
+		if (ticks % 10 == 0) sync(snapshot, frame, paired, minecraft.player);
 		if (ticks % 8 == 0) {
 			for (Map.Entry<String, Mannequin> entry : agents.entrySet()) effects(entry.getValue(), row(snapshot, entry.getKey()));
 		}
@@ -128,14 +130,15 @@ final class OfficeResidents {
 	}
 
 	/**
-	 * Sync the brain with the thread list, then the agents, desk laptops, props, whiteboards and lamps. Unpaired, the
-	 * office keeps its props and lamps and has no agents.
+	 * Sync the brain with the thread list, then the agents, desk laptops, props, usage board, whiteboards and lamps.
+	 * Unpaired, the office keeps its props, lamps and usage board (asking you to connect T3) and has no agents.
 	 */
-	private void sync(T3State.Snapshot snapshot, OfficeFrame frame, boolean paired) {
+	private void sync(T3State.Snapshot snapshot, OfficeFrame frame, boolean paired, net.minecraft.world.entity.player.Player player) {
 		List<String> floors = mod.floors();
 		if (paired) syncResidents(snapshot, frame);
 		else if (!agents.isEmpty() || !brain.agents().isEmpty()) clearResidents();
 		laptops.sync(level, frame, paired ? brain.agents().values() : List.of(), Math.max(2, floors.size() * 2));
+		usageBoard.sync(level, frame, paired, player);
 		if (mod.office().building() || ticks < nextDecorationAttempt) return;
 		nextDecorationAttempt = ticks + 100;
 		// Retry after chunk reloads; never resend unchanged content on a timer.
@@ -209,6 +212,9 @@ final class OfficeResidents {
 	/** The Mannequin standing in for {@code threadId}, for the dev showcase; null when it is not in this world. */
 	Mannequin mannequinFor(String threadId) { return agents.get(threadId); }
 
+	/** The usage board on the wall, for the self-test. */
+	UsageBoardWall usageBoardForTest() { return usageBoard; }
+
 	/** Entity id → thread, for the self-test. */
 	Map<Integer, String> threadsByEntity() {
 		return Map.copyOf(threadByEntity);
@@ -219,11 +225,12 @@ final class OfficeResidents {
 	void clear() {
 		clearResidents();
 		laptops.clear();
+		usageBoard.clear();
 		boards.clear();
 		night = null;
 	}
 
-	/** Removes the agents (unpaired, or leaving the world); the office's props stay with {@link #laptops}. */
+	/** Removes the agents (unpaired, or leaving the world); the office's props stay with {@link #laptops}, the board with {@link #usageBoard}. */
 	private void clearResidents() {
 		if (level != null) {
 			for (Mannequin mannequin : agents.values()) level.removeEntity(mannequin.getId(), Entity.RemovalReason.DISCARDED);
