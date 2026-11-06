@@ -98,6 +98,10 @@ class Fixture(ThreadingHTTPServer):
         self.mcp_sessions = set()
         self.revoked = set()
         self.mcp_down = False
+        self.oauth_access = "full-access"
+        self.oauth_decision = "approve"
+        self.mcp_violations = []
+        self.mcp_posts = 0
         self.mcp_answered = False
         self.mcp_sent = False
         self.oauth_redirect = None
@@ -138,6 +142,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.server.threads['mcp-approval'] = thread('mcp-approval', True)
                 self.server.threads['mcp-question'] = thread('mcp-question', True, True)
                 return self.reply({'ok': True})
+            if self.path.startswith('/_qa/mcp-consent?'):
+                q = parse_qs(urlparse(self.path).query)
+                self.server.oauth_access = q.get('access', ['full-access'])[0]
+                self.server.oauth_decision = q.get('decision', ['approve'])[0]
+                return self.reply({'ok': True})
+            if self.path == '/_qa/mcp-violations': return self.reply(self.server.mcp_violations)
+            if self.path == '/_qa/mcp-posts': return self.reply({'count': self.server.mcp_posts})
             if self.path == '/_qa/mcp-restart': self.server.mcp_sessions.clear(); return self.reply({'ok': True})
             if self.path == '/_qa/mcp-revoke': self.server.revoked.add('mcp-fixture'); return self.reply({'ok': True})
             if self.path in ('/_qa/mcp-down', '/_qa/mcp-up'): self.server.mcp_down = self.path.endswith('-down'); return self.reply({'ok': True})
@@ -148,7 +159,9 @@ class Handler(BaseHTTPRequestHandler):
                 assert q['redirect_uri'] == [self.server.oauth_redirect]
                 assert q['resource'] == [base + '/mcp']
                 self.server.oauth_challenge = q['code_challenge'][0]
-                return self.reply({'redirect': self.server.oauth_redirect, 'state': q['state'][0], 'code': 'fixture-code', 'iss': base})
+                result = {'redirect': self.server.oauth_redirect, 'state': q['state'][0], 'iss': base}
+                result.update({'error': 'access_denied'} if self.server.oauth_decision == 'deny' else {'code': 'fixture-code'})
+                return self.reply(result)
             if self.path == '/.well-known/t3/environment': return self.reply({'label': 'Fixture ' + self.server.machine, 'orchestrationProtocolVersion': self.server.protocol_version})
             if self.path in ('/_qa/protocol3', '/_qa/auth-failed'):
                 if self.path == '/_qa/protocol3': self.server.protocol_version = 3
@@ -213,7 +226,8 @@ class Handler(BaseHTTPRequestHandler):
             challenge = base64.urlsafe_b64encode(hashlib.sha256(q['code_verifier'][0].encode()).digest()).decode().rstrip('=')
             assert challenge == self.server.oauth_challenge
             assert q['code'] == ['fixture-code'] and q['redirect_uri'] == [self.server.oauth_redirect]
-            return self.reply({'access_token': 'mcp-fixture', 'expires_in': 3600, 'token_type': 'Bearer'})
+            token, scope = {'full-access': ('mcp-fixture', 'orchestration:read orchestration:operate settings:write source-control:write'), 'approval-required': ('mcp-supervised', 'orchestration:read orchestration:operate'), 'read-only': ('mcp-readonly', 'orchestration:read')}[self.server.oauth_access]
+            return self.reply({'access_token': token, 'expires_in': 2592000, 'token_type': 'Bearer', 'scope': scope})
         if self.path == '/oauth/token' and parse_qs(body.decode()).get('subject_token', [''])[0] == 'delayed-fixture': time.sleep(3)
         with self.server.lock:
             if self.server.offline: return self.reply({'message': 'Fixture offline'}, 503)
@@ -232,8 +246,9 @@ class Handler(BaseHTTPRequestHandler):
         self.reply({'message': 'Unknown route'}, 404)
 
     def mcp(self, request):
+        self.server.mcp_posts += 1
         auth = self.headers.get('Authorization', '').removeprefix('Bearer ')
-        if auth not in ('mcp-fixture', 'mcp-readonly') or auth in self.server.revoked:
+        if auth not in ('mcp-fixture', 'mcp-readonly', 'mcp-supervised') or auth in self.server.revoked:
             return self.reply({'error': 'invalid_mcp_credential', 'message': 'A valid T3 Code MCP credential is required.'}, 401, {'WWW-Authenticate': f'Bearer resource_metadata="http://127.0.0.1:{self.server.server_port}/.well-known/oauth-protected-resource/mcp", error="invalid_token"'})
         if self.server.mcp_down: return self.reply({'message': 'Fixture MCP offline'}, 503)
         if self.headers.get('Content-Type') != 'application/json': return self.reply_empty(415)
@@ -255,6 +270,28 @@ class Handler(BaseHTTPRequestHandler):
         self.server.mcp_calls.append({'name': name, 'arguments': args})
         if auth == 'mcp-readonly' and (name in ('t3_thread_send', 't3_thread_launch', 't3_thread_interrupt') or 'answers' in args or 'modelSelection' in args):
             return self.reply({'jsonrpc': '2.0', 'id': request['id'], 'result': {'isError': True, 'content': [{'type': 'text', 'text': json.dumps({'_tag': 'OrchestratorMcpFailure', 'code': 'capability_denied', 'message': 'This tool changes the environment, and this MCP client was approved for read-only access.'})}]}})
+        if auth == 'mcp-supervised' and name in ('t3_thread_send', 't3_thread_interrupt', 't3_thread_launch'):
+            return self.reply({'jsonrpc': '2.0', 'id': request['id'], 'result': {'isError': True, 'content': [{'type': 'text', 'text': json.dumps({'_tag': 'OrchestratorMcpFailure', 'code': 'runtime_mode_escalation_denied', 'message': 'Child runtime mode full-access is broader than parent mode approval-required.'})}]}})
+        allowed = {
+            't3_thread_list': 'environmentId projectId allProjects statuses titleContains settled snoozed includeSubagents cursor limit',
+            't3_project_list': 'environmentId cursor limit',
+            't3_thread_read': 'environmentId threadId itemId textOffset view afterPosition limit runLimit maxCharsPerItem',
+            't3_pending_request': 'action environmentId threadId requestId answers',
+            'orchestrator_capabilities': 'environmentId search',
+            't3_thread_configure': 'environmentId threadId modelSelection',
+            't3_thread_send': 'environmentId threadId message mode clientRequestId',
+            't3_thread_launch': 'environmentId projectId scratch title modelSelection runtimeMode interactionMode workspaceStrategy message attachments clientRequestId delegatedFrom',
+            't3_thread_interrupt': 'environmentId threadId runId reason stop clientRequestId',
+        }
+        extra = sorted(set(args) - set(allowed[name].split()))
+        if extra:
+            if name == 't3_thread_read': return self.reply({'jsonrpc': '2.0', 'id': request['id'], 'error': {'code': -32602, 'message': 'Unexpected key ' + ', '.join(extra)}})
+            self.server.mcp_violations.append({'tool': name, 'extra': extra})
+        if name in ('t3_thread_list', 't3_project_list'): assert 1 <= args.get('limit', 100) <= 100
+        if 'runLimit' in args: assert args['runLimit'] >= 1
+        if name == 't3_thread_launch': assert args['title'] == args['title'].strip() and args['title']
+        if name == 't3_thread_send': assert args['mode'] in ('auto', 'queue', 'steer', 'restart')
+        if name == 't3_pending_request': assert args['action'] in ('list', 'read', 'respond')
         ident = args.get('threadId', 'mcp-question')
         now = '2026-11-01T00:00:00Z'
         row = {'threadId': ident, 'projectId': 'mcp-project', 'title': 'MCP fixture', 'status': 'completed' if self.server.mcp_answered else 'waiting', 'latestRunId': 'mcp-run', 'providerInstanceId': 'fixture-provider', 'model': 'fixture-model', 'runtimeMode': 'full-access', 'interactionMode': 'default', 'updatedAt': now}

@@ -77,8 +77,29 @@ public final class McpChecks {
 		try { readonly.sendPrompt(row, "Fixture prompt", null); throw new AssertionError("read-only write accepted"); } catch (IOException e) { check(e.getMessage().contains("Read only"), "read-only access explained"); }
 		var calls = JsonParser.parseString(HTTP.send(HttpRequest.newBuilder(URI.create(base + "/_qa/mcp-calls")).GET().build(), HttpResponse.BodyHandlers.ofString()).body()).getAsJsonArray();
 		check(calls.asList().stream().anyMatch(c -> c.getAsJsonObject().get("name").getAsString().equals("t3_thread_configure")), "model switched through MCP");
-		get(base + "/_qa/reset"); System.out.println("MCP checks passed: OAuth/state/PKCE, private persistence, JSON/SSE, pagination, models, send/launch/stop/questions, polling and legacy/auth fallbacks.");
+		consentChecks(); get(base + "/_qa/reset"); System.out.println("MCP checks passed: OAuth/state/PKCE, private persistence, JSON/SSE, pagination, models, send/launch/stop/questions, polling and legacy/auth fallbacks.");
 	}
+    static T3Config.Environment authorize() throws Exception {
+        return T3McpAuth.authorize(base + "/mcp", uri -> {
+            try {
+                JsonObject consent = get(uri.toString());
+                String query = consent.entrySet().stream().filter(e -> !e.getKey().equals("redirect"))
+                    .map(e -> e.getKey() + "=" + URLEncoder.encode(e.getValue().getAsString(), java.nio.charset.StandardCharsets.UTF_8)).reduce((a,b) -> a + "&" + b).orElse("");
+                var response = HTTP.send(HttpRequest.newBuilder(URI.create(consent.get("redirect").getAsString() + "?" + query)).GET().build(), HttpResponse.BodyHandlers.ofString());
+                check(response.statusCode() == 200 && response.headers().firstValue("Content-Type").orElse("").startsWith("text/html"), "OAuth callback HTML");
+            } catch (Exception e) { throw new RuntimeException(e); }
+        });
+    }
+    static void consentChecks() throws Exception {
+        get(base + "/_qa/reset");
+        get(base + "/_qa/mcp-consent?access=read-only");
+        try { authorize(); throw new AssertionError("read only paired"); } catch (T3McpException e) { check(e.getMessage().contains("Full access"), "read only pairing guidance"); }
+        get(base + "/_qa/mcp-consent?access=approval-required");
+        var env = authorize(); check(!env.mcpScope.contains("settings:write"), "limited scope retained");
+        var api = T3Backend.forEnvironment(env); var row = api.shell().getAsJsonArray("threads").get(0).getAsJsonObject();
+        try { api.sendPrompt(row, "Fixture prompt", null); throw new AssertionError("limited write accepted"); }
+        catch (T3McpException e) { check(e.kind == T3McpException.Kind.DENIED && e.getMessage().contains("Full access") && !e.getMessage().contains("mcp-supervised"), "mode ceiling explained"); }
+    }
 	private static JsonObject get(String url) throws Exception { return JsonParser.parseString(HTTP.send(HttpRequest.newBuilder(URI.create(url)).GET().build(), HttpResponse.BodyHandlers.ofString()).body()).getAsJsonObject(); }
 	interface Action { void run() throws Exception; }
 	interface Condition { boolean get(); }
