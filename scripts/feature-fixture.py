@@ -11,6 +11,7 @@ import socket
 import struct
 import threading
 import time
+import uuid
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -94,6 +95,9 @@ class Fixture(ThreadingHTTPServer):
         self.threads[f'{self.machine}-done-11']['projectId'] = 'fixture-alt'
         self.dispatches.clear()
         self.mcp_calls = []
+        self.mcp_sessions = set()
+        self.revoked = set()
+        self.mcp_down = False
         self.mcp_answered = False
         self.mcp_sent = False
         self.oauth_redirect = None
@@ -119,6 +123,12 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def reply_empty(self, code, headers=None):
+        self.send_response(code)
+        self.send_header('Content-Length', '0')
+        for key, value in (headers or {}).items(): self.send_header(key, value)
+        self.end_headers()
+
     def do_GET(self):
         with self.server.lock:
             base = f'http://127.0.0.1:{self.server.server_port}'
@@ -128,6 +138,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.server.threads['mcp-approval'] = thread('mcp-approval', True)
                 self.server.threads['mcp-question'] = thread('mcp-question', True, True)
                 return self.reply({'ok': True})
+            if self.path == '/_qa/mcp-restart': self.server.mcp_sessions.clear(); return self.reply({'ok': True})
+            if self.path == '/_qa/mcp-revoke': self.server.revoked.add('mcp-fixture'); return self.reply({'ok': True})
+            if self.path in ('/_qa/mcp-down', '/_qa/mcp-up'): self.server.mcp_down = self.path.endswith('-down'); return self.reply({'ok': True})
             if self.path == '/_qa/mcp-calls': return self.reply(self.server.mcp_calls)
             if self.path.startswith('/oauth/mcp/authorize?'):
                 q = parse_qs(urlparse(self.path).query)
@@ -219,20 +232,29 @@ class Handler(BaseHTTPRequestHandler):
         self.reply({'message': 'Unknown route'}, 404)
 
     def mcp(self, request):
-        auth = self.headers.get('Authorization')
-        if auth not in ('Bearer mcp-fixture', 'Bearer mcp-readonly'):
-            return self.reply({'error': 'Credential must never be echoed: ' + str(auth)}, 401)
-        assert self.headers.get('MCP-Protocol-Version') == '2025-06-18'
+        auth = self.headers.get('Authorization', '').removeprefix('Bearer ')
+        if auth not in ('mcp-fixture', 'mcp-readonly') or auth in self.server.revoked:
+            return self.reply({'error': 'invalid_mcp_credential', 'message': 'A valid T3 Code MCP credential is required.'}, 401, {'WWW-Authenticate': f'Bearer resource_metadata="http://127.0.0.1:{self.server.server_port}/.well-known/oauth-protected-resource/mcp", error="invalid_token"'})
+        if self.server.mcp_down: return self.reply({'message': 'Fixture MCP offline'}, 503)
+        if self.headers.get('Content-Type') != 'application/json': return self.reply_empty(415)
+        if any(t not in self.headers.get('Accept', '') for t in ('application/json', 'text/event-stream')): return self.reply_empty(406)
         method = request['method']
+        session = self.headers.get('Mcp-Session-Id')
+        def rejected(message): return self.reply({'jsonrpc': '2.0', 'id': request.get('id'), 'error': {'code': -32600, 'message': message}}, 400)
         if method == 'initialize':
-            return self.reply({'jsonrpc': '2.0', 'id': request['id'], 'result': {'protocolVersion': '2025-06-18', 'capabilities': {'tools': {}}, 'serverInfo': {'name': 'fixture', 'version': '1'}}}, headers={'Mcp-Session-Id': 'mcp-session'})
-        assert self.headers.get('Mcp-Session-Id') == 'mcp-session'
-        if method == 'notifications/initialized': return self.reply({}, 202)
+            if session: return rejected('initialize must not include an MCP-Session-Id header')
+            session = str(uuid.uuid4()); self.server.mcp_sessions.add(session)
+            self.server.mcp_calls.append({'name': 'initialize'})
+            return self.reply({'jsonrpc': '2.0', 'id': request['id'], 'result': {'protocolVersion': '2025-06-18', 'capabilities': {'tools': {}}, 'serverInfo': {'name': 'fixture', 'version': '1'}}}, headers={'Mcp-Session-Id': session, 'MCP-Protocol-Version': '2025-06-18'})
+        if not session: return rejected('MCP-Session-Id header is required; send initialize to start a session')
+        if session not in self.server.mcp_sessions: return self.reply_empty(404)
+        if self.headers.get('MCP-Protocol-Version', '2025-06-18') != '2025-06-18': return rejected('Unsupported protocol version')
+        if method == 'notifications/initialized': return self.reply_empty(202)
         assert method == 'tools/call'
         name, args = request['params']['name'], request['params']['arguments']
         self.server.mcp_calls.append({'name': name, 'arguments': args})
-        if auth == 'Bearer mcp-readonly' and (name in ('t3_thread_send', 't3_thread_launch', 't3_thread_interrupt') or 'answers' in args or 'modelSelection' in args):
-            return self.reply({'error': 'Read-only'}, 403)
+        if auth == 'mcp-readonly' and (name in ('t3_thread_send', 't3_thread_launch', 't3_thread_interrupt') or 'answers' in args or 'modelSelection' in args):
+            return self.reply({'jsonrpc': '2.0', 'id': request['id'], 'result': {'isError': True, 'content': [{'type': 'text', 'text': json.dumps({'_tag': 'OrchestratorMcpFailure', 'code': 'capability_denied', 'message': 'This tool changes the environment, and this MCP client was approved for read-only access.'})}]}})
         ident = args.get('threadId', 'mcp-question')
         now = '2026-11-01T00:00:00Z'
         row = {'threadId': ident, 'projectId': 'mcp-project', 'title': 'MCP fixture', 'status': 'completed' if self.server.mcp_answered else 'waiting', 'latestRunId': 'mcp-run', 'providerInstanceId': 'fixture-provider', 'model': 'fixture-model', 'runtimeMode': 'full-access', 'interactionMode': 'default', 'updatedAt': now}
@@ -277,10 +299,10 @@ class Handler(BaseHTTPRequestHandler):
             result = {'threadId': 'mcp-new'}
         elif name == 't3_thread_interrupt': result = {'threadId': ident}
         else: raise AssertionError('Unknown MCP tool: ' + name)
-        reply = {'jsonrpc': '2.0', 'id': request['id'], 'result': {'content': [{'type': 'text', 'text': json.dumps(result)}]}}
+        reply = {'jsonrpc': '2.0', 'id': request['id'], 'result': {'isError': False, 'structuredContent': result, 'content': [{'type': 'text', 'text': json.dumps(result)}]}}
         # Exercise both Streamable HTTP response formats and both tool-result encodings.
         if name == 't3_thread_read':
-            payload = ('event: message\ndata: ' + json.dumps(reply) + '\n\n').encode()
+            payload = ('data: ' + json.dumps({'jsonrpc': '2.0', 'method': 'notifications/message', 'params': {'level': 'info', 'data': 'fixture'}}) + '\n\ndata: ' + json.dumps(reply) + '\n\n').encode()
             self.send_response(200); self.send_header('Content-Type', 'text/event-stream'); self.send_header('Content-Length', str(len(payload))); self.end_headers(); self.wfile.write(payload)
         else:
             reply['result']['structuredContent'] = result

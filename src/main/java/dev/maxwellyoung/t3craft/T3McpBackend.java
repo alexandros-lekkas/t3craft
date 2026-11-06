@@ -2,6 +2,7 @@ package dev.maxwellyoung.t3craft;
 
 import com.google.gson.*;
 import java.io.IOException;
+import static dev.maxwellyoung.t3craft.T3McpException.Kind.*;
 import java.net.URI;
 import java.net.http.*;
 import java.time.Duration;
@@ -16,7 +17,22 @@ final class T3McpBackend implements T3Backend {
 	private final long expiresAt;
 	private final T3Api legacy;
 	private boolean initialized;
-	private String session;
+	private String session, authBlocked;
+ static final String READ_ONLY = "T3 approved T3 Craft for Read only access, so it cannot change anything. Re-pair this machine with its MCP URL and choose Full access on T3's consent page.";
+ static final String MODE_LIMIT = "T3 refused: this thread runs with more access than T3 Craft was approved for. Re-pair this machine with its MCP URL and choose Full access on T3's consent page.";
+ private static final String AUTH_MESSAGE = "T3 MCP access expired or was revoked. Re-pair this machine with its MCP URL in Connections.";
+ private static final class SessionLost extends IOException {}
+ private static T3McpException failure(T3McpException.Kind kind, boolean safe, String message) { return new T3McpException(kind, null, safe, message); }
+ private static String cap(String text, int limit) { return text == null ? "Unknown error" : text.substring(0, Math.min(limit, text.length())); }
+ private static String serverMessage(String body) {
+  try { JsonObject value = JsonParser.parseString(body).getAsJsonObject(); JsonObject error = T3Protocol.object(value, "error"); return T3Protocol.string(error == null ? value : error, "message"); }
+  catch (RuntimeException ignored) { return null; }
+ }
+ private static String verb(String name) { return switch (name) {
+  case "t3_thread_send" -> "send the prompt"; case "t3_thread_launch" -> "start the thread";
+  case "t3_thread_interrupt" -> "stop the thread"; case "t3_pending_request" -> "answer the question";
+  case "t3_thread_configure" -> "change the model"; default -> "load threads";
+ }; }
 	private long sequence;
 	T3McpBackend(T3Config.Environment env) {
 		url = env.mcpUrl; token = env.mcpToken; owner = T3Config.ownerKey(env.baseUrl); expiresAt = env.mcpExpiresAt;
@@ -29,28 +45,39 @@ final class T3McpBackend implements T3Backend {
 		return other instanceof T3McpBackend m && url.equals(m.url) && Objects.equals(token, m.token) && expiresAt == m.expiresAt
 			&& (legacy == null ? m.legacy == null : legacy.sameCredentials(m.legacy));
 	}
-	public void forgetProtocol() { if (legacy != null) legacy.forgetProtocol(); }
+	public synchronized void forgetProtocol() { authBlocked = null; initialized = false; session = null; if (legacy != null) legacy.forgetProtocol(); }
 	public int negotiatedProtocol() { return legacy == null ? 0 : legacy.negotiatedProtocol(); }
-	public JsonObject adaptShell(JsonObject value) { return legacy.adaptShell(value); }
-	public JsonObject adaptShellThread(JsonObject value) { return legacy.adaptShellThread(value); }
+	public JsonObject adaptShell(JsonObject value) { return legacy == null ? value : legacy.adaptShell(value); }
+	public JsonObject adaptShellThread(JsonObject value) { return legacy == null ? value : legacy.adaptShellThread(value); }
 	public T3Socket openSocket(Consumer<String> closed) throws IOException, InterruptedException {
 		if (legacy == null) throw new IOException(LEGACY_REQUIRED);
 		return legacy.openSocket(closed);
 	}
 	private JsonObject rpc(String method, JsonObject params, boolean notification) throws IOException, InterruptedException {
 		if (token == null || token.isBlank() || expiresAt > 0 && System.currentTimeMillis() >= expiresAt)
-			throw new IOException("MCP access expired. Re-pair with the MCP URL in Connections to authorize again.");
+			throw failure(AUTH, true, AUTH_MESSAGE);
+		if (authBlocked != null) throw failure(AUTH, true, authBlocked);
+		if ("initialize".equals(method)) session = null;
 		JsonObject body = obj("jsonrpc", "2.0"); body.addProperty("method", method); body.add("params", params);
 		long id = ++sequence; if (!notification) body.addProperty("id", id);
 		var builder = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(20))
 			.header("Authorization", "Bearer " + token).header("Content-Type", "application/json")
 			.header("Accept", "application/json, text/event-stream").header("MCP-Protocol-Version", "2025-06-18");
 		if (session != null) builder.header("Mcp-Session-Id", session);
-		var response = HTTP.send(builder.POST(HttpRequest.BodyPublishers.ofString(body.toString())).build(), HttpResponse.BodyHandlers.ofString());
-		if (response.statusCode() == 401) { initialized = false; session = null; throw new IOException("MCP access expired or revoked. Re-pair with the MCP URL in Connections."); }
-		if (response.statusCode() == 403) throw new IOException("MCP access is read-only or restricted. Authorize write access in the browser to perform this action.");
-		if (response.statusCode() == 404) { initialized = false; session = null; }
-		if (response.statusCode() / 100 != 2) throw new IOException("T3 MCP request failed (HTTP " + response.statusCode() + ").");
+        HttpResponse<String> response;
+        try { response = HTTP.send(builder.POST(HttpRequest.BodyPublishers.ofString(body.toString())).build(), HttpResponse.BodyHandlers.ofString()); }
+        catch (java.net.ConnectException | HttpConnectTimeoutException e) { throw failure(UNREACHABLE, true, "Could not reach T3 MCP at " + URI.create(url).getAuthority() + ". Check that T3 Code is running."); }
+        catch (IOException e) { throw failure(AMBIGUOUS, false, "T3 MCP did not answer in time; the action may still have happened. Check T3 before retrying."); }
+        int status = response.statusCode();
+        if (status == 401) { initialized = false; session = null; authBlocked = AUTH_MESSAGE; throw failure(AUTH, true, authBlocked); }
+        if (status == 404 && session != null) { initialized = false; session = null; throw new SessionLost(); }
+        String message = serverMessage(response.body());
+        if (status == 400 || status == 406 || status == 415) {
+            if (status == 400) { initialized = false; session = null; }
+            throw failure(REJECTED, true, "T3 MCP rejected the request" + (message == null ? " (HTTP " + status + ")" : ": " + cap(message, 300)));
+        }
+        if (status == 403) throw failure(REJECTED, true, "T3 refused the MCP request (HTTP 403)" + (message == null ? "" : ": " + cap(message, 300)));
+        if (status / 100 != 2) throw failure("tools/call".equals(method) ? AMBIGUOUS : PROTOCOL, false, "T3 MCP request failed (HTTP " + status + ").");
 		response.headers().firstValue("Mcp-Session-Id").ifPresent(value -> session = value);
 		if (notification) return new JsonObject();
 		try {
@@ -63,29 +90,44 @@ final class T3McpBackend implements T3Backend {
 					if (candidate.has("id") && candidate.get("id").getAsLong() == id) reply = candidate;
 				}
 			} else reply = JsonParser.parseString(response.body()).getAsJsonObject();
-			if (reply == null || !reply.has("id") || reply.get("id").getAsLong() != id) throw new IOException("T3 MCP returned no matching response.");
-			if (reply.has("error")) throw new IOException("T3 MCP rejected the request. Check access permissions and server compatibility.");
+			if (reply == null || !reply.has("id") || reply.get("id").getAsLong() != id) throw failure(PROTOCOL, false, "T3 MCP returned no matching response.");
+			if (reply.has("error")) throw failure(REJECTED, true, "T3 MCP rejected " + ("tools/call".equals(method) ? T3Protocol.string(params, "name") : method) + ": " + cap(serverMessage(reply.toString()), 300));
 			return reply.getAsJsonObject("result");
-		} catch (RuntimeException e) { throw new IOException("T3 MCP returned an invalid response."); }
+		} catch (RuntimeException e) { throw failure(PROTOCOL, false, "T3 MCP returned an invalid response."); }
 	}
 	synchronized JsonObject call(String name, JsonObject arguments) throws IOException, InterruptedException {
+  for (int attempt = 0; ; attempt++) try { return callOnce(name, arguments); }
+  catch (SessionLost e) { if (attempt > 0) throw failure(PROTOCOL, true, "T3 MCP session could not be re-established."); }
+ }
+ private JsonObject callOnce(String name, JsonObject arguments) throws IOException, InterruptedException {
 		if (!initialized) {
 			JsonObject init = obj("protocolVersion", "2025-06-18"); init.add("capabilities", new JsonObject());
 			JsonObject client = obj("name", "T3 Craft"); client.addProperty("version", "1"); init.add("clientInfo", client);
 			JsonObject result = rpc("initialize", init, false);
-			if (!"2025-06-18".equals(T3Protocol.string(result, "protocolVersion"))) throw new IOException("Unsupported MCP protocol version. Update T3 Craft.");
+			if (!"2025-06-18".equals(T3Protocol.string(result, "protocolVersion"))) throw failure(PROTOCOL, true, "Unsupported MCP protocol version. Update T3 Craft.");
 			rpc("notifications/initialized", new JsonObject(), true); initialized = true;
 		}
 		JsonObject params = obj("name", name); params.add("arguments", arguments);
 		JsonObject result = rpc("tools/call", params, false);
-		if (result.has("isError") && result.get("isError").getAsBoolean()) throw new IOException("T3 MCP could not complete " + name + ". Check access and the current thread state in T3.");
+        if (result.has("isError") && result.get("isError").getAsBoolean()) {
+            String text = null, code = null;
+            for (var item : T3Protocol.array(result, "content")) if ("text".equals(T3Protocol.string(item.getAsJsonObject(), "type"))) { text = T3Protocol.string(item.getAsJsonObject(), "text"); break; }
+            try { JsonObject error = JsonParser.parseString(text).getAsJsonObject(); code = T3Protocol.string(error, "code"); text = Optional.ofNullable(T3Protocol.string(error, "message")).orElse(text); } catch (RuntimeException ignored) {}
+            throw new T3McpException("capability_denied".equals(code) || "runtime_mode_escalation_denied".equals(code) || "interaction_mode_escalation_denied".equals(code) ? DENIED : TOOL, code, true,
+                switch (code == null ? "" : code) {
+                    case "capability_denied" -> READ_ONLY;
+                    case "runtime_mode_escalation_denied", "interaction_mode_escalation_denied" -> MODE_LIMIT;
+                    case "thread_not_found" -> "This thread no longer exists in T3.";
+                    default -> "T3 could not " + verb(name) + ": " + cap(text, 300);
+                });
+        }
 		JsonObject data = T3Protocol.object(result, "structuredContent");
 		if (data == null) for (var item : T3Protocol.array(result, "content")) {
 			JsonObject block = item.getAsJsonObject();
 			if ("text".equals(T3Protocol.string(block, "type"))) try { data = JsonParser.parseString(block.get("text").getAsString()).getAsJsonObject(); break; }
 			catch (RuntimeException ignored) {}
 		}
-		if (data == null || data.has("error") || data.has("_tag")) throw new IOException("T3 MCP returned an unsuccessful tool result for " + name + ".");
+		if (data == null || data.has("_tag")) throw failure(PROTOCOL, false, "T3 MCP returned an unsuccessful tool result for " + name + ".");
 		return data;
 	}
 	private JsonArray pages(String tool, String key, JsonObject args) throws IOException, InterruptedException {
@@ -98,7 +140,7 @@ final class T3McpBackend implements T3Backend {
 		}
 	}
 	public JsonObject shell() throws IOException, InterruptedException {
-		JsonObject out = new JsonObject(), args = new JsonObject(); args.addProperty("allProjects", true);
+		JsonObject out = new JsonObject(), args = new JsonObject(); args.addProperty("allProjects", true); args.addProperty("includeSubagents", false);
 		JsonArray threads = new JsonArray(); for (var value : pages("t3_thread_list", "threads", args)) threads.add(normalize(value.getAsJsonObject()));
 		out.add("threads", threads); out.add("projects", pages("t3_project_list", "projects", new JsonObject())); return out;
 	}
@@ -118,9 +160,9 @@ final class T3McpBackend implements T3Backend {
 		JsonObject page = call("t3_thread_read", args), out = normalize(page.getAsJsonObject("thread"));
 		JsonArray items = new JsonArray(), messages = new JsonArray(), activities = new JsonArray();
 		int previous = -1;
-		while (true) {
+		for (int pageCount = 0; pageCount < 10; pageCount++) {
 			items.addAll(T3Protocol.array(page, "items"));
-			if (!page.has("hasMore") || !page.get("hasMore").getAsBoolean()) break;
+			if (!page.has("nextPosition") || page.get("nextPosition").isJsonNull() || pageCount == 9 || !page.has("hasMore") || !page.get("hasMore").getAsBoolean()) break;
 			int next = page.get("nextPosition").getAsInt(); if (next <= previous) throw new IOException("T3 MCP activity pagination did not advance.");
 			previous = next; args.addProperty("afterPosition", next); page = call("t3_thread_read", args);
 		}
@@ -165,15 +207,16 @@ final class T3McpBackend implements T3Backend {
 	public String startThread(JsonObject template, String text, JsonObject model) throws IOException, InterruptedException {
 		// Fetch detail because list rows intentionally omit worktree settings.
 		JsonObject read = obj("threadId", template.get("id").getAsString());
+		read.addProperty("limit", 1); read.addProperty("maxCharsPerItem", 1);
 		JsonObject detail = call("t3_thread_read", read).getAsJsonObject("thread");
-		JsonObject args = obj("message", text); args.add("projectId", template.get("projectId")); args.addProperty("title", text.strip().substring(0, Math.min(60, text.strip().length())));
+		JsonObject args = obj("message", text); args.add("projectId", template.get("projectId")); String title = text.strip().substring(0, Math.min(60, text.strip().length())).strip(); args.addProperty("title", title.isEmpty() ? "New thread" : title);
 		args.add("modelSelection", model == null ? template.get("modelSelection") : model);
 		args.add("runtimeMode", template.get("runtimeMode")); args.add("interactionMode", template.get("interactionMode"));
 		String path = T3Protocol.string(detail, "worktreePath"); JsonObject workspace = obj("type", path == null ? "root" : "existing_worktree");
 		if (path != null) workspace.addProperty("worktreePath", path); args.add("workspaceStrategy", workspace);
 		args.addProperty("clientRequestId", UUID.randomUUID().toString()); return call("t3_thread_launch", args).get("threadId").getAsString();
 	}
-	public void interrupt(String id) throws IOException, InterruptedException { call("t3_thread_interrupt", obj("threadId", id)); }
+	public void interrupt(String id) throws IOException, InterruptedException { JsonObject args = obj("threadId", id); args.addProperty("clientRequestId", UUID.randomUUID().toString()); call("t3_thread_interrupt", args); }
 	public void answerQuestions(String id, String request, JsonObject answers) throws IOException, InterruptedException {
 		JsonObject args = obj("threadId", id); args.addProperty("action", "respond"); args.addProperty("requestId", request); args.add("answers", answers); call("t3_pending_request", args);
 	}

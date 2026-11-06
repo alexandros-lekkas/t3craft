@@ -258,7 +258,7 @@ public final class T3CraftClient implements ClientModInitializer {
 				return;
 			} catch (T3Api.UnsupportedVersionException e) { error = e.getMessage(); }
 			catch (java.io.IOException e) {
-				error = e.getClass() == java.io.IOException.class ? e.getMessage() : "Could not reach this machine. Check T3 Code, the address and network, then try again.";
+				error = (e.getClass() == java.io.IOException.class || e instanceof T3McpException) ? e.getMessage() : "Could not reach this machine. Check T3 Code, the address and network, then try again.";
 			} catch (Exception e) { error = "Pairing could not finish. Check T3 Code and try a fresh link."; }
 			String message = error;
 			Minecraft.getInstance().execute(() -> { pairingInProgress = false; result.accept(message); });

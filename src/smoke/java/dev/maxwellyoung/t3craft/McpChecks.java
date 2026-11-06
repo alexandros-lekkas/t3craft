@@ -34,7 +34,11 @@ public final class McpChecks {
 		T3Backend api = T3Backend.forEnvironment(env);
 		check(api.publicMcp() && !api.hasLegacy(), "MCP-only backend");
 		JsonObject shell = api.shell(); check(shell.getAsJsonArray("threads").size() == 2, "all thread pages loaded");
-		JsonObject row = shell.getAsJsonArray("threads").get(0).getAsJsonObject();
+		get(base + "/_qa/mcp-restart");
+        check(api.shell().getAsJsonArray("threads").size() == 2, "re-initializes after T3 restart");
+        var initCalls = JsonParser.parseString(HTTP.send(HttpRequest.newBuilder(URI.create(base + "/_qa/mcp-calls")).GET().build(), HttpResponse.BodyHandlers.ofString()).body()).getAsJsonArray();
+        check(initCalls.asList().stream().filter(c -> "initialize".equals(c.getAsJsonObject().get("name").getAsString())).count() == 2, "one recovery initialize");
+        JsonObject row = shell.getAsJsonArray("threads").get(0).getAsJsonObject();
 		var focus = T3State.focus(api.thread("mcp-question", 4));
 		check(focus.messages().getFirst().text().equals("MCP reply"), "SSE text result decoded");
 		check(focus.userInputs().size() == 1 && focus.activity().size() == 1, "questions and paginated activity loaded");
@@ -70,7 +74,7 @@ public final class McpChecks {
 		T3Config.Environment expired = new T3Config.Environment("Expired", base, null); expired.mcpUrl = base + "/mcp"; expired.mcpToken = "private-marker"; expired.mcpExpiresAt = 1;
 		expectAuth(T3Backend.forEnvironment(expired)); expired.mcpExpiresAt = 0; expectAuth(T3Backend.forEnvironment(expired));
 		expired.mcpToken = "mcp-readonly"; T3Backend readonly = T3Backend.forEnvironment(expired); readonly.shell();
-		try { readonly.sendPrompt(row, "Fixture prompt", null); throw new AssertionError("read-only write accepted"); } catch (IOException e) { check(e.getMessage().contains("read-only"), "read-only access explained"); }
+		try { readonly.sendPrompt(row, "Fixture prompt", null); throw new AssertionError("read-only write accepted"); } catch (IOException e) { check(e.getMessage().contains("Read only"), "read-only access explained"); }
 		var calls = JsonParser.parseString(HTTP.send(HttpRequest.newBuilder(URI.create(base + "/_qa/mcp-calls")).GET().build(), HttpResponse.BodyHandlers.ofString()).body()).getAsJsonArray();
 		check(calls.asList().stream().anyMatch(c -> c.getAsJsonObject().get("name").getAsString().equals("t3_thread_configure")), "model switched through MCP");
 		get(base + "/_qa/reset"); System.out.println("MCP checks passed: OAuth/state/PKCE, private persistence, JSON/SSE, pagination, models, send/launch/stop/questions, polling and legacy/auth fallbacks.");
