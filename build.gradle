@@ -70,6 +70,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 java {
+	toolchain.languageVersion = JavaLanguageVersion.of(25)
 	sourceCompatibility = JavaVersion.VERSION_25
 	targetCompatibility = JavaVersion.VERSION_25
 }
@@ -121,4 +122,18 @@ tasks.register('connectionCheck', JavaExec) {
 	classpath = sourceSets.smoke.runtimeClasspath
 	mainClass = 'dev.maxwellyoung.t3craft.ConnectionChecks'
 	args = [project.findProperty('fixturePort') ?: '25680']
+}
+
+// Fixture-backed checks share one entry point in PR and tag builds.
+tasks.register('verifyAll') {
+	dependsOn 'build', 'officeCheck', 'connectionCheck', 'featureCheck', 'reliabilityCheck'
+}
+
+dependencyLocking { lockAllConfigurations() }
+
+// Exercise smoke checks on the invoking JDK while compiling the mod with Java 25.
+tasks.withType(JavaExec).configureEach {
+	javaLauncher = javaToolchains.launcherFor {
+		languageVersion = JavaLanguageVersion.of(JavaVersion.current().majorVersion)
+	}
 }
