@@ -106,6 +106,7 @@ public final class T3CraftServer implements DedicatedServerModInitializer {
 				.then(Commands.literal("pair").then(Commands.argument("link", StringArgumentType.greedyString()).executes(ctx -> {
 					String link = StringArgumentType.getString(ctx, "link");
 					var source = ctx.getSource();
+                    if (T3McpAuth.isMcp(link)) { source.sendFailure(Component.literal("The shared server needs a legacy pairing link from T3 Settings → Environments. MCP URLs authorize in a browser, so pair them from your client.")); return 0; }
 					Thread thread = new Thread(() -> {
 						try {
 							T3Api.Pairing pairing = T3Api.pair(link, "Minecraft server");

@@ -93,7 +93,7 @@ public final class T3Api implements T3Backend {
 		HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
 		if (response.statusCode() / 100 != 2) {
 			throw new IOException(response.statusCode() == 400 || response.statusCode() == 401 || response.statusCode() == 403
-				? "Link expired, used or revoked. In T3 Settings > Connections, create a fresh link."
+				? "Link expired, used or revoked. In T3 Settings → Environments, create a fresh link."
 				: "Pairing failed (" + response.statusCode() + "). Check this machine and try a fresh link.");
 		}
 		try {
@@ -113,7 +113,7 @@ public final class T3Api implements T3Backend {
 			URI uri = URI.create(link.trim());
 			String token = param(uri.getRawFragment(), "token");
 			if (token == null) token = param(uri.getRawQuery(), "token");
-			if (token == null) throw new IOException("Copy the full pairing link, including #token=, from T3 Settings > Connections.");
+			if (token == null) throw new IOException("Copy the full pairing link, including #token=, from T3 Settings → Environments.");
 			String host = param(uri.getRawQuery(), "host");
 			String base = host != null ? (host.contains("://") ? host : "https://" + host)
 				: uri.getScheme() + "://" + uri.getRawAuthority();
@@ -123,7 +123,7 @@ public final class T3Api implements T3Backend {
 				|| address.getUserInfo() != null || address.getRawQuery() != null || address.getRawFragment() != null
 				|| !address.getPath().isEmpty() || address.getPort() > 65535 || address.getPort() == 0) throw new IllegalArgumentException();
 			return new PairingTarget(base, token);
-		} catch (RuntimeException e) { throw new IOException("That pairing link is invalid. Copy the complete link from T3 Settings > Connections."); }
+		} catch (RuntimeException e) { throw new IOException("That pairing link is invalid. Copy the complete link from T3 Settings → Environments."); }
 	}
 
 	static String pairingAddress(String link) throws IOException { return pairingTarget(link).baseUrl(); }
@@ -404,7 +404,7 @@ public final class T3Api implements T3Backend {
 		HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
 		if (response.statusCode() == 401 || response.statusCode() == 403) {
 			throw new AuthException("Pairing expired, was revoked, or lacks access (" + response.statusCode()
-				+ "). Create a new pairing link in T3 Settings > Connections, then use /t3 pair <link>.");
+				+ "). Create a new pairing link in T3 Settings → Environments, then use /t3 pair <link>.");
 		}
 		if (response.statusCode() / 100 != 2) {
 			throw new IOException("T3 " + request.method() + " " + request.uri().getPath() + " → " + response.statusCode() + ": " + errorText(response.body()));
