@@ -87,7 +87,7 @@ final class T3ConnectionsScreen extends Screen {
 	@Override public void tick() {
 		for (var health : mod.state().machines()) {
 			Button button = retryButtons.get(health.owner());
-			if (button != null) button.setTooltip(Tooltip.create(Component.literal(health.error() == null ? "Retry this machine without interrupting the others." : health.error())));
+			if (button != null) button.setTooltip(Tooltip.create(Component.literal(health.error() != null ? health.error() : health.legs().mcpError() != null ? health.legs().mcpError() : health.legs().legacyError() != null ? health.legs().legacyError() : "Retry this machine without interrupting the others.")));
 		}
 		if (form && pair != null) { pair.active = !busy && !link.getValue().isBlank(); paste.active = !busy; link.setEditable(!busy); name.setEditable(!busy); pair.setTooltip(message.isEmpty() ? null : Tooltip.create(Component.literal(message))); }
 	}
@@ -140,17 +140,30 @@ final class T3ConnectionsScreen extends Screen {
 			for (int i = page * count; i < Math.min(shown.size(), (page + 1) * count); i++) {
 				var env = shown.get(i); String owner = T3Config.ownerKey(env.baseUrl); int y = 58 + (i - page * count) * 52;
 				var health = mod.state().machines().stream().filter(m -> m.owner().equals(owner)).findFirst().orElse(null);
-				String status = health == null ? "Connecting…" : health.error() != null ? recovery(health.error()) : health.online()
-					? (env.mcpUrl != null ? (health.live() ? "MCP + legacy live" : "MCP · polling") : (health.live() ? "Live" : "Connected · polling") + " · protocol " + health.protocol()) + " · " + health.threads() + " threads" : "Connecting…";
+				String status = status(health, env);
 				g.text(font, T3Hud.ellipsize(font, mod.machineLabel(owner), w - 182), x, y + 2, 0xFFE5E7EB, false);
 				g.text(font, T3Hud.ellipsize(font, owner, w), x, y + 22, 0xFF9CA3AF, false);
-				g.text(font, T3Hud.ellipsize(font, status, w), x, y + 35, health != null && health.online() ? 0xFF86EFAC : 0xFFFFCC72, false);
+				g.text(font, T3Hud.ellipsize(font, status, w), x, y + 35, health != null && health.online() && health.legs().mcpError() == null && health.legs().legacyError() == null ? 0xFF86EFAC : 0xFFFFCC72, false);
 			}
 			wrapped(g, message, x + 138, height - 58, w - 138, 0xFFFFCC72);
 		}
 		super.extractRenderState(g, mouseX, mouseY, delta);
 	}
+ static String status(T3State.MachineHealth h, T3Config.Environment env) {
+  if (h == null) return "Connecting…";
+  var l = h.legs();
+  if (h.error() != null) return recovery(h.error());
+  if (!h.online()) return "Connecting…";
+  String threads = " · " + h.threads() + " threads";
+  if (!l.mcp()) return (h.live() ? "Live" : "Connected · polling") + " · protocol " + h.protocol() + threads;
+  String base = l.mcpError() != null ? "Legacy only · MCP: " + recovery(l.mcpError()) : !l.legacy() ? "MCP · polling"
+   : l.legacyError() != null ? "MCP · legacy unavailable: " + recovery(l.legacyError()) : h.live() ? "MCP + legacy live" : "MCP + legacy · polling";
+  return base + threads + expiry(l.mcpExpiresAt());
+ }
+ private static String expiry(long at) { if (at <= 0) return ""; long d = (at - System.currentTimeMillis()) / 86_400_000L; return d < 0 ? "" : d <= 3 ? " · MCP expires in " + Math.max(d, 0) + "d, Re-pair" : " · MCP " + d + "d left"; }
 	private static String recovery(String error) {
+  if (error.contains("Re-pair this machine with its MCP URL")) return "MCP access expired or revoked · Re-pair with the MCP URL";
+  if (error.contains("Full access")) return "MCP access too limited · Re-pair and choose Full access";
 		if (error.contains("Settings > Connections")) return "Access expired/revoked · Re-pair with a fresh T3 link";
 		if (error.contains("Update T3 Craft")) return "Unsupported protocol · Update T3 Craft";
 		if (error.contains("Update T3 Code")) return "Unsupported protocol · Update T3 Code";

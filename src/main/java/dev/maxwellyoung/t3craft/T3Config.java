@@ -18,6 +18,7 @@ public final class T3Config {
 		public String accessToken;
 		public String mcpUrl;
 		public String mcpToken;
+		public String mcpScope;
 		public long mcpExpiresAt;
 
 		public Environment(String label, String baseUrl, String accessToken) {
@@ -60,7 +61,7 @@ public final class T3Config {
 	public void upsert(Environment environment) {
 		for (int i = 0; i < environments.size(); i++) {
 			if (ownerKey(environments.get(i).baseUrl).equals(ownerKey(environment.baseUrl))) { Environment old = environments.get(i);
-				if (environment.mcpUrl == null) { environment.mcpUrl = old.mcpUrl; environment.mcpToken = old.mcpToken; environment.mcpExpiresAt = old.mcpExpiresAt; }
+				if (environment.mcpUrl == null) { environment.mcpUrl = old.mcpUrl; environment.mcpToken = old.mcpToken; environment.mcpExpiresAt = old.mcpExpiresAt; environment.mcpScope = old.mcpScope; }
 				if (environment.accessToken == null) environment.accessToken = old.accessToken;
 				environments.set(i, environment); return; }
 		}

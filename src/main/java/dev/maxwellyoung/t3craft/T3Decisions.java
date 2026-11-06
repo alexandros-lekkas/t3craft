@@ -28,7 +28,7 @@ final class T3Decisions {
 						.reduce((a, b) -> a + "\n\n" + b).orElse("Question"), at(raw, input.requestId())));
 			}
 			if (before == entries.size()) entries.add(new Entry(row, null, "Waiting",
-				(row.raw().has("mcpOnlyRequests") ? T3McpBackend.LEGACY_REQUIRED : "Waiting for current request details…"), null));
+				(raw != null && raw.has("unsupportedRequest") ? raw.get("unsupportedRequest").getAsString() : "Waiting for current request details…"), null));
 		}
 		entries.sort(Comparator.comparing(Entry::requestedAt, Comparator.nullsLast(Comparator.naturalOrder()))
 			.thenComparing(e -> e.thread().id()).thenComparing(Entry::key));

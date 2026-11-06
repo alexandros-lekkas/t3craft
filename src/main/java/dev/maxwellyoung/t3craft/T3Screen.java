@@ -155,10 +155,11 @@ final class T3Screen extends Screen {
 		boolean hasApproval = currentApproval() != null;
 		boolean online = mod.state().online(snapshot.focusedId());
 		approve.active = deny.active = online;
-		review.active = snapshot.focusedRow() != null && online;
-		T3Backend backend = mod.state().apiFor(snapshot.focusedId());
-		review.setTooltip(backend != null && backend.publicMcp()
-			? net.minecraft.client.gui.components.Tooltip.create(Component.literal(T3McpBackend.LEGACY_REQUIRED)) : null);
+        T3Backend.Legs legs = mod.state().legs(snapshot.focusedId());
+        boolean legacyOk = legs == null || legs.legacy() && legs.legacyError() == null;
+        review.active = snapshot.focusedRow() != null && online && (legs == null || legs.legacy());
+        review.setTooltip(legs == null || legacyOk ? null : net.minecraft.client.gui.components.Tooltip.create(Component.literal(
+            !legs.legacy() ? T3McpBackend.LEGACY_REQUIRED : "Legacy connection unavailable: " + legs.legacyError())));
 		activity.active = !newThread && snapshot.focusedRow() != null;
 		stop.active = online;
 		approve.visible = deny.visible = hasApproval;
@@ -661,10 +662,8 @@ final class T3Screen extends Screen {
 			graphics.text(font, T3Hud.ellipsize(font, detail, x1 - x0 - 24), x0 + 12, y + 18, 0xFFE5E7EB, false);
 		}
 
-		boolean mcpWaiting = mod.state().snapshot().focusedRow() != null
-			&& mod.state().snapshot().focusedRow().status() == T3State.Status.NEEDS_YOU
-			&& mod.state().snapshot().focusedRow().raw().has("mcpOnlyRequests") && question == null && !hasApproval;
-		String footer = mcpWaiting ? "Approval needs legacy connection; T3 MCP does not support it yet." : "Enter send · Shift+Enter stay · " + (hasApproval ? "Y/N answer · " : "") + "Esc play";
+        String gap = focus == null ? null : focus.unsupported();
+        String footer = gap != null && question == null && !hasApproval ? gap : "Enter send · Shift+Enter stay · " + (hasApproval ? "Y/N answer · " : "") + "Esc play";
 		graphics.text(font, T3Hud.ellipsize(font, footer, x1 - x0 - 4), x0 + 2, height - MARGIN - 10, 0xFF6B7280, false);
 	}
 

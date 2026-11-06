@@ -47,7 +47,7 @@ public final class T3State {
 	public record UserInput(String requestId, List<Question> questions) {}
 
 	public record Focus(String threadId, List<Message> messages, List<Approval> approvals,
-		List<UserInput> userInputs, String lastError, List<T3Activity.Entry> activity) {
+		List<UserInput> userInputs, String lastError, List<T3Activity.Entry> activity, String unsupported) {
 		public boolean needsInput() {
 			return !userInputs.isEmpty();
 		}
@@ -84,8 +84,9 @@ public final class T3State {
 	private volatile Map<String, Boolean> onlineThreads = Map.of();
 	private volatile Map<String, String> connectionErrors = Map.of();
 	private volatile List<String> offlineMachines = List.of();
-	public record MachineHealth(String owner, String label, boolean online, boolean live, int protocol, int threads, String error) {}
+	public record MachineHealth(String owner, String label, boolean online, boolean live, int protocol, int threads, String error, T3Backend.Legs legs) {}
 	private volatile List<MachineHealth> machines = List.of();
+	T3Backend.Legs legs(String threadId) { Env env = envFor(threadId); return env == null ? null : env.api.legs(); }
 	List<MachineHealth> machines() { return machines; }
 
 	List<T3Decisions.Entry> decisions() { return decisions; }
@@ -247,7 +248,7 @@ public final class T3State {
 		executor.execute(() -> {
 			for (Env env : envs) if (env.api.ownerKey().equals(owner)) {
 				closeSocket(env); env.api.forgetProtocol(); env.nextSocketAttempt = 0; env.socketFailures = 0;
-				env.error = "Reconnecting…";
+				if (!env.api.publicMcp()) env.error = "Reconnecting…";
 			}
 			publish(List.of()); refreshSoon = true; maintainSafely();
 		});
@@ -286,7 +287,7 @@ public final class T3State {
 				: !detail.userInputs().isEmpty() ? detail.userInputs().getFirst().questions().getFirst().question() : "";
 			waitingDetails.put(threadId, text == null ? "" : text);
 		} catch (Exception e) {
-			env.error = "Could not refresh pending requests: " + e.getMessage();
+			waitingDetails.put(threadId, "Could not load the request: " + e.getMessage());
 			T3Log.LOGGER.debug("Could not load what {} is waiting on", threadId, e);
 		}
 	}
@@ -430,7 +431,7 @@ public final class T3State {
 		env.threadRequestFor = null;
 		env.nextSocketAttempt = System.currentTimeMillis() + 2_000;
 		env.api.forgetProtocol();
-		env.error = "Reconnecting…";
+		if (!env.api.publicMcp()) env.error = "Reconnecting…";
 		publish(List.of());
 	}
 
@@ -443,7 +444,7 @@ public final class T3State {
 	}
 
 	private void onShellItem(Env env, JsonObject item) {
-		if (env.api.publicMcp()) {
+		if (env.api.publicMcp() && env.api.legs().mcpError() == null) {
 			if ("synchronized".equals(string(item, "kind"))) { env.shellLive = true; syncThreadSubscription(env); }
 			refreshSoon = true;
 			return;
@@ -632,7 +633,7 @@ public final class T3State {
 		onlineThreads = Map.copyOf(health);
 		connectionErrors = Map.copyOf(errors);
 		machines = current.stream().map(env -> new MachineHealth(env.api.ownerKey(), env.label,
-			env.error == null && (env.shellLive || env.shellLoaded), env.shellLive, env.api.negotiatedProtocol(), env.threads.size(), env.error)).toList();
+			env.error == null && (env.shellLive || env.shellLoaded), env.shellLive, env.api.negotiatedProtocol(), env.threads.size(), env.error, env.api.legs())).toList();
 		offlineMachines = current.stream().filter(env -> env.error != null || !env.shellLoaded && !env.shellLive)
 			.map(env -> env.label).toList();
 		decisions = T3Decisions.collect(rows, waitingThreads);
@@ -713,7 +714,7 @@ public final class T3State {
 		}
 		JsonObject session = object(thread, "session");
 		return new Focus(thread.get("id").getAsString(), Collections.unmodifiableList(messages),
-			List.copyOf(approvals.values()), List.copyOf(openInputs.values()), session == null ? null : string(session, "lastError"), T3Activity.entries(thread));
+			List.copyOf(approvals.values()), List.copyOf(openInputs.values()), session == null ? null : string(session, "lastError"), T3Activity.entries(thread), string(thread, "unsupportedRequest"));
 	}
 
 	private static List<Question> questions(JsonObject payload) {

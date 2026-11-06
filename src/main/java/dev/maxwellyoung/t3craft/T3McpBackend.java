@@ -15,6 +15,8 @@ final class T3McpBackend implements T3Backend {
 	private static final HttpClient HTTP = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(5)).build();
 	private final String url, token, owner;
 	private final long expiresAt;
+ private final String access;
+ private volatile String mcpError, legacyError;
 	private final T3Api legacy;
 	private boolean initialized;
 	private String session, authBlocked;
@@ -35,9 +37,39 @@ final class T3McpBackend implements T3Backend {
  }; }
 	private long sequence;
 	T3McpBackend(T3Config.Environment env) {
-		url = env.mcpUrl; token = env.mcpToken; owner = T3Config.ownerKey(env.baseUrl); expiresAt = env.mcpExpiresAt;
+		url = env.mcpUrl; token = env.mcpToken; owner = T3Config.ownerKey(env.baseUrl); expiresAt = env.mcpExpiresAt; access = env.mcpScope;
 		legacy = env.accessToken == null || env.accessToken.isBlank() ? null : new T3Api(owner, env.accessToken);
 	}
+ public Legs legs() { return new Legs(true, mcpError, legacy != null, legacyError, expiresAt, access); }
+ @FunctionalInterface private interface IoSupplier<T> { T get() throws IOException, InterruptedException; }
+ private <T> T mcp(IoSupplier<T> op) throws IOException, InterruptedException {
+  try { T value = op.get(); mcpError = null; return value; }
+  catch (T3McpException e) { mcpError = e.getMessage(); throw e; }
+ }
+ private <T> T viaLegacy(IoSupplier<T> op) throws IOException, InterruptedException {
+  try { T value = op.get(); legacyError = null; return value; }
+  catch (IOException | RuntimeException e) { legacyError = e.getMessage() == null ? "Legacy connection failed." : e.getMessage(); throw e; }
+ }
+ private <T> T read(IoSupplier<T> primary, IoSupplier<T> fallback) throws IOException, InterruptedException {
+  try { return mcp(primary); } catch (T3McpException e) {
+   if (fallback == null) throw e;
+   try { return viaLegacy(fallback); } catch (IOException e2) { throw new IOException("MCP: " + mcpError + " · Legacy: " + legacyError); }
+  }
+ }
+ private <T> T write(IoSupplier<T> primary, IoSupplier<T> fallback) throws IOException, InterruptedException {
+  try { return mcp(primary); } catch (T3McpException e) {
+   if (fallback == null || !e.notExecuted || e.kind == TOOL) throw e;
+   return viaLegacy(fallback);
+  }
+ }
+ private static JsonObject servedByLegacy(JsonObject value) { value.addProperty("servedBy", "legacy"); return value; }
+ public JsonObject shell() throws IOException, InterruptedException { return read(this::mcpShell, legacy == null ? null : () -> servedByLegacy(legacy.shell())); }
+ public JsonObject thread(String id, int turns) throws IOException, InterruptedException { return read(() -> mcpThread(id, turns), legacy == null ? null : () -> servedByLegacy(legacy.thread(id, turns))); }
+ public List<T3Api.Provider> providers(T3Socket socket) throws IOException, InterruptedException { return read(this::mcpProviders, legacy == null || socket == null ? null : () -> legacy.providers(socket)); }
+ public void sendPrompt(JsonObject thread, String text, JsonObject model) throws IOException, InterruptedException { write(() -> { mcpSendPrompt(thread, text, model); return null; }, legacy == null ? null : () -> { legacy.sendPrompt(thread, text, model); return null; }); }
+ public String startThread(JsonObject template, String text, JsonObject model) throws IOException, InterruptedException { return write(() -> mcpStartThread(template, text, model), legacy == null ? null : () -> legacy.startThread(template, text, model)); }
+ public void interrupt(String id) throws IOException, InterruptedException { write(() -> { mcpInterrupt(id); return null; }, legacy == null ? null : () -> { legacy.interrupt(id); return null; }); }
+ public void answerQuestions(String id, String request, JsonObject answers) throws IOException, InterruptedException { write(() -> { mcpAnswerQuestions(id, request, answers); return null; }, legacy == null ? null : () -> { legacy.answerQuestions(id, request, answers); return null; }); }
 	public String ownerKey() { return owner; }
 	public boolean publicMcp() { return true; }
 	public boolean hasLegacy() { return legacy != null; }
@@ -51,7 +83,7 @@ final class T3McpBackend implements T3Backend {
 	public JsonObject adaptShellThread(JsonObject value) { return legacy == null ? value : legacy.adaptShellThread(value); }
 	public T3Socket openSocket(Consumer<String> closed) throws IOException, InterruptedException {
 		if (legacy == null) throw new IOException(LEGACY_REQUIRED);
-		return legacy.openSocket(closed);
+		return viaLegacy(() -> legacy.openSocket(closed));
 	}
 	private JsonObject rpc(String method, JsonObject params, boolean notification) throws IOException, InterruptedException {
 		if (token == null || token.isBlank() || expiresAt > 0 && System.currentTimeMillis() >= expiresAt)
@@ -139,7 +171,7 @@ final class T3McpBackend implements T3Backend {
 			previous = next; args.addProperty("cursor", next);
 		}
 	}
-	public JsonObject shell() throws IOException, InterruptedException {
+	private JsonObject mcpShell() throws IOException, InterruptedException {
 		JsonObject out = new JsonObject(), args = new JsonObject(); args.addProperty("allProjects", true); args.addProperty("includeSubagents", false);
 		JsonArray threads = new JsonArray(); for (var value : pages("t3_thread_list", "threads", args)) threads.add(normalize(value.getAsJsonObject()));
 		out.add("threads", threads); out.add("projects", pages("t3_project_list", "projects", new JsonObject())); return out;
@@ -149,13 +181,12 @@ final class T3McpBackend implements T3Backend {
 		out.add("modelSelection", T3Api.modelSelection(T3Protocol.string(source, "providerInstanceId"), T3Protocol.string(source, "model")));
 		String status = T3Protocol.string(source, "status");
 		out.addProperty("hasPendingUserInput", "waiting".equals(status));
-		out.addProperty("mcpOnlyRequests", true);
 		if (T3Protocol.string(source, "latestRunId") != null) {
 			JsonObject turn = obj("turnId", T3Protocol.string(source, "latestRunId")); turn.addProperty("state", T3Protocol.legacyStatus(status)); out.add("latestTurn", turn);
 		}
 		return out;
 	}
-	public JsonObject thread(String id, int turns) throws IOException, InterruptedException {
+	private synchronized JsonObject mcpThread(String id, int turns) throws IOException, InterruptedException {
 		JsonObject args = obj("threadId", id); args.addProperty("view", "activity"); args.addProperty("runLimit", turns); args.addProperty("limit", 100); args.addProperty("maxCharsPerItem", 50000);
 		JsonObject page = call("t3_thread_read", args), out = normalize(page.getAsJsonObject("thread"));
 		JsonArray items = new JsonArray(), messages = new JsonArray(), activities = new JsonArray();
@@ -182,13 +213,16 @@ final class T3McpBackend implements T3Backend {
 		}
 		// Only permission requests come from the legacy projection; questions always use MCP.
 		if (legacy != null) try {
-			for (var value : T3Protocol.array(legacy.thread(id, turns), "activities")) {
+			JsonObject legacyDetail = viaLegacy(() -> legacy.thread(id, turns));
+            if (legacyDetail.has("checkpoints")) out.add("checkpoints", legacyDetail.get("checkpoints"));
+            for (var value : T3Protocol.array(legacyDetail, "activities")) {
 				String kind = T3Protocol.string(value.getAsJsonObject(), "kind"); if (kind != null && kind.startsWith("approval.")) activities.add(value);
 			}
-		} catch (IOException | RuntimeException ignored) { out.addProperty("legacyUnavailable", true); }
+		} catch (IOException | RuntimeException ignored) {}
+        if ("waiting".equals(T3Protocol.string(out, "status")) && activities.isEmpty()) out.addProperty("unsupportedRequest", legacy == null ? LEGACY_REQUIRED : "Waiting on a permission request. The legacy connection is unavailable: " + legacyError);
 		out.add("messages", messages); out.add("activities", activities); out.add("turnItems", items); return out;
 	}
-	public List<T3Api.Provider> providers(T3Socket ignored) throws IOException, InterruptedException {
+	private List<T3Api.Provider> mcpProviders() throws IOException, InterruptedException {
 		List<T3Api.Provider> result = new ArrayList<>();
 		for (var value : T3Protocol.array(call("orchestrator_capabilities", new JsonObject()), "providers")) {
 			JsonObject p = value.getAsJsonObject();
@@ -199,12 +233,12 @@ final class T3McpBackend implements T3Backend {
 		}
 		return List.copyOf(result);
 	}
-	public void sendPrompt(JsonObject thread, String text, JsonObject model) throws IOException, InterruptedException {
+	private void mcpSendPrompt(JsonObject thread, String text, JsonObject model) throws IOException, InterruptedException {
 		String id = thread.get("id").getAsString();
 		if (model != null && !model.equals(thread.get("modelSelection"))) { JsonObject args = obj("threadId", id); args.add("modelSelection", model); call("t3_thread_configure", args); }
 		JsonObject args = obj("threadId", id); args.addProperty("message", text); args.addProperty("mode", "queue"); args.addProperty("clientRequestId", UUID.randomUUID().toString()); call("t3_thread_send", args);
 	}
-	public String startThread(JsonObject template, String text, JsonObject model) throws IOException, InterruptedException {
+	private String mcpStartThread(JsonObject template, String text, JsonObject model) throws IOException, InterruptedException {
 		// Fetch detail because list rows intentionally omit worktree settings.
 		JsonObject read = obj("threadId", template.get("id").getAsString());
 		read.addProperty("limit", 1); read.addProperty("maxCharsPerItem", 1);
@@ -216,17 +250,17 @@ final class T3McpBackend implements T3Backend {
 		if (path != null) workspace.addProperty("worktreePath", path); args.add("workspaceStrategy", workspace);
 		args.addProperty("clientRequestId", UUID.randomUUID().toString()); return call("t3_thread_launch", args).get("threadId").getAsString();
 	}
-	public void interrupt(String id) throws IOException, InterruptedException { JsonObject args = obj("threadId", id); args.addProperty("clientRequestId", UUID.randomUUID().toString()); call("t3_thread_interrupt", args); }
-	public void answerQuestions(String id, String request, JsonObject answers) throws IOException, InterruptedException {
+	private void mcpInterrupt(String id) throws IOException, InterruptedException { JsonObject args = obj("threadId", id); args.addProperty("clientRequestId", UUID.randomUUID().toString()); call("t3_thread_interrupt", args); }
+	private void mcpAnswerQuestions(String id, String request, JsonObject answers) throws IOException, InterruptedException {
 		JsonObject args = obj("threadId", id); args.addProperty("action", "respond"); args.addProperty("requestId", request); args.add("answers", answers); call("t3_pending_request", args);
 	}
 	public void respondToApproval(String id, String request, String decision) throws IOException, InterruptedException {
 		if (legacy == null) throw new IOException(LEGACY_REQUIRED);
-		try { legacy.respondToApproval(id, request, decision); } catch (IOException | RuntimeException e) { throw new IOException(LEGACY_REQUIRED); }
+		viaLegacy(() -> { legacy.respondToApproval(id, request, decision); return null; });
 	}
 	public T3Api.Review review(String id) throws IOException, InterruptedException {
 		if (legacy == null) throw new IOException(LEGACY_REQUIRED);
-		try { return legacy.review(id); } catch (IOException | RuntimeException e) { throw new IOException(LEGACY_REQUIRED + " Check that the legacy connection is healthy and a checkpoint exists."); }
+		return viaLegacy(() -> legacy.review(id));
 	}
 	static JsonObject obj(String key, String value) { JsonObject o = new JsonObject(); o.addProperty(key, value); return o; }
 }

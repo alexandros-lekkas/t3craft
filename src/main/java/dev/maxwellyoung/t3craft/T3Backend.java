@@ -7,7 +7,11 @@ import java.util.function.Consumer;
 
 /** Application operations; credentials and wire protocols stay inside each backend. */
 public interface T3Backend {
-	String ownerKey();
+	record Legs(boolean mcp, String mcpError, boolean legacy, String legacyError, long mcpExpiresAt, String mcpAccess) {
+  static final Legs LEGACY = new Legs(false, null, true, null, 0, null);
+ }
+ default Legs legs() { return Legs.LEGACY; }
+ String ownerKey();
 	boolean sameCredentials(T3Backend other);
 	JsonObject shell() throws IOException, InterruptedException;
 	JsonObject thread(String id, int turns) throws IOException, InterruptedException;

@@ -69,7 +69,7 @@ public final class McpChecks {
 		get(base + "/_qa/protocol3");
 		T3Backend hybrid = healthyHybrid;
 		await(() -> !state.live() && state.snapshot().connected() && state.snapshot().focus() != null, "incompatible legacy keeps MCP online without reconnecting");
-		check(!state.live(), "incompatible legacy uses polling"); expectLegacy(() -> hybrid.review("mcp-question"));
+		check(!state.live(), "incompatible legacy uses polling"); try { hybrid.review("mcp-question"); throw new AssertionError("broken legacy accepted"); } catch (IOException e) { check(e.getMessage().contains("Update T3"), "original legacy error retained"); }
 		state.connect(List.of(), null);
 		T3Config.Environment expired = new T3Config.Environment("Expired", base, null); expired.mcpUrl = base + "/mcp"; expired.mcpToken = "private-marker"; expired.mcpExpiresAt = 1;
 		expectAuth(T3Backend.forEnvironment(expired)); expired.mcpExpiresAt = 0; expectAuth(T3Backend.forEnvironment(expired));
