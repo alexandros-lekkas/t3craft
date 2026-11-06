@@ -99,11 +99,24 @@ final class T3Hud implements HudElement {
 	}
 
 	static String ellipsize(Font font, String text, int maxWidth) {
+		return ellipsize(text, maxWidth, font::width);
+	}
+
+	/**
+	 * Longest prefix that fits with "…" appended, found by binary search over code points so a
+	 * surrogate pair is never split and a long string costs O(log n) width calls, not O(n).
+	 */
+	static String ellipsize(String text, int maxWidth, java.util.function.ToIntFunction<String> width) {
 		if (text == null) return "";
-		if (font.width(text) <= maxWidth) return text;
+		if (width.applyAsInt(text) <= maxWidth) return text;
 		String ellipsis = "…";
-		int end = text.length();
-		while (end > 0 && font.width(text.substring(0, end)) + font.width(ellipsis) > maxWidth) end--;
-		return text.substring(0, end) + ellipsis;
+		int room = maxWidth - width.applyAsInt(ellipsis);
+		int low = 0, high = text.codePointCount(0, text.length());
+		while (low < high) {
+			int mid = (low + high + 1) >>> 1;
+			if (width.applyAsInt(text.substring(0, text.offsetByCodePoints(0, mid))) <= room) low = mid;
+			else high = mid - 1;
+		}
+		return text.substring(0, text.offsetByCodePoints(0, low)) + ellipsis;
 	}
 }
