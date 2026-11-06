@@ -197,21 +197,24 @@ final class T3Mcp {
 
 	/** Sends the command, then waits briefly for the server's reply so the agent can check its work. */
 	private synchronized String runCommand(String command) throws Exception {
-		feedback.clear();
-		collecting = true;
+		var dispatched = new java.util.concurrent.CompletableFuture<Long>();
 		try {
 			String sent = onGameThread(() -> {
 				Minecraft minecraft = Minecraft.getInstance();
 				if (minecraft.player == null) return "error: the player is not in a world.";
 				agentChat(Component.literal("/" + command).withStyle(ChatFormatting.GRAY));
-				ClientCommands.send(command);
+				ClientCommands.send(command, () -> {
+					feedback.clear();
+					collecting = true;
+					dispatched.complete(System.nanoTime());
+				}, () -> dispatched.completeExceptionally(new IllegalStateException("Command dropped because the world session changed.")));
 				return "sent";
 			});
 			if (!"sent".equals(sent)) return sent;
 			// Feedback usually lands within a tick or two; stop early once it has settled.
-			long deadline = System.currentTimeMillis() + 1500;
+			long deadline = dispatched.get() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(1500);
 			int seen = -1;
-			while (System.currentTimeMillis() < deadline) {
+			while (System.nanoTime() < deadline) {
 				Thread.sleep(150);
 				if (!feedback.isEmpty() && feedback.size() == seen) break;
 				seen = feedback.size();

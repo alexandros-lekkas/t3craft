@@ -11,6 +11,7 @@ final class OfficeQueue {
 	private final WorldBoundQueue<Work> queue = new WorldBoundQueue<>();
 	private long quietUntil;
 	private boolean denied, inFlight;
+	private int failedCommands, sentCommands;
 	private Object sessionLevel, sessionConnection;
 	private volatile int generation;
 
@@ -19,7 +20,7 @@ final class OfficeQueue {
 		clear(); denied = false;
 		send(origin, T3Office.blueprint(floors));
 	}
-	void clear() { queue.clear(); quietUntil = 0; inFlight = false; generation++; }
+	void clear() { queue.clear(); quietUntil = 0; inFlight = false; generation++; failedCommands = 0; sentCommands = 0; }
 	void send(BlockPos origin, List<String> commands) { send(origin, commands, () -> {}); }
 	boolean send(BlockPos origin, List<String> commands, Runnable completed) {
 		Minecraft mc = Minecraft.getInstance();
@@ -32,16 +33,20 @@ final class OfficeQueue {
 	boolean hideFeedback(Component component) {
 		String message = component.getString();
 		boolean quiet = building() || System.currentTimeMillis() < quietUntil;
-		if (quiet && (permissionFailure(component) || message.contains("permission") || message.startsWith("Unknown or incomplete command") || message.startsWith("Unknown command"))) {
+		if (quiet && permissionFailure(component)) {
 			clear(); denied = true;
 		}
 		return quiet && (message.startsWith("Successfully filled") || message.startsWith("Changed the block")
 			|| message.startsWith("Could not set the block") || message.startsWith("No blocks were filled"));
 	}
-	private static boolean permissionFailure(Component message) {
+	static boolean permissionFailure(Component message) {
 		if (message.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents text
 			&& (text.getKey().equals("command.unknown.command") || text.getKey().equals("commands.generic.permission"))) return true;
 		return message.getSiblings().stream().anyMatch(OfficeQueue::permissionFailure);
+	}
+
+	private static void report(Minecraft mc, String message) {
+		mc.gui.hud.getChat().addClientSystemMessage(Component.literal(message));
 	}
 
 	private void bind(Minecraft mc) {
@@ -63,7 +68,11 @@ final class OfficeQueue {
 		}
 		var server = mc.getSingleplayerServer();
 		if (server == null) {
-			if (ClientCommands.trySend(mc, work.command())) { queue.poll(); work.completed().run(); }
+			if (ClientCommands.trySend(mc, work.command())) {
+				queue.poll(); work.completed().run();
+				if (++sentCommands % 32 == 0 && !queue.isEmpty()) report(mc, "Office placement: " + sentCommands + " commands sent…");
+				if (queue.isEmpty()) sentCommands = 0;
+			}
 			return;
 		}
 		var clientLevel = mc.level;
@@ -74,13 +83,20 @@ final class OfficeQueue {
 		server.execute(() -> {
 			var level = server.getLevel(dimension);
 			boolean valid = token == generation && level != null && OfficeSite.loaded(level, BlockPos.ZERO, List.of(work.command()));
-			if (valid) server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withLevel(level).withSuppressedOutput(), work.command());
+			boolean[] succeeded = {false};
+			if (valid) server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withLevel(level)
+				.withSuppressedOutput().withCallback((success, result) -> succeeded[0] = success), work.command());
 			mc.execute(() -> {
 				if (token != generation) return;
 				if (mc.level != clientLevel || mc.getConnection() != connection) { clear(); return; }
 				inFlight = false;
 				if (!valid) { clear(); return; }
+				if (!succeeded[0]) failedCommands++;
 				queue.poll(); work.completed().run();
+				if (queue.isEmpty() && failedCommands > 0) {
+					report(mc, "Office placement finished with " + failedCommands + " failed commands; some blocks may be unchanged or missing.");
+					failedCommands = 0;
+				}
 			});
 		});
 	}

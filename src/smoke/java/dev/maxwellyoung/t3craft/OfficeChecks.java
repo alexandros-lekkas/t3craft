@@ -12,6 +12,10 @@ import java.util.Map;
 public final class OfficeChecks {
 	public static void main(String[] args) throws Exception {
 		checkPlacement();
+		checkCommandDispatch();
+		check(!OfficeQueue.permissionFailure(net.minecraft.network.chat.Component.literal("Unknown command: permission")), "literal chat is not a permission denial");
+		for (String key : List.of("command.unknown.command", "commands.generic.permission"))
+			check(OfficeQueue.permissionFailure(net.minecraft.network.chat.Component.empty().append(net.minecraft.network.chat.Component.translatable(key))), "nested translatable denial is recognized");
 		CommandBudget budget = new CommandBudget();
 		int spam = 0, sends = 0;
 		for (int tick = 0; tick < 24000; tick++) {
@@ -151,6 +155,37 @@ public final class OfficeChecks {
 		blocks.put(sign, net.minecraft.world.level.block.Blocks.BIRCH_WALL_SIGN.defaultBlockState());
 		var signEntity = new net.minecraft.world.level.block.entity.SignBlockEntity(sign, blocks.get(sign));
 		check(!OfficeSite.occupied(bounds, origin, blueprint, read, pos -> pos.equals(sign) ? signEntity : null), "daytime lamps and office whiteboards are rebuildable");
+		// Use the blueprint coordinate so this protects the office's own container exemption.
+		String shulkerCommand = blueprint.stream().filter(command -> command.contains("white_shulker_box")).findFirst().orElseThrow();
+		String[] coordinates = shulkerCommand.split(" ");
+		var shulkerPos = origin.offset(Integer.parseInt(coordinates[1]), Integer.parseInt(coordinates[2]), Integer.parseInt(coordinates[3]));
+		var shulkerState = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace("white_shulker_box")).defaultBlockState();
+		var shulker = new net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity(shulkerPos, shulkerState);
+		blocks.put(shulkerPos, shulkerState);
+		check(!OfficeSite.occupied(bounds, origin, blueprint, read, pos -> pos.equals(shulkerPos) ? shulker : null), "empty office shulker permits rebuild");
+		shulker.setItem(0, new net.minecraft.world.item.ItemStack(net.minecraft.core.Holder.direct(net.minecraft.world.item.Items.DIAMOND, net.minecraft.core.component.DataComponentMap.EMPTY)));
+		check(OfficeSite.occupied(bounds, origin, blueprint, read, pos -> pos.equals(shulkerPos) ? shulker : null), "non-empty office shulker requires confirmation");
+		shulker.clearContent();
+		check(OfficeSite.occupied(bounds, null, List.of(), read, pos -> pos.equals(shulkerPos) ? shulker : null), "unowned empty shulker remains protected");
+	}
+
+	private static void checkCommandDispatch() {
+		Object level = new Object(), connection = new Object();
+		var dispatched = new java.util.concurrent.CompletableFuture<Long>();
+		ClientCommands.enqueue(level, connection, "test", () -> dispatched.complete(2_000L), () -> dispatched.completeExceptionally(new IllegalStateException("dropped")));
+		ClientCommands.dispatch(level, connection, command -> false);
+		check(!dispatched.isDone(), "budget-delayed MCP command does not start its feedback window");
+		ClientCommands.dispatch(level, connection, command -> true);
+		check(dispatched.join() == 2_000L, "MCP feedback window begins at actual dispatch");
+		for (boolean enqueue : List.of(false, true)) {
+			var dropped = new java.util.concurrent.CompletableFuture<Void>();
+			ClientCommands.enqueue(level, connection, "old", () -> { throw new AssertionError("stale command sent"); },
+				() -> dropped.completeExceptionally(new IllegalStateException("session changed")));
+			if (enqueue) ClientCommands.enqueue(new Object(), connection, "new", () -> {}, () -> {});
+			else ClientCommands.dispatch(null, null, command -> { throw new AssertionError("disconnected command sent"); });
+			check(dropped.isCompletedExceptionally(), "session change reports queued MCP command failure");
+		}
+		ClientCommands.dispatch(null, null, command -> false);
 	}
 
 	private static T3State.ThreadRow row(String owner, int index, T3State.Status status) {
