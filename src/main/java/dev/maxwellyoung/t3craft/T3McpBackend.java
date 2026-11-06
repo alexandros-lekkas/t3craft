@@ -86,6 +86,7 @@ final class T3McpBackend implements T3Backend {
 			&& (legacy == null ? m.legacy == null : legacy.sameCredentials(m.legacy));
 	}
 	public synchronized void forgetProtocol() { authBlocked = null; initialized = false; session = null; if (legacy != null) legacy.forgetProtocol(); }
+	public void forgetLegacyProtocol() { if (legacy != null) legacy.forgetProtocol(); }
 	public int negotiatedProtocol() { return legacy == null ? 0 : legacy.negotiatedProtocol(); }
 	public JsonObject adaptShell(JsonObject value) { return legacy == null ? value : legacy.adaptShell(value); }
 	public JsonObject adaptShellThread(JsonObject value) { return legacy == null ? value : legacy.adaptShellThread(value); }

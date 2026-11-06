@@ -435,7 +435,7 @@ public final class T3State {
 		env.threadRequest = null;
 		env.threadRequestFor = null;
 		env.nextSocketAttempt = System.currentTimeMillis() + 2_000;
-		env.api.forgetProtocol();
+		env.api.forgetLegacyProtocol();
 		if (!env.api.publicMcp()) env.error = "Reconnecting…";
 		publish(List.of());
 	}

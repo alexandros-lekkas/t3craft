@@ -26,6 +26,7 @@ public interface T3Backend {
 	default boolean publicMcp() { return false; }
 	default boolean hasLegacy() { return true; }
 	default void forgetProtocol() {}
+	default void forgetLegacyProtocol() { forgetProtocol(); }
 	default int negotiatedProtocol() { return 0; }
 	default JsonObject adaptShell(JsonObject source) { return source; }
 	default JsonObject adaptShellThread(JsonObject source) { return source; }

@@ -151,6 +151,8 @@ public final class McpChecks {
    check(state.snapshot().connected() && state.online("mcp-approval"), "revoked MCP keeps legacy online");
    int posts = get(base + "/_qa/mcp-posts").get("count").getAsInt(); Thread.sleep(5000);
    check(get(base + "/_qa/mcp-posts").get("count").getAsInt() == posts, "revoked token not hammered");
+   get(base + "/_qa/protocol3"); await(() -> !state.live(), "legacy disconnect while MCP revoked"); Thread.sleep(1000);
+   check(get(base + "/_qa/mcp-posts").get("count").getAsInt() == posts, "legacy disconnect does not reset revoked MCP access");
    state.retry(api.ownerKey()); Thread.sleep(1000);
    check(get(base + "/_qa/mcp-posts").get("count").getAsInt() == posts + 1, "retry sends one auth probe");
   } finally { close(state); }
