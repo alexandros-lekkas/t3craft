@@ -867,7 +867,13 @@ final class T3Screen extends Screen {
 	}
 
 	private int chipX() {
-		return chipRight() - font.width(modelLabel(effectiveModel()) + " ▾") - 10;
+		return chipRight() - font.width(chipLabel()) - 10;
+	}
+
+	/** A long model name is cut so the chip keeps to half the header and never reaches the sidebar. */
+	private String chipLabel() {
+		int max = Math.max(40, (chipRight() - (MARGIN + SIDEBAR + 8)) / 2);
+		return T3Hud.ellipsize(font, modelLabel(effectiveModel()), max - 10 - font.width(" ▾")) + " ▾";
 	}
 
 	private boolean chipContains(double x, double y) {
@@ -876,7 +882,7 @@ final class T3Screen extends Screen {
 
 	private void extractModelChip(GuiGraphicsExtractor graphics, T3State.Snapshot snapshot, int mouseX, int mouseY) {
 		if (snapshot.focusedRow() == null) return;
-		String label = modelLabel(effectiveModel()) + " ▾";
+		String label = chipLabel();
 		boolean hovered = chipContains(mouseX, mouseY);
 		graphics.fill(chipX(), MARGIN + 4, chipRight(), MARGIN + 20, pickerOpen || hovered ? 0x50FFFFFF : 0x28FFFFFF);
 		graphics.text(font, label, chipX() + 5, MARGIN + 8, pickedModel != null ? 0xFFFFB02E : 0xFFE5E7EB, false);
