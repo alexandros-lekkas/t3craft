@@ -124,7 +124,7 @@ public final class T3CraftClient implements ClientModInitializer {
 			pos = config.village;
 			config.villages.put(world, pos);
 			config.village = null;
-			config.save(configPath);
+			saveConfig();
 		}
 		return pos == null || pos.length != 3 ? null : new net.minecraft.core.BlockPos(pos[0], pos[1], pos[2]);
 	}
@@ -178,7 +178,11 @@ public final class T3CraftClient implements ClientModInitializer {
 	}
 
 	boolean canPin() { return worldKey() != null; }
-	void saveOfficePreferences() { config.save(configPath); }
+	private void saveConfig() {
+		if (!config.save(configPath)) chat(Component.literal("Could not save settings; changes apply for this session only. Check Minecraft's config folder permissions."));
+	}
+
+	void saveOfficePreferences() { saveConfig(); }
 	boolean pinned(T3State.ThreadRow row) { return row != null && officePreferences().pinned(row); }
 	void togglePin(T3State.ThreadRow row) {
 		if (row == null || !canPin()) return;
@@ -243,7 +247,7 @@ public final class T3CraftClient implements ClientModInitializer {
 		}
 		office.build(origin, request.labels());
 		village.clear();
-		chat(Component.literal("Office build accepted. Needs command permission (op). Rebuild to add floors for newly paired machines."));
+		chat(Component.literal("Office build accepted. " + (minecraft.getSingleplayerServer() == null ? "Needs command permission (op). " : "") + "Rebuild to add floors for newly paired machines."));
 	}
 
 	private int officeOff() {
@@ -370,7 +374,7 @@ public final class T3CraftClient implements ClientModInitializer {
 		lastPingThread = null;
 		state.focus(threadId);
 		config.threadId = threadId;
-		config.save(configPath);
+		saveConfig();
 	}
 
 	/** Sends to the focused thread, or starts a new thread beside it. Runs off-thread; reports back in chat. */
@@ -490,7 +494,7 @@ public final class T3CraftClient implements ClientModInitializer {
 
 	private int setBooks(boolean on) {
 		config.books = on;
-		config.save(configPath);
+		saveConfig();
 		chat(Component.literal(on ? "Finished threads you started or opened here hand you a written report (needs command permission)."
 			: "Report books off."));
 		return 1;
@@ -553,7 +557,7 @@ public final class T3CraftClient implements ClientModInitializer {
 						config.villages.remove(world);
 						config.officeWorlds.remove(world);
 					}
-					config.save(configPath);
+					saveConfig();
 					village.clear();
 					chat(Component.literal("Village hidden."));
 					return 1;
@@ -587,7 +591,7 @@ public final class T3CraftClient implements ClientModInitializer {
 
 	int setAgentCommands(boolean allowed) {
 		config.agentCommands = allowed;
-		config.save(configPath);
+		saveConfig();
 		chat(Component.literal(allowed
 			? "Agents on this machine can now run commands in your world (you'll see each one in chat). /t3 agent-build off to stop."
 			: "Agents can no longer run commands in your world."));

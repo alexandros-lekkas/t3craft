@@ -13,6 +13,9 @@ public final class OfficeChecks {
 	public static void main(String[] args) throws Exception {
 		checkPlacement();
 		checkCommandDispatch();
+		check(!OfficeQueue.permissionFailure(net.minecraft.network.chat.Component.literal("Unknown command: permission")), "literal chat is not a permission denial");
+		for (String key : List.of("command.unknown.command", "commands.generic.permission"))
+			check(OfficeQueue.permissionFailure(net.minecraft.network.chat.Component.empty().append(net.minecraft.network.chat.Component.translatable(key))), "nested translatable denial is recognized");
 		CommandBudget budget = new CommandBudget();
 		int spam = 0, sends = 0;
 		for (int tick = 0; tick < 24000; tick++) {
