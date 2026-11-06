@@ -47,6 +47,9 @@ final class OfficeTalks {
 	}
 
 	void observe(T3State.Snapshot snapshot, OfficeBrain brain) {
+		// The detector takes its first call as the baseline, so wait for T3: a join before it connects must not
+		// replay a "Can you take…?" for every subagent that was already running.
+		if (!snapshot.connected()) return;
 		Set<String> online = snapshot.machines().stream().filter(T3State.MachineHealth::online).map(T3State.MachineHealth::owner)
 			.collect(java.util.stream.Collectors.toSet());
 		director.observe(snapshot.children(), brain, online);

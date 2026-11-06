@@ -442,6 +442,7 @@ final class AgentTalk {
 			next(c, Phase.LEAVE);
 			if (parentBack && c.parent.errand) {
 				c.parent.errand = false;
+				c.parent.path.clear();
 				T3Office.Spot goal = c.parent.goal;
 				if (goal != null) c.parent.path.addAll(T3Office.path((int) Math.floor(c.parent.x), (int) Math.floor(c.parent.z), goal.x(), goal.z()));
 			}
