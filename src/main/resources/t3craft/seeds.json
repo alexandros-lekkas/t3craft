@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "minecraft": "26.3",
+  "office": "origin = design A's inside ground-floor corner in world coordinates; facing = where the glazing (design south) ends up; the building is turned about the origin. Verified in-game with the full footprint; docs/specs/seeds-report.md has the survey these came from.",
+  "seeds": [
+    {
+      "id": "lakeside",
+      "name": "Lakeside",
+      "seed": "-2085440121970745551",
+      "blurb": "Plains by a lake. The office looks east over it.",
+      "office": {
+        "x": 8,
+        "y": 65,
+        "z": -2,
+        "facing": "east"
+      },
+      "verified": "2026-11-05 vanilla 26.3 server survey; 2026-11-06 in-game with design A: flat 63-64, dry, agents at desks"
+    },
+    {
+      "id": "cherry-plains",
+      "name": "Cherry Plains",
+      "seed": "-4474845086078965121",
+      "blurb": "Open plains, cherry trees west, village beyond.",
+      "office": {
+        "x": 44,
+        "y": 63,
+        "z": 7,
+        "facing": "west"
+      },
+      "verified": "2026-11-05 vanilla 26.3 server survey; 2026-11-06 in-game with design A: site found by the placement search beside the survey box (its box is too small for design A), dry, flat"
+    },
+    {
+      "id": "river-bend",
+      "name": "River Bend",
+      "seed": "3478701220631481329",
+      "blurb": "Plains on a river bend, glazing over the water.",
+      "office": {
+        "x": 7,
+        "y": 64,
+        "z": -69,
+        "facing": "north"
+      },
+      "verified": "2026-11-05 vanilla 26.3 server survey; 2026-11-06 in-game with design A: site found by the placement search on the bend north of the survey box, dry, flat, agents at desks"
+    }
+  ]
+}

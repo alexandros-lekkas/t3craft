@@ -33,7 +33,8 @@ import java.util.function.BooleanSupplier;
  * Register with: {@code claude mcp add --transport http minecraft http://127.0.0.1:25590/mcp}
  */
 final class T3Mcp {
-	static final int PORT = 25590;
+	/** Override with {@code -Dt3craft.mcpPort=} so a dev client beside your real game does not take its port. */
+	static final int PORT = Integer.getInteger("t3craft.mcpPort", 25590);
 	private static final String PROTOCOL = "2025-06-18";
 
 	private final BooleanSupplier commandsAllowed;

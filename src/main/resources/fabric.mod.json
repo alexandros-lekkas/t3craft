@@ -14,6 +14,7 @@
 	"icon": "assets/t3craft/icon.png",
 	"environment": "*",
 	"entrypoints": {
+		"main": ["dev.maxwellyoung.t3craft.T3CraftCommon"],
 		"client": ["dev.maxwellyoung.t3craft.T3CraftClient"],
 		"server": ["dev.maxwellyoung.t3craft.T3CraftServer"]
 	},

@@ -36,7 +36,8 @@ final class OfficeProps {
    default -> base;
   };
  }
- void sync(Level level, BlockPos origin, int floors, Collection<OfficeBrain.Agent> agents) {
+ void sync(Level level, OfficeFrame frame, int floors, Collection<OfficeBrain.Agent> agents) {
+  BlockPos origin = frame.origin();
   Map<String, OfficeBrain.Agent> desks = new HashMap<>();
   for (var agent : agents) desks.put(agent.floor + ":" + agent.desk, agent);
   for (int floor = 0; floor < floors; floor++) for (var e : PROPS) {
@@ -55,10 +56,9 @@ final class OfficeProps {
    }
    var display = prop.display;
    var pos = p.getAsJsonArray("pos");
-   double x = origin.getX() + pos.get(0).getAsDouble();
-   double y = origin.getY() + 6 * floor + pos.get(1).getAsDouble();
-   double z = origin.getZ() + pos.get(2).getAsDouble();
-   float yaw = p.get("yaw").getAsFloat();
+   var at = frame.point(pos.get(0).getAsDouble(), 6 * floor + pos.get(1).getAsDouble(), pos.get(2).getAsDouble());
+   double x = at.x, y = at.y, z = at.z;
+   float yaw = frame.yaw(p.get("yaw").getAsFloat());
    var agent = p.has("desk") ? desks.get(floor + ":" + p.get("desk").getAsInt()) : null;
    String base = p.has("state") && !p.get("state").isJsonNull() ? p.get("state").getAsString() : "";
    String state = state(item, base, agent == null ? null : agent.status, night(level));

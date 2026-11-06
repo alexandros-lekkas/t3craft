@@ -26,8 +26,8 @@ final class DeskLaptops {
   var item=new ItemStack(Items.PAPER);item.set(DataComponents.ITEM_MODEL,Identifier.fromNamespaceAndPath("t3craft","laptop"));
   item.set(DataComponents.CUSTOM_MODEL_DATA,new CustomModelData(List.of(),List.of(),List.of(state(status)),List.of()));return item;
  }
- void sync(Level level,BlockPos origin,Collection<OfficeBrain.Agent> agents, int floors) {
-  props.sync(level,origin,floors,agents);
+ void sync(Level level,OfficeFrame frame,Collection<OfficeBrain.Agent> agents, int floors) {
+  props.sync(level,frame,floors,agents);
   Set<String> keep=new HashSet<>();
   for(var a:agents) {
    keep.add(a.threadId);var p=pairs.get(a.threadId);
@@ -38,19 +38,19 @@ final class DeskLaptops {
     display.addTag("t3craft_laptop");hit.addTag("t3craft_laptop");
     display.setItemTransform(ItemDisplayContext.FIXED);hit.setWidth(.85f);hit.setHeight(.65f);
     p=new Pair(display,hit);pairs.put(a.threadId,p);
-    position(p,origin,a);p.show(a.status);
+    position(p,frame,a);p.show(a.status);
     if(level instanceof net.minecraft.server.level.ServerLevel server) {
      for(Entity e:List.of(display,hit)){var stale=server.getEntity(e.getUUID());if(stale!=null)stale.discard();server.addFreshEntity(e);}
     }else if(level instanceof net.minecraft.client.multiplayer.ClientLevel client){display.setId(nextId--);hit.setId(nextId--);client.addEntity(display);client.addEntity(hit);}
    }
-   position(p,origin,a);p.show(a.status);
+   position(p,frame,a);p.show(a.status);
   }
   pairs.entrySet().removeIf(e->{if(keep.contains(e.getKey()))return false;remove(e.getValue());return true;});
  }
- private static void position(Pair p,BlockPos o,OfficeBrain.Agent a) {
+ private static void position(Pair p,OfficeFrame frame,OfficeBrain.Agent a) {
   var desk=OfficeDesign.floor().getAsJsonArray("work").get(a.desk).getAsJsonObject().getAsJsonArray("desk");
-  double x=o.getX()+desk.get(0).getAsInt()+.5,z=o.getZ()+desk.get(1).getAsInt()+(a.desk<4?.45:.55),y=o.getY()+a.floor*T3Office.FLOOR_HEIGHT+1;
-  p.display.setPos(x,y,z);p.display.setYRot(a.desk<4?0:180);p.hitbox.setPos(x,y,z);
+  var at=frame.point(desk.get(0).getAsInt()+.5,a.floor*T3Office.FLOOR_HEIGHT+1,desk.get(1).getAsInt()+(a.desk<4?.45:.55));
+  p.display.setPos(at);p.display.setYRot(frame.yaw(a.desk<4?0:180));p.hitbox.setPos(at);
  }
  private static void remove(Pair p){p.display.discard();p.hitbox.discard();}
  void onLoad(Entity entity){props.onLoad(entity);if(entity.entityTags().contains("t3craft_laptop")&&pairs.values().stream().noneMatch(p->p.display==entity||p.hitbox==entity))entity.discard();}

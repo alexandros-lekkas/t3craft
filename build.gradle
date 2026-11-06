@@ -45,6 +45,13 @@ loom {
 				if(project.hasProperty("world")) programArgs "--quickPlaySingleplayer", project.property("world")
 				else programArgs "--quickPlayMultiplayer", (project.findProperty('join') ?: 'localhost:25565')
 			}
+			// ./gradlew runClient -Pworldtest=<place> [-Pconfig=<pairing file>] walks title screen → New T3 World → Create and screenshots the arrival and desks.
+			if (project.hasProperty('worldtest')) {
+				vmArg "-Dt3craft.worldtest=${project.property('worldtest')}"
+				if (project.hasProperty('config')) vmArg "-Dt3craft.config=${project.property('config')}"
+			}
+			// -PmcpPort=<port> keeps a dev client's Minecraft MCP server off the port your real game uses (25590).
+			if (project.hasProperty('mcpPort')) vmArg "-Dt3craft.mcpPort=${project.property('mcpPort')}"
 		}
 	}
 
@@ -132,6 +139,12 @@ tasks.register('connectionCheck', JavaExec) {
 	args = [project.findProperty('fixturePort') ?: '25680']
 }
 
+tasks.register('worldCheck', JavaExec) {
+	description = 'T3 World seed list, save marker and office/spawn placement math without starting Minecraft.'
+	classpath = sourceSets.smoke.runtimeClasspath
+	mainClass = 'dev.maxwellyoung.t3craft.WorldChecks'
+}
+
 tasks.register('uiCheck', JavaExec) {
 	description = 'Pure UI logic (diff headers, table cells, ellipsize) without starting Minecraft.'
 	classpath = sourceSets.smoke.runtimeClasspath
@@ -139,7 +152,7 @@ tasks.register('uiCheck', JavaExec) {
 }
 
 // No fixture needed, so `build` runs it everywhere.
-tasks.named('check') { dependsOn 'uiCheck' }
+tasks.named('check') { dependsOn 'uiCheck', 'worldCheck' }
 
 // Fixture-backed checks share one entry point in PR and tag builds.
 tasks.register('verifyAll') {

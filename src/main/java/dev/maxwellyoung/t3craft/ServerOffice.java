@@ -69,6 +69,12 @@ final class ServerOffice {
 		return config.serverOffice == null ? null : new BlockPos(config.serverOffice[0], config.serverOffice[1], config.serverOffice[2]);
 	}
 
+	/** The shared office is built where the operator stood, in the design's own orientation. */
+	private OfficeFrame frame() {
+		BlockPos o = origin();
+		return o == null ? null : OfficeFrame.at(o);
+	}
+
 	private record Pending(BlockPos origin, List<String> owners, List<String> labels) {}
 	private final Map<String, Pending> pending = new HashMap<>();
 
@@ -136,19 +142,21 @@ final class ServerOffice {
 	}
 
 	void tick(MinecraftServer server) {
-		BlockPos o = origin();
-		if (o == null) return;
+		OfficeFrame frame = frame();
+		if (frame == null) return;
+		BlockPos o = frame.origin();
 		ServerLevel level = server.overworld();
 		if (!level.isLoaded(o)) return;
 		ticks++;
-		if (ticks % 10 == 0) sync(server, level, o);
+		if (ticks % 10 == 0) sync(server, level, frame);
 		brain.tick();
 		for (OfficeBrain.Agent agent : brain.agents().values()) {
 			Mannequin villager = villagers.get(agent.threadId);
 			if (villager == null || villager.isRemoved()) continue;
-			villager.setPos(o.getX() + agent.x, o.getY() + agent.y(), o.getZ() + agent.z);
-			villager.setYRot(agent.yaw);
-			villager.setYBodyRot(agent.yaw);
+			villager.setPos(frame.point(agent.x, agent.y(), agent.z));
+			float yaw = frame.yaw(agent.yaw);
+			villager.setYRot(yaw);
+			villager.setYBodyRot(yaw);
 
    var player=level.getNearestPlayer(villager,agent.faceHold>0?32:3);
    if(player!=null){if(player.distanceToSqr(villager)<9)agent.faceHold=Math.max(agent.faceHold,8);AgentPose.face(villager,player);}else AgentPose.rest(villager);
@@ -164,7 +172,8 @@ final class ServerOffice {
 		}
 	}
 
-	private void sync(MinecraftServer server, ServerLevel level, BlockPos o) {
+	private void sync(MinecraftServer server, ServerLevel level, OfficeFrame frame) {
+		BlockPos o = frame.origin();
 		T3State.Snapshot snapshot = state.snapshot();
 		List<String> floors = floors();
 		config.sharedOfficePreferences.normalize();
@@ -184,7 +193,8 @@ final class ServerOffice {
 				villager.setPermanentlyInvulnerable(true);
 				villager.addTag(TAG);
 				villager.setCustomNameVisible(true);
-				villager.snapTo(o.getX() + agent.x, o.getY() + agent.y(), o.getZ() + agent.z, 0, 0);
+				var at = frame.point(agent.x, agent.y(), agent.z);
+				villager.snapTo(at.x, at.y, at.z, 0, 0);
 				villager.setUUID(OfficeBrain.villagerUuid(agent.threadId));
 				villagers.put(agent.threadId, villager);
 				if (!level.addFreshEntity(villager)) {
@@ -199,29 +209,29 @@ final class ServerOffice {
 				AgentAppearance.update(villager, row, state.online(row.id()), state.driverFor(row));
 			}
 		}
-		laptops.sync(level,o,brain.agents().values(),Math.max(2,floors.size()*2));
+		laptops.sync(level,frame,brain.agents().values(),Math.max(2,floors.size()*2));
 		// Invalidate updates while their chunks are unloaded.
 		for (int floor = 0; floor < Math.max(2, floors.size()*2); floor++) {
 			List<T3Office.Note> notes = brain.notes(floor, state::waitingDetail);
 			String key = notes.toString();
-			if (!OfficeSite.loaded(level, o, T3Office.whiteboard(floor, notes))) { boards.remove(floor); continue; }
+			if (!OfficeSite.loaded(level, frame, T3Office.whiteboard(floor, notes))) { boards.remove(floor); continue; }
 			if (!key.equals(boards.get(floor))) {
-				run(server, o, T3Office.whiteboard(floor, notes));
+				run(server, frame, T3Office.whiteboard(floor, notes));
 				boards.put(floor, key);
 			}
 		}
 		boolean dark = OfficeProps.night(level);
-		if (!OfficeSite.loaded(level, o, T3Office.lamps(floors.size(), dark))) { night = null; return; }
+		if (!OfficeSite.loaded(level, frame, T3Office.lamps(floors.size(), dark))) { night = null; return; }
 		if (night == null || night != dark) {
-			run(server, o, T3Office.lamps(floors.size(), dark));
+			run(server, frame, T3Office.lamps(floors.size(), dark));
 			night = dark;
 		}
 	}
 
-	private static void run(MinecraftServer server, BlockPos o, List<String> commands) {
+	private static void run(MinecraftServer server, OfficeFrame frame, List<String> commands) {
 		CommandSourceStack source = quiet(server);
 		for (String command : commands) {
-			server.getCommands().performPrefixedCommand(source, T3Office.absolute(command, o.getX(), o.getY(), o.getZ()));
+			server.getCommands().performPrefixedCommand(source, frame.command(command));
 		}
 	}
 

@@ -26,7 +26,7 @@ brew install openjdk@25
 export JAVA_HOME="$(brew --prefix openjdk@25)/libexec/openjdk.jdk/Contents/Home"
 
 git clone https://github.com/alexandros-lekkas/t3craft && cd t3craft
-./gradlew build          # → build/libs/t3craft-<version>.jar (also runs uiCheck)
+./gradlew build          # → build/libs/t3craft-<version>.jar (also runs uiCheck and worldCheck)
 ./gradlew runClient      # dev client, offline, no Minecraft account needed
 ./gradlew runServer --args=nogui   # local test server in run-server/
 ```

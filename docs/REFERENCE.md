@@ -201,6 +201,8 @@ python3 scripts/feature-fixture.py --config "$PWD/run/feature-fixture.json"
 
 Then run `./gradlew featureCheck`. It also checks explicit failed-command receipts, unknown activity types and multi-hunk line numbering. It exercises two-machine routing, older waiting threads, stale requests, disconnect/reconnect, checkpoint reply identity, and deleted/binary/renamed/empty patches. It never uses a real pairing or dispatches to an agent. Run the fixture with `--protocol2 --port 25682`, then `./gradlew featureCheck -PfixturePort=25682`, to exercise current T3 wire shapes. CI checks both protocols.
 
+`./gradlew worldCheck` verifies the curated seed list, the T3 World save marker round-trip, and office placement math for all four facings: door and spawn geometry, block, entity and yaw transforms, hit-test inverses, block-state rotation and turned whiteboard/lamp commands. It runs as part of `build`.
+
 `./gradlew officeCheck` verifies stable assignments, pin/waiting/working priority, actual configuration save/load, owner/project identity, removal and independent client/shared preferences with synthetic data. It does not contact an agent.
 
 `./gradlew reliabilityCheck` (or `-PfixturePort=25682`) checks MCP Host/Origin policy and auth/protocol recovery with the same isolated fixtures. `python3 scripts/check-launcher.py` checks that client success and failure both save/stop only the launcher-owned console server, preserving unrelated and reused servers. It never launches Minecraft or reads a user world.
@@ -244,6 +246,6 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 
 T3 Craft is an independent community project and is not affiliated with or endorsed by T3 Tools Inc. "T3 Code" is theirs; this mod only talks to it over its client protocol. The jar contains no Minecraft, Fabric, or T3 code.
 
-Office builds report their exact inclusive bounds before clearing the site. If existing blocks would be replaced, run `/t3 office confirm` to accept that same site. The whole site must be loaded. `/t3 office off` cancels queued work and hides residents without removing the blocks. Floor ownership is saved when building; rebuild after adding machines to give them floors. Older offices adopt the current pairing order once on first use.
+In a T3 World the office the server built is adopted as that save's office when you first load in, so bare `/t3 office` (or `/t3 office go`) takes you to its door; `/t3 office build` rebuilds by hand. Office builds report their exact inclusive bounds before clearing the site. If existing blocks would be replaced, run `/t3 office confirm` to accept that same site. The whole site must be loaded. `/t3 office off` cancels queued work and hides residents without removing the blocks. Floor ownership is saved when building; rebuild after adding machines to give them floors. Older offices adopt the current pairing order once on first use.
 
 For the fixture-backed release checks, run `bash scripts/verify-ci.sh` (requires JDK 25 as a compile toolchain; Gradle and the smoke checks can run on JDK 25 or 27). It runs `verifyAll`, both protocol fixtures, launcher/installer checks and the packaged-jar contract. The separate `smoke`, `reviewProbe` and `liveCheck` tasks require an explicitly supplied live T3 pairing/project and are not CI fixtures.

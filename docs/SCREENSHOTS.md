@@ -22,10 +22,12 @@ The real in-game shots the docs need. When a feature lands, the implementing PR 
 | ☐ | `office-exterior-day` | Same world | Front three-quarter view from the plaza, eye height | HUD hidden |
 | ☐ | `office-interior-desks` | 8 agents: 6 working, 1 needs you, 1 done | Standing behind the bench, looking across desks to the glass | 2, HUD hidden |
 | ☐ | `office-roof` | Afternoon, `/time set 9000` | On the roof terrace, looking across the pergola to the lake | HUD hidden |
-| ☐ | `world-title` | Title screen with the mod loaded | Full screen | 2 |
-| ☐ | `world-create` | *T3 World* → New T3 World page, defaults untouched | Full screen | 2 |
-| ☐ | `world-arrival` | The first frame after loading the new world, with the welcome toast visible | Spawn view, facing the door, as loaded | 2 |
-| ☐ | `world-hub` | A T3 world exists. Title → *T3 World* | Full screen | 2 |
+| ☑ | `world-lakeside-title` | Title screen with the mod loaded | Full screen | **5** |
+| ☑ | `world-lakeside-new-world` | *T3 World* → New T3 World page, defaults untouched | Full screen | **5** |
+| ☑ | `world-lakeside-arrival` | The first frame after loading the new world, with the welcome toast visible | Spawn view, facing the door, as loaded | **5** |
+| ☑ | `world-lakeside-hub` | A T3 world exists. Title → *T3 World* | Full screen | **5** |
+| ☑ | `world-lakeside-plaza`, `world-lakeside-lake`, `world-lakeside-desks` | Lakeside, office fixture paired | Plaza side, lake side, ground-floor desks with agents seated | HUD hidden, **5** |
+| ☑ | `world-river-bend-plaza`, `world-river-bend-desks` | River Bend (office turned 180°) | Same | HUD hidden, **5** |
 
 ### Characters and laptop
 
@@ -88,7 +90,7 @@ These were taken against the real local T3 in the dev client with `./gradlew run
 |:--|:--|
 | `hero-office`, `hero-office-night` | The `<picture>` hero in the [README](../README.md) |
 | `office-*`, `agents-*` | Renders in [office.md](design/office.md) and the README's "What it feels like" |
-| `world-*` | Mockups in [world.md](design/world.md) |
+| `world-*` | Real shots from `-Pworldtest` in [world.md](design/world.md); the `docs/images/world-*.png` files are the design mockups |
 | `ui-real-*` | [real-t3-ui.md](design/real-t3-ui.md) and the README feature table |
 | `ui-*` | Mockups in [ui.md](design/ui.md) |
 | `laptop-*` | The texture in [characters-and-laptop.md](design/characters-and-laptop.md) |

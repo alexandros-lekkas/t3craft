@@ -99,4 +99,4 @@ Working agents sit at their desk. Agents that need you walk to the whiteboard. F
 
 ## Build and checks
 
-JDK 25+ (27 works since [#2](https://github.com/alexandros-lekkas/t3craft/pull/2)). `./gradlew build` runs the fixture-free checks. CI also runs `officeCheck`, `connectionCheck`, `featureCheck`, `reliabilityCheck`, `mcpCheck` and `uiCheck` against legacy and protocol-2 fixtures. The full list is in the [0.5 reference](REFERENCE.md#build-and-develop).
+JDK 25+ (27 works since [#2](https://github.com/alexandros-lekkas/t3craft/pull/2)). `./gradlew build` runs the fixture-free checks. CI also runs `officeCheck`, `connectionCheck`, `featureCheck`, `reliabilityCheck`, `mcpCheck`, `uiCheck` and `worldCheck` against legacy and protocol-2 fixtures. The full list is in the [0.5 reference](REFERENCE.md#build-and-develop).

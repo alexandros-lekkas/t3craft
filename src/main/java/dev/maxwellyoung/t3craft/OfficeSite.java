@@ -29,6 +29,14 @@ final class OfficeSite {
 		return new Bounds(origin.offset(minX, minY, minZ), origin.offset(maxX, maxY, maxZ));
 	}
 
+	/** Whether every chunk a turned office's relative commands touch is loaded. */
+	static boolean loaded(Level level, OfficeFrame frame, List<String> commands) {
+		if (frame.rotation() == net.minecraft.world.level.block.Rotation.NONE) return loaded(level, frame.origin(), commands);
+		List<String> absolute = new java.util.ArrayList<>();
+		for (String command : commands) absolute.add(frame.command(command));
+		return loaded(level, BlockPos.ZERO, absolute);
+	}
+
 	static boolean loaded(Level level, BlockPos origin, List<String> commands) {
 		Bounds bounds = bounds(origin, commands);
 		if (bounds.min().getY() < level.getMinY() || bounds.max().getY() > level.getMaxY()) return false;

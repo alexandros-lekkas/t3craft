@@ -55,7 +55,7 @@ Walk up to one, click it, and answer it. You never alt-tab, and there's **nothin
 
 1. **Download the T3 Craft pack** from [**Releases**](https://github.com/alexandros-lekkas/t3craft/releases/latest) or [Modrinth](https://modrinth.com/modpack/t3craft-pack). It adds a *T3 Craft* installation to the official Minecraft Launcher and leaves your other installs alone.
 2. **Open T3 Code**, then press **Play** on *T3 Craft*.
-3. **Click _T3 World_.** You spawn facing your office, and your agents are already at their desks.
+3. **Click _T3 World_.** You spawn facing your office, and your agents are already at their desks. <a href="docs/design/world.md">How it works →</a>
 
 No pairing links, no commands, no settings screens. T3 Craft finds T3 Code on your computer and connects by itself.
 
@@ -81,8 +81,8 @@ No pairing links, no commands, no settings screens. T3 Craft finds T3 Code on yo
 <b>They can build, too.</b> Ask for a beacon platform and watch it go up block by block. You get one quiet toast when it's done.
 </td>
 <td valign="top">
-<img src="docs/images/world-new-t3-world.png" alt="The New T3 World screen">
-<b>One click to a world.</b> A plains seed, chosen so the office sits flat and dry by a lake, 13 blocks from spawn.
+<img src="docs/images/shots/world-lakeside-lake.jpg" alt="The office on Lakeside, glazing over the lake">
+<b>One click to a world.</b> <i>T3 World</i> on the title screen makes a world on a plains seed with the office already standing by the lake, turned to face the view. <a href="docs/design/world.md">How it works →</a>
 </td>
 </tr>
 </table>

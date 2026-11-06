@@ -11,11 +11,16 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.toasts.SystemToast;
+import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -57,6 +62,8 @@ public final class T3CraftClient implements ClientModInitializer {
 	private static final long PING_JUMP_WINDOW_MS = 60_000;
 	private T3Village village;
 	private final OfficeQueue office = new OfficeQueue();
+	/** The last level checked for a T3 World marker, so each world is adopted once per visit. */
+	private Object t3WorldLevel;
 
 	public static T3CraftClient get() {
 		return instance;
@@ -98,11 +105,13 @@ public final class T3CraftClient implements ClientModInitializer {
 		net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents.ALLOW_GAME.register(
 			(message, overlay) -> overlay || !(T3Books.isOwnFeedback(message.getString()) || office.hideFeedback(message)));
 		SelfTest selfTest = SelfTest.fromSystemProperty(this);
+		WorldSelfTest worldTest = WorldSelfTest.fromSystemProperty(this);
 		WebShowcase webShowcase = WebShowcase.fromSystemProperty(this);
 		if (webShowcase != null) ClientTickEvents.END_CLIENT_TICK.register(webShowcase::tick);
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			state.setPins(List.copyOf(officePreferences().pins));
 			if (selfTest != null) selfTest.tick(client);
+			if (worldTest != null) worldTest.tick(client);
 			while (decisionsKey.consumeClick()) if (client.gui.screen() == null) openDecisions();
 			while (openKey.consumeClick()) {
 				openPanelNextTick = true;
@@ -121,7 +130,93 @@ public final class T3CraftClient implements ClientModInitializer {
 		// The hidden Chrome behind the laptop never outlives the game.
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(client -> ChromeHost.shutdown());
 		HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(MOD_ID, "status"), new T3Hud(this));
+		ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> { if (screen instanceof TitleScreen) addWorldButton(screen); });
+		ClientTickEvents.END_CLIENT_TICK.register(this::trackWorld);
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> registerCommands(dispatcher));
+	}
+
+	/**
+	 * "T3 World" beside Singleplayer: the vanilla button shrinks to the left half of its row and ours
+	 * takes the right half, like the Options/Quit row. Nothing else on the title screen moves.
+	 */
+	private void addWorldButton(net.minecraft.client.gui.screens.Screen screen) {
+		for (var widget : Screens.getWidgets(screen)) {
+			if (!(widget instanceof Button single) || !(single.getMessage().getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents text)
+				|| !text.getKey().equals("menu.singleplayer")) continue;
+			int half = (single.getWidth() - 4) / 2;
+			single.setWidth(half);
+			Button ours = Button.builder(Component.literal("T3 World"), b -> Minecraft.getInstance().gui.setScreen(T3WorldScreen.open(screen, this)))
+				.bounds(single.getX() + half + 4, single.getY(), half, single.getHeight())
+				.tooltip(Tooltip.create(Component.literal("Your world with your agents in it. Office at spawn, ready to go."))).build();
+			Screens.getWidgets(screen).add(ours);
+			return;
+		}
+	}
+
+	/** The New T3 World screen turns agent build on: that's what the world is for. */
+	void saveAgentBuildOn() {
+		if (config.agentCommands) return;
+		config.agentCommands = true;
+		saveConfig();
+	}
+
+	/**
+	 * Entering a T3 World: adopt the office the server built as this world's office (once, so a
+	 * later /t3 village or rebuild is respected), and show the one welcome toast. After that,
+	 * bare /t3 office takes you to the door instead of building a second office.
+	 */
+	private void trackWorld(Minecraft minecraft) {
+		if (minecraft.level == t3WorldLevel) return;
+		t3WorldLevel = minecraft.level;
+		var server = minecraft.getSingleplayerServer();
+		if (minecraft.level == null || server == null) return;
+		var level = minecraft.level;
+		server.execute(() -> {
+			T3WorldData data = T3WorldData.get(server);
+			if (data == null) return;
+			boolean welcome = data.setupDone && !data.welcomed;
+			if (welcome) { data.welcomed = true; data.setDirty(); }
+			var origin = data.origin;
+			var rotation = data.rotation;
+			minecraft.execute(() -> {
+				if (minecraft.level != level) return;
+				if (origin != null) adoptOffice(origin, rotation);
+				if (!welcome) return;
+				SystemToast.addOrUpdate(minecraft.gui.toastManager(), TOAST, Component.literal("Welcome to " + data.name),
+					Component.literal(origin != null ? "Your office is ready. Press " + openKeyName() + " to talk to your agents."
+						: "No flat spot for the office. Stand somewhere and run /t3 office."));
+			});
+		});
+	}
+
+	/** Records a server-built office for the overworld of this save unless the world already has a village or office. */
+	private void adoptOffice(net.minecraft.core.BlockPos origin, net.minecraft.world.level.block.Rotation rotation) {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (minecraft.level == null || minecraft.level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return;
+		String world = worldKey();
+		if (world == null || config.villages.containsKey(world) || config.officeWorlds.contains(world)) return;
+		config.villages.put(world, new int[] {origin.getX(), origin.getY(), origin.getZ()});
+		config.officeWorlds.add(world);
+		if (rotation != net.minecraft.world.level.block.Rotation.NONE) config.officeRotations.put(world, rotation.getSerializedName());
+		else config.officeRotations.remove(world);
+		saveConfig();
+		LOGGER.info("Adopted the T3 World office at {} ({}) for {}", origin.toShortString(), rotation, world);
+	}
+
+	/** How this world's office is turned, from the config; the design's own orientation when nothing is recorded. */
+	private net.minecraft.world.level.block.Rotation officeRotation(String world) {
+		String name = config.officeRotations.get(world);
+		if (name == null) return net.minecraft.world.level.block.Rotation.NONE;
+		for (var rotation : net.minecraft.world.level.block.Rotation.values()) if (rotation.getSerializedName().equals(name)) return rotation;
+		return net.minecraft.world.level.block.Rotation.NONE;
+	}
+
+	/** This world's office as a frame (origin and turn), or null when its village isn't an office. */
+	OfficeFrame officeFrame() {
+		String world = worldKey();
+		if (world == null || !config.officeWorlds.contains(world)) return null;
+		var anchor = villageAnchor();
+		return anchor == null ? null : new OfficeFrame(anchor, officeRotation(world));
 	}
 
 	public net.minecraft.core.BlockPos villageAnchor() {
@@ -209,7 +304,7 @@ public final class T3CraftClient implements ClientModInitializer {
 		return world != null && config.officeWorlds.contains(world);
 	}
 
-    private record OfficeDestination(net.minecraft.core.BlockPos origin, String dimension) {}
+    private record OfficeDestination(OfficeFrame frame, String dimension) {}
     private OfficeDestination officeDestination() {
         String current = worldKey();
         if (current == null) return null;
@@ -219,7 +314,7 @@ public final class T3CraftClient implements ClientModInitializer {
         if (key == null) return null;
         int[] point = config.villages.get(key);
         return point == null || point.length != 3 ? null : new OfficeDestination(
-            new net.minecraft.core.BlockPos(point[0], point[1], point[2]), key.substring(key.lastIndexOf('|') + 1));
+            new OfficeFrame(new net.minecraft.core.BlockPos(point[0], point[1], point[2]), officeRotation(key)), key.substring(key.lastIndexOf('|') + 1));
     }
 
     /** Return to the entrance even from an unloaded area or another dimension of this world. */
@@ -230,11 +325,14 @@ public final class T3CraftClient implements ClientModInitializer {
             chat(Component.literal("No office in this world yet. Use /t3 office build."));
             return 0;
         }
-        var origin = destination.origin();
-        double x = origin.getX() + 25.5, y = origin.getY(), z = origin.getZ() - 4.5;
+        // Just outside the door, looking in, however the office is turned.
+        int[] outside = OfficeDesign.doorOutside();
+        var at = destination.frame().point(outside[0] + 0.5, 0, outside[1] - 2.5);
+        double x = at.x, y = at.y, z = at.z;
+        float yaw = destination.frame().yaw(0);
         var server = mc.getSingleplayerServer();
         if (server == null) {
-            String command = "tp @s " + x + " " + y + " " + z + " 0 0";
+            String command = "tp @s " + x + " " + y + " " + z + " " + yaw + " 0";
             if (!mc.level.dimension().identifier().toString().equals(destination.dimension()))
                 command = "execute in " + destination.dimension() + " run " + command;
             ClientCommands.send(command);
@@ -247,7 +345,7 @@ public final class T3CraftClient implements ClientModInitializer {
                     net.minecraft.core.registries.Registries.DIMENSION, net.minecraft.resources.Identifier.parse(destination.dimension())));
                 var player = server.getPlayerList().getPlayer(playerId);
                 if (target != null && player != null) {
-                    player.teleportTo(target, x, y, z, java.util.Set.of(), 0, 0, true);
+                    player.teleportTo(target, x, y, z, java.util.Set.of(), yaw, 0, true);
                     player.fallDistance = 0;
                 }
             });
@@ -296,12 +394,15 @@ public final class T3CraftClient implements ClientModInitializer {
 		var oldVillage = config.villages.get(world);
 		boolean oldOffice = config.officeWorlds.contains(world);
 		var oldOwners = officePreferences().floorOwners;
+		var oldRotation = config.officeRotations.get(world);
 		config.villages.put(world, new int[] {origin.getX(), origin.getY(), origin.getZ()});
 		config.officeWorlds.add(world);
+		config.officeRotations.remove(world); // Built by hand: the design's own orientation.
 		officePreferences().floorOwners = List.copyOf(request.owners());
 		if (!config.save(configPath)) {
 			if (oldVillage == null) config.villages.remove(world); else config.villages.put(world, oldVillage);
 			if (!oldOffice) config.officeWorlds.remove(world);
+			if (oldRotation != null) config.officeRotations.put(world, oldRotation);
 			officePreferences().floorOwners = oldOwners;
 			chat(Component.literal("Could not save office settings; no blocks were changed.")); return;
 		}
@@ -314,10 +415,12 @@ public final class T3CraftClient implements ClientModInitializer {
 		String world = worldKey();
 		var oldVillage = world == null ? null : config.villages.get(world);
 		boolean oldOffice = world != null && config.officeWorlds.contains(world);
-		if (world != null) { config.officeWorlds.remove(world); config.villages.remove(world); }
+		var oldRotation = world == null ? null : config.officeRotations.get(world);
+		if (world != null) { config.officeWorlds.remove(world); config.villages.remove(world); config.officeRotations.remove(world); }
 		if (!config.save(configPath)) {
 			if (oldVillage != null) config.villages.put(world, oldVillage);
 			if (oldOffice) config.officeWorlds.add(world);
+			if (oldRotation != null) config.officeRotations.put(world, oldRotation);
 			chat(Component.literal("Could not save office settings; office kept.")); return 0;
 		}
 		pendingOffice = null;
@@ -340,9 +443,11 @@ public final class T3CraftClient implements ClientModInitializer {
 		var ahead = player.blockPosition().relative(player.getDirection(), distance);
 		var previous = config.villages.put(world, new int[] {ahead.getX(), ahead.getY(), ahead.getZ()});
 		boolean wasOffice = config.officeWorlds.remove(world);
+		var wasTurned = config.officeRotations.remove(world);
 		if (!config.save(configPath)) {
 			if (previous == null) config.villages.remove(world); else config.villages.put(world, previous);
 			if (wasOffice) config.officeWorlds.add(world);
+			if (wasTurned != null) config.officeRotations.put(world, wasTurned);
 			chat(Component.literal("Could not save village settings; village kept.")); return;
 		}
 		office.clear();
@@ -668,6 +773,7 @@ public final class T3CraftClient implements ClientModInitializer {
 					if (world != null) {
 						config.villages.remove(world);
 						config.officeWorlds.remove(world);
+						config.officeRotations.remove(world);
 					}
 					saveConfig();
 					village.clear();

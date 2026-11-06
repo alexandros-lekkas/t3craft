@@ -15,6 +15,28 @@ final class OfficeDesign {
   } catch (IOException e) { throw new IllegalStateException(path, e); }
  }
  static JsonObject floor() { return BASE.getAsJsonObject("anchors").getAsJsonArray("floors").get(0).getAsJsonObject(); }
+ /** The design's footprint in its own frame: {minX, maxX, minZ, maxZ} over every block, plaza and fins included. */
+ static final int[] EXTENT = extent();
+ /** The plaza and floor slab sit one below the ground floor; everything is cleared from here up. */
+ static final int GROUND = -1;
+ private static int[] extent() {
+  int[] e={Integer.MAX_VALUE,Integer.MIN_VALUE,Integer.MAX_VALUE,Integer.MIN_VALUE};
+  for(var b:BASE.getAsJsonArray("blocks")){var p=b.getAsJsonObject().getAsJsonArray("pos");int x=p.get(0).getAsInt(),z=p.get(2).getAsInt();e[0]=Math.min(e[0],x);e[1]=Math.max(e[1],x);e[2]=Math.min(e[2],z);e[3]=Math.max(e[3],z);}
+  return e;
+ }
+ /** Highest block of a build with this many floors (the roof terrace rail). */
+ static int top(int floors) { return floors*6+5; }
+ /** An exterior anchor ({@code door}, {@code sign}) as {x, y, z}. */
+ static int[] exterior(String key) { return ints(BASE.getAsJsonObject("anchors").getAsJsonObject("exterior").getAsJsonArray(key)); }
+ /** The cell just outside the entry door, {x, z}, where arrivals stand. */
+ static int[] doorOutside() { return ints(floor().getAsJsonObject("door").getAsJsonArray("outside")); }
+ /** Every column that has a plaza or floor-slab block at ground level, as {x, z}: what needs solid ground under it. */
+ static List<int[]> plaza() {
+  List<int[]> out=new ArrayList<>();
+  for(var b:BASE.getAsJsonArray("blocks")){var p=b.getAsJsonObject().getAsJsonArray("pos");if(p.get(1).getAsInt()==GROUND)out.add(new int[]{p.get(0).getAsInt(),p.get(2).getAsInt()});}
+  return out;
+ }
+ private static int[] ints(JsonArray a) { int[] out=new int[a.size()];for(int i=0;i<out.length;i++)out[i]=a.get(i).getAsInt();return out; }
  static T3Office.Spot spot(JsonObject a) { return new T3Office.Spot(a.get("x").getAsInt(),a.get("z").getAsInt(),a.get("sink").getAsDouble(),a.get("yaw").getAsFloat()); }
  static T3Office.Spot[] spots(String key) { return floor().getAsJsonArray(key).asList().stream().map(a->spot(a.getAsJsonObject())).toArray(T3Office.Spot[]::new); }
  static List<String> blueprint(int count) {

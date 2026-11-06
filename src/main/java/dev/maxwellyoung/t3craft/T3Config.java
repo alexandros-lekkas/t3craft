@@ -42,6 +42,8 @@ public final class T3Config {
 	public java.util.Map<String, int[]> villages = new java.util.HashMap<>();
 	/** Client: worlds (same keys) whose village is the Silk office built at that spot. */
 	public java.util.Set<String> officeWorlds = new java.util.HashSet<>();
+	/** Client: how each office world's office is turned (a {@code Rotation} name); absent means the design's own orientation. */
+	public java.util.Map<String, String> officeRotations = new java.util.HashMap<>();
 	/** Server: where the shared Silk office stands; null when it's off. */
 	public int[] serverOffice;
 	/** Client spatial preferences, independently saved per world and dimension. */
@@ -93,6 +95,7 @@ public final class T3Config {
 					}
 					if (config.villages == null) config.villages = new java.util.HashMap<>();
 					if (config.officeWorlds == null) config.officeWorlds = new java.util.HashSet<>();
+					if (config.officeRotations == null) config.officeRotations = new java.util.HashMap<>();
 					if (config.officePreferences == null) config.officePreferences = new java.util.HashMap<>();
 					config.officePreferences.values().removeIf(java.util.Objects::isNull);
 					config.officePreferences.values().forEach(OfficeRoster.Preferences::normalize);

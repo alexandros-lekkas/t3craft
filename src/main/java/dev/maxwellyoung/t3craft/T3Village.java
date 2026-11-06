@@ -68,11 +68,13 @@ final class T3Village {
 		// Shared villagers can be opened by a paired client without placing a local village.
 		if (anchor == null) return;
 
-		if (mod.officeMode() && minecraft.gui.screen() == null
+		OfficeFrame frame = mod.officeFrame();
+		if (frame != null && minecraft.gui.screen() == null
 			&& minecraft.hitResult instanceof net.minecraft.world.phys.BlockHitResult hit) {
-			BlockPos position = hit.getBlockPos();
-			int x = position.getX() - anchor.getX(), z = position.getZ() - anchor.getZ();
-			int floor = Math.floorDiv(position.getY() - anchor.getY(), T3Office.FLOOR_HEIGHT);
+			// Hit tests happen in the design's own frame, whichever way this office is turned.
+			BlockPos position = frame.local(hit.getBlockPos());
+			int x = position.getX(), z = position.getZ();
+			int floor = Math.floorDiv(position.getY(), T3Office.FLOOR_HEIGHT);
 			boolean board = x >= 0 && x <= 1 && z >= 14 && z <= 16;
 			boolean lectern = x == 26 && z == 16;
 			if (floor >= 0 && floor < Math.max(2, mod.floors().size()*2) && (board || lectern) && minecraft.options.keyUse.consumeClick()) {
@@ -84,10 +86,10 @@ final class T3Village {
 		}
 
 		T3State.Snapshot snapshot = mod.state().snapshot();
-		boolean office = mod.officeMode();
+		boolean office = frame != null;
 		if (office && mod.office().building()) return;
 		if (ticks % 10 == 0) {
-			if (office) syncOffice(snapshot, anchor);
+			if (office) syncOffice(snapshot, frame);
 			else sync(snapshot, anchor);
 		}
 		for (Map.Entry<String, Mannequin> entry : villagers.entrySet()) {
@@ -103,15 +105,15 @@ final class T3Village {
 	 * position. Vanilla owns walk animation; only position, yaw and head yaw are set here.
 	 */
 	void animate(Minecraft minecraft) {
-		if (level == null || !mod.officeMode() || minecraft.player == null) return;
-		BlockPos o = mod.villageAnchor();
-		if (o == null) return;
+		if (level == null || minecraft.player == null) return;
+		OfficeFrame frame = mod.officeFrame();
+		if (frame == null) return;
 		brain.tick();
 		for (OfficeBrain.Agent agent : brain.agents().values()) {
 			Mannequin villager = villagers.get(agent.threadId);
 			if (villager == null) continue;
-			villager.setPos(o.getX() + agent.x, o.getY() + agent.y(), o.getZ() + agent.z);
-			turn(villager, agent.yaw);
+			villager.setPos(frame.point(agent.x, agent.y(), agent.z));
+			turn(villager, frame.yaw(agent.yaw));
    if(minecraft.player.distanceToSqr(villager)<9)agent.faceHold=Math.max(agent.faceHold,8);
    if(agent.faceHold>0) AgentPose.face(villager,minecraft.player);else AgentPose.rest(villager);
    AgentPose.set(villager,agent.settled()&&agent.goal.seat());
@@ -139,7 +141,7 @@ final class T3Village {
 	}
 
 	/** Office mode: sync the brain with the thread list, then villagers, whiteboards and lamps. */
-	private void syncOffice(T3State.Snapshot snapshot, BlockPos o) {
+	private void syncOffice(T3State.Snapshot snapshot, OfficeFrame frame) {
 		List<String> floors = mod.floors();
 		OfficeRoster.Preferences prefs = mod.officePreferences();
 		prefs.normalize();
@@ -153,7 +155,7 @@ final class T3Village {
 		}
 		if (!previousDesks.equals(prefs.desks)) mod.saveOfficePreferences();
 		for (OfficeBrain.Agent agent : brain.agents().values()) {
-			if (!level.isLoaded(o.offset((int) agent.x, (int) agent.y(), (int) agent.z))) continue;
+			if (!level.isLoaded(frame.block((int) Math.floor(agent.x), (int) agent.y(), (int) Math.floor(agent.z)))) continue;
 			Mannequin villager = villagers.get(agent.threadId);
 			if (villager == null || villager.isRemoved() || level.getEntity(villager.getId()) != villager) {
 				if (villager != null) threadByEntity.remove(villager.getId());
@@ -162,7 +164,8 @@ final class T3Village {
                 villager.noPhysics=true;
 				villager.setSilent(true);
 				villager.setCustomNameVisible(true);
-				villager.snapTo(o.getX() + agent.x, o.getY() + agent.y(), o.getZ() + agent.z, 0, 0);
+				var at = frame.point(agent.x, agent.y(), agent.z);
+				villager.snapTo(at.x, at.y, at.z, 0, 0);
 				level.addEntity(villager);
 				villagers.put(agent.threadId, villager);
 				threadByEntity.put(villager.getId(), agent.threadId);
@@ -172,7 +175,7 @@ final class T3Village {
 				AgentAppearance.update(villager, row, mod.state().online(row.id()), mod.state().driverFor(row));
 			}
 		}
-		laptops.sync(level,o,brain.agents().values(),Math.max(2,floors.size()*2));
+		laptops.sync(level,frame,brain.agents().values(),Math.max(2,floors.size()*2));
 		if (mod.office().building() || ticks < nextDecorationAttempt) return;
 		nextDecorationAttempt = ticks + 100;
 		// Retry after chunk reloads; never resend unchanged content on a timer.
@@ -180,17 +183,17 @@ final class T3Village {
 		for (int floor = 0; floor < Math.max(2, floors.size()*2); floor++) {
 			List<T3Office.Note> notes = brain.notes(floor, mod.state()::waitingDetail);
 			String key = notes.toString();
-			if (!OfficeSite.loaded(level, o, T3Office.whiteboard(floor, notes))) { boards.remove(floor); continue; }
+			if (!OfficeSite.loaded(level, frame, T3Office.whiteboard(floor, notes))) { boards.remove(floor); continue; }
 			if (!key.equals(boards.get(floor))) {
 				int index = floor;
-				mod.office().send(o, T3Office.whiteboard(floor, notes), () -> boards.put(index, key));
+				mod.office().send(frame, T3Office.whiteboard(floor, notes), () -> boards.put(index, key));
 			}
 		}
 		// Lamps follow this world's day/night cycle.
 		boolean dark = OfficeProps.night(level);
-		if (!OfficeSite.loaded(level, o, T3Office.lamps(floors.size(), dark))) { night = null; return; }
+		if (!OfficeSite.loaded(level, frame, T3Office.lamps(floors.size(), dark))) { night = null; return; }
 		if (night == null || night != dark) {
-			mod.office().send(o, T3Office.lamps(floors.size(), dark), () -> night = dark);
+			mod.office().send(frame, T3Office.lamps(floors.size(), dark), () -> night = dark);
 		}
 	}
 

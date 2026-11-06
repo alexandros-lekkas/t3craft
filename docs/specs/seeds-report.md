@@ -1,10 +1,20 @@
-> **Status:** verified 2026-11-05. Default and alternates adopted (see [Decisions](../DECISIONS.md#2026-11-05--plains-seed-by-default)). Pictures: [docs/design/world.md](../design/world.md).
+> **Status:** verified 2026-11-05. Default and alternates adopted (see [Decisions](../DECISIONS.md#2026-11-05--plains-seed-by-default)). Pictures: [docs/design/world.md](../design/world.md). The coordinates the mod actually uses are in [Recorded office sites](#recorded-office-sites) below; the per-seed "office origin" lines are the survey's 24 × 20 boxes.
 
 # Verified Java 26.3 seed shortlist
 
 Generated and measured using the official vanilla 26.3 server, JDK 25. Fifteen distinct seeds evaluated: ten published leads and five pseudorandom seeds. All 256×256 maps contain 65,536 measured columns, with no missing data.
 
 Recommended default: `-2085440121970745551`.
+
+## Recorded office sites
+
+The survey below measured axis-aligned 24 × 20 boxes (origin = minimum-X, minimum-Z corner) to rank seeds. The mod records a different thing in `src/main/resources/t3craft/seeds.json`: the office **origin** in design A's own convention (the inside floor corner of the ground floor, see [office-design-a/spec.md](office-design-a/spec.md)) and the direction its glazing **faces**; the building, plaza included (34 × 32 blocks), is turned about that cell. These sites were verified in-game with the full footprint (`./gradlew runClient -Pworldtest=<place>`, pictures in [world.md](../design/world.md)) and are the numbers to use. Placement re-checks them against the generator's heightmaps and searches nearby if worldgen has drifted.
+
+| Place | Seed | Recorded origin | Glazing faces | Survey box (this report) |
+| --- | --- | --- | --- | --- |
+| Lakeside | `-2085440121970745551` | (8, 65, -2) | east | (-5, 65, -21), face east |
+| Cherry Plains | `-4474845086078965121` | (44, 63, 7) | west | (24, 64, 10), face west |
+| River Bend | `3478701220631481329` | (7, 64, -69) | north | (6, 65, 9), face north |
 
 Office origin is the northwest/min-X/min-Z floor corner; footprint is 24 along +X by 20 along +Z. Y is one above the highest existing surface block. All 480 columns are dry natural ground and clear of trees/buildings; ordinary grass/flowers need clearing. Fill lower ground to Y−1. Every footprint corner lies within 64 horizontal blocks of saved world spawn. Facing identifies the front/view, and does not redefine the footprint. Spawn coordinates are the saved world spawn, not a promise of an exact joining-player location.
 
@@ -13,7 +23,7 @@ Office origin is the northwest/min-X/min-Z floor corner; footprint is 24 along +
 An open green start with a broad river-water basin east of the office and a wooded southern edge. The best balance of a comfortable spawn, scenery, and easy automatic construction. The office is essentially beside spawn, with no trees or water in its footprint.
 
 - Spawn: `(0, 65, 0)`.
-- Office origin: `(-5, 65, -21)`; face **east**; center 13.2 blocks from spawn.
+- Survey box origin: `(-5, 65, -21)`; face **east**; center 13.2 blocks from spawn. Recorded site: origin `(8, 65, -2)` facing east (see above).
 - Flatness: ground Y 63–64; range 1 blocks; standard deviation 0.431; 118 foundation-fill blocks; 480/480 dry columns.
 - Nearby features: Broad water basin east (river located at 64,65,0; 64 blocks from spawn); forest edge south, about 76 blocks from office center; windswept hills within the mapped area. Village at -176,~, -480 (511 blocks from spawn). Cherry grove 1,229 blocks away and jagged peaks 830 blocks away: neither is advertised as an immediate spawn view. A ruined portal/lava area lies farther southeast in the forest, outside the office.
 - PNG: see the map in [docs/design/world.md](../design/world.md).
@@ -23,7 +33,7 @@ An open green start with a broad river-water basin east of the office and a wood
 Broad, mostly treeless plains with cherry trees on the western side, forest to the northeast and village buildings to the southeast. The office patch is especially uniform. There are cave openings elsewhere near spawn; keep paths away from those holes. Water is farther away than in the first and third choices.
 
 - Spawn: `(0, 66, 0)`.
-- Office origin: `(24, 64, 10)`; face **west**; center 40.5 blocks from spawn.
+- Survey box origin: `(24, 64, 10)`; face **west**; center 40.5 blocks from spawn. Recorded site: origin `(44, 63, 7)` facing west, where the placement search put design A (the survey box is too small for it).
 - Flatness: ground Y 62–63; range 1 blocks; standard deviation 0.162; 467 foundation-fill blocks; 480/480 dry columns.
 - Nearby features: Cherry grove located at -128,66,0 (128 blocks from spawn), west-facing pink-tree view; village at 144,~,64 (157 blocks); river at 64,66,-128 (143 blocks), with mapped water about 100 blocks north of office center. No nearby peak biome: frozen peaks 2,056 blocks away.
 - PNG: see the map in [docs/design/world.md](../design/world.md).
@@ -33,7 +43,7 @@ Broad, mostly treeless plains with cherry trees on the western side, forest to t
 Open plains beside a broad river bend, with a cherry-covered hill south of the office. Face the front north across the water and use south-facing upper-floor windows for the cherry hill. The clear patch needs modest two-block grading; the spawn and office are on the low plains, not atop the hill.
 
 - Spawn: `(-16, 68, 16)`.
-- Office origin: `(6, 65, 9)`; face **north**; center 33.6 blocks from spawn.
+- Survey box origin: `(6, 65, 9)`; face **north**; center 33.6 blocks from spawn. Recorded site: origin `(7, 64, -69)` facing north on the bend, where the placement search put design A.
 - Flatness: ground Y 62–64; range 2 blocks; standard deviation 0.608; 620 foundation-fill blocks; 480/480 dry columns.
 - Nearby features: Mapped water 13.5 blocks from office center; river located at -48,68,-16 (45 blocks from spawn). Cherry grove located at 16,68,80 (71 blocks from spawn), with its mapped edge about 37 blocks from office center. Village at -176,~,176 (226 blocks). No nearby peak biome: frozen peaks 2,404 blocks away.
 - PNG: see the map in [docs/design/world.md](../design/world.md).

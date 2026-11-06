@@ -29,13 +29,13 @@ final class OfficeQueue {
   });
 	}
 	void clear() { queue.clear(); quietUntil = 0; inFlight = false; generation++; failedCommands = 0; sentCommands = 0; }
-	void send(BlockPos origin, List<String> commands) { send(origin, commands, () -> {}); }
-	boolean send(BlockPos origin, List<String> commands, Runnable completed) {
+	void send(BlockPos origin, List<String> commands) { send(OfficeFrame.at(origin), commands, () -> {}); }
+	boolean send(OfficeFrame frame, List<String> commands, Runnable completed) {
 		Minecraft mc = Minecraft.getInstance();
 		bind(mc);
 		if (denied || commands.isEmpty()) return false;
 		for (int i = 0; i < commands.size(); i++) queue.add(mc.level, mc.getConnection(), List.of(new Work(
-			T3Office.absolute(commands.get(i), origin.getX(), origin.getY(), origin.getZ()), i == commands.size() - 1 ? completed : () -> {})));
+			frame.command(commands.get(i)), i == commands.size() - 1 ? completed : () -> {})));
 		return true;
 	}
 	boolean hideFeedback(Component component) {
