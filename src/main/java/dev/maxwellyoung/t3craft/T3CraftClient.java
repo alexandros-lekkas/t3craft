@@ -90,6 +90,7 @@ public final class T3CraftClient implements ClientModInitializer {
 			(message, overlay) -> overlay || !(T3Books.isOwnFeedback(message.getString()) || office.hideFeedback(message.getString())));
 		SelfTest selfTest = SelfTest.fromSystemProperty(this);
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
+			state.setPins(List.copyOf(officePreferences().pins));
 			if (selfTest != null) selfTest.tick(client);
 			while (decisionsKey.consumeClick()) if (client.gui.screen() == null) openDecisions();
 			while (openKey.consumeClick()) {

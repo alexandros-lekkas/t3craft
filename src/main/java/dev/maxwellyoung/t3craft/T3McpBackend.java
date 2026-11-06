@@ -36,6 +36,13 @@ final class T3McpBackend implements T3Backend {
   case "t3_thread_configure" -> "change the model"; default -> "load threads";
  }; }
 	private long sequence;
+ private static final class History {
+  final LinkedHashMap<String, JsonObject> items = new LinkedHashMap<>();
+  Integer nextPosition;
+ }
+ private final Map<String, History> histories = new LinkedHashMap<>(16, 0.75f, true) {
+  @Override protected boolean removeEldestEntry(Map.Entry<String, History> eldest) { return size() > 64; }
+ };
 	T3McpBackend(T3Config.Environment env) {
 		url = env.mcpUrl; token = env.mcpToken; owner = T3Config.ownerKey(env.baseUrl); expiresAt = env.mcpExpiresAt; access = env.mcpScope;
 		legacy = env.accessToken == null || env.accessToken.isBlank() ? null : new T3Api(owner, env.accessToken);
@@ -131,6 +138,7 @@ final class T3McpBackend implements T3Backend {
 	synchronized JsonObject call(String name, JsonObject arguments) throws IOException, InterruptedException {
   for (int attempt = 0; ; attempt++) try { return callOnce(name, arguments); }
   catch (SessionLost e) { if (attempt > 0) throw failure(PROTOCOL, true, "T3 MCP session could not be re-established."); }
+  catch (RuntimeException e) { throw failure(PROTOCOL, false, "T3 MCP returned an invalid tool response."); }
  }
  private JsonObject callOnce(String name, JsonObject arguments) throws IOException, InterruptedException {
 		if (!initialized) {
@@ -168,13 +176,30 @@ final class T3McpBackend implements T3Backend {
 		while (true) {
 			JsonObject page = call(tool, args); all.addAll(T3Protocol.array(page, key));
 			if (!page.has("nextCursor") || page.get("nextCursor").isJsonNull()) return all;
-			int next = page.get("nextCursor").getAsInt(); if (next <= previous) throw new IOException("T3 MCP pagination did not advance.");
+			int next = page.get("nextCursor").getAsInt(); if (next <= previous) throw failure(PROTOCOL, false, "T3 MCP pagination did not advance.");
 			previous = next; args.addProperty("cursor", next);
 		}
 	}
 	private JsonObject mcpShell() throws IOException, InterruptedException {
 		JsonObject out = new JsonObject(), args = new JsonObject(); args.addProperty("allProjects", true); args.addProperty("includeSubagents", false);
-		JsonArray threads = new JsonArray(); for (var value : pages("t3_thread_list", "threads", args)) threads.add(normalize(value.getAsJsonObject()));
+		JsonArray threads = new JsonArray(); Set<String> listed = new HashSet<>();
+        for (var value : pages("t3_thread_list", "threads", args)) { JsonObject row = normalize(value.getAsJsonObject()); threads.add(row); listed.add(T3Protocol.string(row, "id")); }
+        // Main rows exclude children. Fetch only waiting children separately so Decisions can route to their own IDs.
+        JsonObject waiting = new JsonObject(); waiting.addProperty("allProjects", true); waiting.addProperty("includeSubagents", true);
+        JsonArray statuses = new JsonArray(); statuses.add("waiting"); waiting.add("statuses", statuses);
+        for (var value : pages("t3_thread_list", "threads", waiting)) {
+            JsonObject row = normalize(value.getAsJsonObject());
+            if (listed.add(T3Protocol.string(row, "id"))) { row.addProperty("childRequestsOnly", true); threads.add(row); }
+        }
+        // Public thread_list never returns side chats, even with includeSubagents:true.
+        // Legacy shell supplies their IDs and pending flags when the companion connection exists.
+        if (legacy != null) try {
+            for (var value : T3Protocol.array(viaLegacy(legacy::shell), "threads")) {
+                JsonObject child = value.getAsJsonObject();
+                if (T3Visibility.child(child) && (T3Visibility.flag(child, "hasPendingApprovals") || T3Visibility.flag(child, "hasPendingUserInput"))
+                    && listed.add(T3Protocol.string(child, "id"))) threads.add(child);
+            }
+        } catch (IOException | RuntimeException ignored) {}
 		out.add("threads", threads); out.add("projects", pages("t3_project_list", "projects", new JsonObject())); return out;
 	}
 	private static JsonObject normalize(JsonObject source) {
@@ -188,16 +213,32 @@ final class T3McpBackend implements T3Backend {
 		return out;
 	}
 	private synchronized JsonObject mcpThread(String id, int turns) throws IOException, InterruptedException {
-		JsonObject args = obj("threadId", id); args.addProperty("view", "activity"); args.addProperty("runLimit", turns); args.addProperty("limit", 100); args.addProperty("maxCharsPerItem", 50000);
-		JsonObject page = call("t3_thread_read", args), out = normalize(page.getAsJsonObject("thread"));
-		JsonArray items = new JsonArray(), messages = new JsonArray(), activities = new JsonArray();
-		int previous = -1;
-		for (int pageCount = 0; pageCount < 10; pageCount++) {
-			items.addAll(T3Protocol.array(page, "items"));
-			if (!page.has("nextPosition") || page.get("nextPosition").isJsonNull() || pageCount == 9 || !page.has("hasMore") || !page.get("hasMore").getAsBoolean()) break;
-			int next = page.get("nextPosition").getAsInt(); if (next <= previous) throw new IOException("T3 MCP activity pagination did not advance.");
-			previous = next; args.addProperty("afterPosition", next); page = call("t3_thread_read", args);
-		}
+        History history = histories.computeIfAbsent(id, ignored -> new History());
+        JsonObject args = obj("threadId", id); args.addProperty("view", "activity"); args.addProperty("runLimit", Math.max(1, Math.min(50, turns))); args.addProperty("limit", 100); args.addProperty("maxCharsPerItem", 50000);
+        if (history.nextPosition != null) args.addProperty("afterPosition", history.nextPosition);
+        JsonObject page = call("t3_thread_read", args), out = normalize(page.getAsJsonObject("thread"));
+        // Positions are stable; refresh in-progress items whose text can change in place.
+        for (var entry : new ArrayList<>(history.items.entrySet())) {
+            String status = T3Protocol.string(entry.getValue(), "status");
+            if (!"running".equals(status) && !"pending".equals(status)) continue;
+            JsonObject itemRead = obj("threadId", id); itemRead.addProperty("itemId", entry.getKey()); itemRead.addProperty("view", "activity"); itemRead.addProperty("maxCharsPerItem", 50000);
+            for (var value : T3Protocol.array(call("t3_thread_read", itemRead), "items")) history.items.put(entry.getKey(), value.getAsJsonObject().deepCopy());
+        }
+        for (int pageCount = 0; pageCount < 10; pageCount++) {
+            for (var value : T3Protocol.array(page, "items")) {
+                JsonObject item = value.getAsJsonObject(); String key = T3Protocol.string(item, "itemId");
+                if (key == null) key = "position:" + item.get("position");
+                history.items.put(key, item.deepCopy());
+            }
+            if (!page.has("nextPosition") || page.get("nextPosition").isJsonNull()) break;
+            int next = page.get("nextPosition").getAsInt();
+            if (history.nextPosition != null && next <= history.nextPosition) throw failure(PROTOCOL, false, "T3 MCP activity pagination did not advance.");
+            history.nextPosition = next;
+            if (!page.has("hasMore") || !page.get("hasMore").getAsBoolean() || pageCount == 9) break;
+            args.addProperty("afterPosition", next); page = call("t3_thread_read", args);
+        }
+        JsonArray items = new JsonArray(), messages = new JsonArray(), activities = new JsonArray();
+        for (var item : history.items.values()) items.add(item.deepCopy());
 		for (var value : items) {
 			JsonObject item = value.getAsJsonObject(); String type = T3Protocol.string(item, "type");
 			item.add("startedAt", item.get("updatedAt")); item.add("input", item.get("text")); item.add("prompt", item.get("text"));
@@ -230,11 +271,13 @@ final class T3McpBackend implements T3Backend {
 			if (!T3Protocol.array(p, "constraints").isEmpty()) continue;
 			List<T3Api.Model> models = new ArrayList<>();
 			for (var m : T3Protocol.array(p, "models")) { JsonObject model = m.getAsJsonObject(); String id = T3Protocol.string(model, "id"); models.add(new T3Api.Model(id, Optional.ofNullable(T3Protocol.string(model, "label")).orElse(id))); }
-			result.add(new T3Api.Provider(T3Protocol.string(p, "providerInstanceId"), Optional.ofNullable(T3Protocol.string(p, "displayName")).orElse(T3Protocol.string(p, "driverKind")), false, List.copyOf(models)));
+			String label = Optional.ofNullable(T3Protocol.string(p, "displayName")).orElse(T3Protocol.string(p, "driverKind"));
+            if (p.has("omittedModels") && !p.get("omittedModels").isJsonNull() && p.get("omittedModels").getAsInt() > 0) label += " (" + p.get("omittedModels").getAsInt() + " more models in T3 Code)";
+            result.add(new T3Api.Provider(T3Protocol.string(p, "providerInstanceId"), label, false, List.copyOf(models)));
 		}
 		return List.copyOf(result);
 	}
-	private void mcpSendPrompt(JsonObject thread, String text, JsonObject model) throws IOException, InterruptedException {
+	private synchronized void mcpSendPrompt(JsonObject thread, String text, JsonObject model) throws IOException, InterruptedException {
 		String id = thread.get("id").getAsString();
 		if (model != null && !model.equals(thread.get("modelSelection"))) { JsonObject args = obj("threadId", id); args.add("modelSelection", model); call("t3_thread_configure", args); }
 		JsonObject args = obj("threadId", id); args.addProperty("message", text); args.addProperty("mode", "queue"); args.addProperty("clientRequestId", UUID.randomUUID().toString()); call("t3_thread_send", args);

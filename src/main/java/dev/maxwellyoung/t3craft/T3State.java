@@ -69,7 +69,13 @@ public final class T3State {
 		thread.setDaemon(true);
 		return thread;
 	});
-	private final Set<String> watched = ConcurrentHashMap.newKeySet();
+	private volatile Set<String> pinnedKeys = Set.of();
+ void setPins(List<OfficeRoster.Pin> pins) {
+  Set<String> next = pins.stream().map(OfficeRoster.Pin::key).collect(java.util.stream.Collectors.toUnmodifiableSet());
+  if (next.equals(pinnedKeys)) return;
+  pinnedKeys = next; executor.execute(() -> publish(List.of()));
+ }
+ private final Set<String> watched = ConcurrentHashMap.newKeySet();
 	private final Map<String, Status> lastStatus = new HashMap<>();
 	private final Map<String, String> lastTurn = new HashMap<>();
 	// Approval/question ids already announced, per thread. The shell only says "has approvals", so a
@@ -562,7 +568,7 @@ public final class T3State {
 		for (Env env : current) {
 			String label = current.size() > 1 ? env.label : null;
 			for (JsonObject thread : env.threads.values()) {
-				if (isNull(thread, "archivedAt")) rows.add(row(thread, env.projectTitles, label, env.api.ownerKey()));
+				if (isNull(thread, "archivedAt") || bool(thread, "hasPendingApprovals") || bool(thread, "hasPendingUserInput")) rows.add(row(thread, env.projectTitles, label, env.api.ownerKey()));
 			}
 		}
 		return rows;
@@ -585,7 +591,7 @@ public final class T3State {
 			String turnBefore = lastTurn.put(row.id(), turn);
 			// A new turn id also counts: a short turn can start and finish between two slow polls.
 			boolean changed = before != row.status() || (turn != null && !turn.equals(turnBefore));
-			if (before != null && changed && watched.contains(row.id()) && row.status() != Status.WORKING
+			if (T3Visibility.pings(row) && before != null && changed && watched.contains(row.id()) && row.status() != Status.WORKING
 				&& row.status() != Status.IDLE) {
 				events.add(new Event(row, row.status()));
 			}
@@ -600,7 +606,7 @@ public final class T3State {
 		Set<String> seen = seenApprovals.put(focus.threadId(), ids);
 		if (seen == null || seen.containsAll(ids) || !watched.contains(focus.threadId())) return events;
 		ThreadRow row = rows.stream().filter(r -> r.id().equals(focus.threadId())).findFirst().orElse(null);
-		if (row == null || events.stream().anyMatch(e -> e.thread().id().equals(row.id()) && e.status() == Status.NEEDS_YOU)) return events;
+		if (row == null || !T3Visibility.pings(row) || events.stream().anyMatch(e -> e.thread().id().equals(row.id()) && e.status() == Status.NEEDS_YOU)) return events;
 		List<Event> more = new ArrayList<>(events);
 		more.add(new Event(row, Status.NEEDS_YOU));
 		return more;
@@ -609,10 +615,11 @@ public final class T3State {
 	/** Rebuilds the published snapshot from the mirrors, then fires events against it. */
 	private void publish(List<Event> events) {
 		List<ThreadRow> rows = allRows();
-		rows.sort(Comparator.comparing((ThreadRow row) -> activityAt(row.raw())).reversed());
+		rows.sort(Comparator.comparingInt((ThreadRow row) -> row.status() == Status.NEEDS_YOU ? 0 : 1)
+            .thenComparing(Comparator.comparing((ThreadRow row) -> activityAt(row.raw())).reversed()));
 		// Every active thread from every machine; the panel scrolls and filters.
 		Map<String, ThreadRow> visible = new LinkedHashMap<>();
-		for (ThreadRow row : rows) visible.put(row.id(), row);
+		for (ThreadRow row : rows) if (T3Visibility.visible(row, pinnedKeys.contains(OfficeRoster.key(row)))) visible.put(row.id(), row);
 		Focus focus = focusDetail != null && focusDetail.threadId().equals(focusedThreadId) ? focusDetail : null;
 		if (focus != null) events = withNewApprovals(focus, rows, events);
 		List<Env> current = envs;

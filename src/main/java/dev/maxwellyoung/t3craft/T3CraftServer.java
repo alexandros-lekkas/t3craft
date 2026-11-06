@@ -132,6 +132,7 @@ public final class T3CraftServer implements DedicatedServerModInitializer {
 		for (T3Config.Environment env : config.environments) {
 			connections.add(new T3State.Connection(T3Backend.forEnvironment(env), env.label));
 		}
+		state.setPins(List.copyOf(config.sharedOfficePreferences.pins));
 		state.connect(connections, null);
 	}
 }

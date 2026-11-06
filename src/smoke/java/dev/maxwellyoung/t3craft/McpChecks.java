@@ -16,7 +16,7 @@ public final class McpChecks {
   int port = Integer.parseInt(args[0]); base = "http://127.0.0.1:" + port; second = "http://127.0.0.1:" + (port + 1);
   try {
    oauthHappyPath(); oauthDeny(); oauthReadOnlyRejected(); supervisedGrantLimits(); readOnlyTokenToolRefusal(); cancelAndReopen();
-   sessionRestart(); mcpOnlyViaState(); hybridHealthy(); hybridMcpDown(); hybridMcpRevoked(); hybridLegacyBroken(); twoMachineRouting(); config050Migration(); credentialFailures();
+   sessionRestart(); incrementalHistory(); mcpOnlyViaState(); hybridHealthy(); hybridMcpDown(); hybridMcpRevoked(); hybridLegacyBroken(); twoMachineRouting(); config050Migration(); credentialFailures(); visibility(false); visibility(true);
    schemaConformance();
    System.out.println("MCP checks passed: OAuth (approve/deny/read-only/limited/cancel), session recovery, per-leg health and fallbacks, refusals, schema conformance, routing and config migration.");
   } finally { reset(); }
@@ -85,6 +85,21 @@ public final class McpChecks {
   get(base + "/_qa/mcp-restart"); api.sendPrompt(row, "Fixture prompt", null);
   check(calls("initialize") == 3 && calls("t3_thread_send") == 1, "write recovered without duplicate execution");
  }
+ static void incrementalHistory() throws Exception {
+  reset(); var api = api(false);
+  var first = api.thread("mcp-question", 4); long before = calls("t3_thread_read");
+  var second = api.thread("mcp-question", 4);
+  check(calls("t3_thread_read") == before + 1 && second.getAsJsonArray("turnItems").equals(first.getAsJsonArray("turnItems")), "incremental history retains items without replay");
+  var reads = array("/_qa/mcp-calls").asList().stream().map(JsonElement::getAsJsonObject).filter(c -> "t3_thread_read".equals(c.get("name").getAsString())).toList();
+  check(reads.getLast().getAsJsonObject("arguments").get("afterPosition").getAsInt() == 2, "resumes at saved nextPosition");
+  check(api.providers(null).getFirst().name().contains("more models in T3 Code"), "omitted models disclosed");
+  get(base + "/_qa/mcp-history-long"); before = calls("t3_thread_read"); api.thread("long-thread", 4);
+  check(calls("t3_thread_read") == before + 10, "history fetch capped at ten pages");
+  before = calls("t3_thread_read"); var continued = api.thread("long-thread", 4);
+  check(calls("t3_thread_read") == before + 10 && continued.getAsJsonArray("turnItems").size() == 20, "capped history resumes next fetch");
+  get(base + "/_qa/mcp-history-null"); before = calls("t3_thread_read"); api.thread("null-thread", 4);
+  check(calls("t3_thread_read") == before + 1, "null position stops even with hasMore");
+ }
  static void mcpOnlyViaState() throws Exception {
   reset(); var api = api(false); var row = row(api); check(api.publicMcp() && !api.hasLegacy(), "MCP only");
   check(api.shell().getAsJsonArray("threads").size() == 2, "all pages loaded");
@@ -98,7 +113,7 @@ public final class McpChecks {
    check(state.snapshot().focus().messages().getFirst().text().equals("MCP reply"), "message before send");
    var error = new AtomicReference<Exception>();
    state.run(() -> api.sendPrompt(row, "Fixture prompt", T3Api.modelSelection("fixture-provider", "changed-model")), error::set);
-   await(() -> state.snapshot().focus().messages().getFirst().text().equals("Sent"), "state observes actual message change");
+   await(() -> state.snapshot().focus().messages().getLast().text().equals("Sent"), "state observes actual message change");
    state.respond("mcp-question", "mcp-request", null, T3McpBackend.obj("format", "json"), error::set);
    await(() -> state.snapshot().focus().userInputs().isEmpty(), "question answered through state"); check(error.get() == null, "state writes succeed");
    check(api.startThread(row, "Fixture new thread ", null).equals("mcp-new"), "launch retains worktree"); api.interrupt("mcp-question");
@@ -174,6 +189,38 @@ public final class McpChecks {
    check(Files.getPosixFilePermissions(file).equals(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")), "private credential persistence");
    config.upsert(new T3Config.Environment("Legacy refreshed", base, "fixture-only")); check(config.environments.getFirst().mcpScope.equals(loaded.mcpScope), "legacy re-pair preserves MCP scope");
   } finally { Files.deleteIfExists(file); Files.deleteIfExists(dir); }
+ }
+ static void visibility(boolean mcp) throws Exception {
+  reset(); get(base + "/_qa/visibility"); if (mcp) get(base + "/_qa/mcp-hybrid");
+  T3Backend api = mcp ? api(true) : new T3Api(base, "fixture-only");
+  var events = new java.util.concurrent.CopyOnWriteArrayList<T3State.Event>(); var state = new T3State(events::add);
+  state.connect(api, "vis-snoozed-needs"); state.setPanelOpen(true);
+  try {
+   await(() -> state.snapshot().connected() && state.snapshot().threads().stream().anyMatch(r -> r.id().equals("vis-active-override")), "visibility fixtures loaded");
+   var rows = state.snapshot().threads();
+   check(rows.stream().noneMatch(r -> List.of("vis-settled", "vis-subagent", "vis-sidechat", "vis-archived").contains(r.id())), "settled, archived and children hidden");
+   check(rows.stream().filter(r -> r.id().equals("vis-snoozed")).allMatch(T3Visibility::snoozedGroup), "snoozed belongs in collapsed group");
+   check(rows.stream().anyMatch(r -> r.id().equals("vis-snoozed-needs") && !T3Visibility.snoozedGroup(r)), "needs-you raised from snoozed group");
+   check(rows.stream().anyMatch(r -> r.id().equals("vis-settled-needs")), "needs-you raised from settled");
+   check(rows.getFirst().status() == T3State.Status.NEEDS_YOU, "needs-you sorted first");
+   await(() -> state.decisions().stream().filter(d -> List.of("vis-subagent", "vis-sidechat").contains(d.thread().id()) && d.requestId() != null).count() == 2, "hidden child decisions retained");
+   var error = new AtomicReference<Exception>();
+   for (String child : List.of("vis-subagent", "vis-sidechat")) {
+    state.respond(child, mcp ? "mcp-request" : "shared-request", null, T3McpBackend.obj("format", "json"), error::set);
+    await(() -> state.decisions().stream().noneMatch(d -> child.equals(d.thread().id()) && d.requestId() != null), "child response routes by child id");
+   }
+   check(error.get() == null, "hidden child answers succeed");
+   if (mcp) check(array("/_qa/mcp-calls").asList().stream().map(JsonElement::getAsJsonObject).filter(c -> "t3_pending_request".equals(c.get("name").getAsString())).anyMatch(c -> "vis-subagent".equals(T3Protocol.string(c.getAsJsonObject("arguments"), "threadId")) && "respond".equals(T3Protocol.string(c.getAsJsonObject("arguments"), "action"))), "MCP child target recorded");
+   else check(array("/_qa/dispatches").asList().stream().anyMatch(c -> "vis-sidechat".equals(T3Protocol.string(c.getAsJsonObject(), "threadId"))), "legacy child target recorded");
+   var snoozed = rows.stream().filter(r -> r.id().equals("vis-snoozed-needs")).findFirst().orElseThrow();
+   check(!T3Visibility.pings(snoozed) && events.stream().noneMatch(e -> e.thread().id().startsWith("vis-snoozed")), "snoozed threads do not ping");
+   state.setPins(List.of(new OfficeRoster.Pin(base, "vis-settled", "Pinned settled")));
+   await(() -> state.snapshot().threads().stream().anyMatch(r -> r.id().equals("vis-settled")), "pinned settled thread visible");
+   var prefs = new OfficeRoster.Preferences(); prefs.pins.add(new OfficeRoster.Pin(base, "vis-settled", "Pinned settled"));
+   var residents = OfficeRoster.sync(state.snapshot().threads(), List.of(base), prefs);
+   check(residents.stream().anyMatch(r -> r.row().id().equals("vis-settled")) && residents.stream().noneMatch(r -> List.of("vis-snoozed", "vis-sidechat", "vis-subagent").contains(r.row().id())), "office shares visibility and pin rules");
+   state.setPins(List.of()); await(() -> state.snapshot().threads().stream().noneMatch(r -> r.id().equals("vis-settled")), "unpin hides settled thread again");
+  } finally { close(state); }
  }
  static void credentialFailures() throws Exception {
   reset(); var env = env(false); env.mcpToken = "private-marker"; env.mcpExpiresAt = 1; expectAuth(T3Backend.forEnvironment(env)); env.mcpExpiresAt = 0; expectAuth(T3Backend.forEnvironment(env));

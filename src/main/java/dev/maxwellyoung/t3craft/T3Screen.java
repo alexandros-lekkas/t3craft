@@ -49,6 +49,7 @@ final class T3Screen extends Screen {
 	private String projectFilter;
 	private record Project(String key, String label) {}
 	private int sidebarScroll;
+ private boolean snoozedExpanded;
 	/** Model chosen in the picker for the next send; null keeps the thread's current model. */
 	private JsonObject pickedModel;
 	private boolean pickerOpen;
@@ -120,7 +121,7 @@ final class T3Screen extends Screen {
 		List<T3State.ThreadRow> rows = sidebarRows();
 		String focused = mod.state().focusedThreadId();
 		for (int i = 0; i < rows.size(); i++) {
-			if (!rows.get(i).id().equals(focused)) continue;
+			if (rows.get(i) == null || !rows.get(i).id().equals(focused)) continue;
 			int visible = visibleRows();
 			if (i < sidebarScroll || i >= sidebarScroll + visible) sidebarScroll = Math.max(0, i - visible / 2);
 			clampSidebarScroll(rows.size());
@@ -186,11 +187,15 @@ final class T3Screen extends Screen {
 		return projects.values().stream().sorted(java.util.Comparator.comparing(Project::label)).toList();
 	}
 
-	private List<T3State.ThreadRow> sidebarRows() {
-		return mod.state().snapshot().threads().stream()
-			.filter(r -> envFilter == null || envFilter.equals(r.ownerKey()))
-			.filter(r -> projectFilter == null || projectFilter.equals(OfficeRoster.projectKey(r))).toList();
-	}
+ private List<T3State.ThreadRow> sidebarRows() {
+  List<T3State.ThreadRow> filtered = mod.state().snapshot().threads().stream()
+   .filter(r -> envFilter == null || envFilter.equals(r.ownerKey()))
+   .filter(r -> projectFilter == null || projectFilter.equals(OfficeRoster.projectKey(r))).toList();
+  List<T3State.ThreadRow> result = new java.util.ArrayList<>(filtered.stream().filter(r -> !T3Visibility.snoozedGroup(r)).toList());
+  List<T3State.ThreadRow> snoozed = filtered.stream().filter(T3Visibility::snoozedGroup).toList();
+  if (!snoozed.isEmpty()) { result.add(null); if (snoozedExpanded) result.addAll(snoozed); }
+  return result;
+ }
 
 	private int projectTop() { return MARGIN + HEADER + (machines().size() > 1 ? FILTER : 0); }
 	private int listTop() { return projectTop() + (projects().size() > 1 ? FILTER : 0); }
@@ -322,14 +327,14 @@ final class T3Screen extends Screen {
 	boolean focusedRowVisibleForTest() {
 		List<T3State.ThreadRow> rows = sidebarRows();
 		for (int i = 0; i < rows.size(); i++) {
-			if (rows.get(i).id().equals(mod.state().focusedThreadId())) return i >= sidebarScroll && i < sidebarScroll + visibleRows();
+			if (rows.get(i) != null && rows.get(i).id().equals(mod.state().focusedThreadId())) return i >= sidebarScroll && i < sidebarScroll + visibleRows();
 		}
 		return false;
 	}
 
 	/** Used by the dev self-test: rows in the sidebar under the current filter. */
 	int sidebarCountForTest() {
-		return sidebarRows().size();
+		return (int) sidebarRows().stream().filter(java.util.Objects::nonNull).count();
 	}
 
 	/** Used by the dev self-test: the same path as the mouse wheel over the sidebar. */
@@ -463,6 +468,7 @@ final class T3Screen extends Screen {
 			&& event.y() < listTop + visibleRows() * ROW) {
 			int index = (int) ((event.y() - listTop) / ROW) + sidebarScroll;
 			if (index < rows.size()) {
+                if (rows.get(index) == null) { snoozedExpanded = !snoozedExpanded; clampSidebarScroll(sidebarRows().size()); return true; }
 				mod.saveDraft(draftKey(), composer.getValue());
 				mod.focus(rows.get(index).id());
 				selectedRequest = null;
@@ -554,6 +560,10 @@ final class T3Screen extends Screen {
 		String focused = mod.state().focusedThreadId();
 		for (int i = sidebarScroll; i < rows.size() && i < sidebarScroll + visible; i++) {
 			T3State.ThreadRow row = rows.get(i);
+            if (row == null) {
+                graphics.text(font, (snoozedExpanded ? "▾ " : "▸ ") + "Snoozed", x0 + 8, y + 6, 0xFF9CA3AF, false);
+                y += ROW; continue;
+            }
 			boolean hovered = mouseX >= x0 && mouseX < x1 && mouseY >= y && mouseY < y + ROW;
 			if (row.id().equals(focused) && !newThread) graphics.fill(x0 + 2, y, x1 - 2, y + ROW, 0x40FFFFFF);
 			else if (hovered) graphics.fill(x0 + 2, y, x1 - 2, y + ROW, 0x20FFFFFF);

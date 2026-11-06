@@ -102,6 +102,9 @@ class Fixture(ThreadingHTTPServer):
         self.oauth_decision = "approve"
         self.mcp_violations = []
         self.mcp_posts = 0
+        self.mcp_history_mode = None
+        self.visibility = False
+        self.mcp_answered_ids = set()
         self.mcp_answered = False
         self.mcp_sent = False
         self.oauth_redirect = None
@@ -138,10 +141,25 @@ class Handler(BaseHTTPRequestHandler):
             base = f'http://127.0.0.1:{self.server.server_port}'
             if self.path == '/.well-known/oauth-protected-resource/mcp': return self.reply({'resource': base + '/mcp', 'authorization_servers': [base]})
             if self.path == '/.well-known/oauth-authorization-server': return self.reply({'issuer': base, 'registration_endpoint': base + '/oauth/mcp/register', 'authorization_endpoint': base + '/oauth/mcp/authorize', 'token_endpoint': base + '/oauth/mcp/token'})
+            if self.path == '/_qa/visibility':
+                self.server.visibility = True
+                for name in ('settled', 'snoozed', 'subagent', 'sidechat', 'settled-needs', 'snoozed-needs', 'active-override', 'archived'):
+                    ident = 'vis-' + name
+                    value = thread(ident, name in ('subagent', 'sidechat', 'settled-needs', 'snoozed-needs'), True)
+                    value['lineage'] = {'relationshipToParent': 'subagent' if name == 'subagent' else None, 'sideChat': name == 'sidechat'}
+                    if name.startswith('settled'): value.update(settledOverride='settled', settledAt='2026-01-01T00:00:00Z')
+                    if name.startswith('snoozed'): value.update(snoozedUntil='2099-01-01T00:00:00Z')
+                    if name == 'active-override': value.update(settledOverride='active', settledAt='2026-01-01T00:00:00Z')
+                    if name == 'archived': value['archivedAt'] = '2026-01-01T00:00:00Z'
+                    self.server.threads[ident] = value
+                self.broadcast_snapshot()
+                return self.reply({'ok': True})
             if self.path == '/_qa/mcp-hybrid':
                 self.server.threads['mcp-approval'] = thread('mcp-approval', True)
                 self.server.threads['mcp-question'] = thread('mcp-question', True, True)
                 return self.reply({'ok': True})
+            if self.path in ('/_qa/mcp-history-long', '/_qa/mcp-history-null'):
+                self.server.mcp_history_mode = self.path.rsplit('-', 1)[1]; return self.reply({'ok': True})
             if self.path.startswith('/_qa/mcp-consent?'):
                 q = parse_qs(urlparse(self.path).query)
                 self.server.oauth_access = q.get('access', ['full-access'])[0]
@@ -295,36 +313,53 @@ class Handler(BaseHTTPRequestHandler):
         ident = args.get('threadId', 'mcp-question')
         now = '2026-11-01T00:00:00Z'
         row = {'threadId': ident, 'projectId': 'mcp-project', 'title': 'MCP fixture', 'status': 'completed' if self.server.mcp_answered else 'waiting', 'latestRunId': 'mcp-run', 'providerInstanceId': 'fixture-provider', 'model': 'fixture-model', 'runtimeMode': 'full-access', 'interactionMode': 'default', 'updatedAt': now}
+        def visibility_row(value):
+            result = {**row, **{k: v for k, v in value.items() if k not in ('activities', 'messages', 'latestTurn', 'id')}}
+            result['threadId'] = value['id']
+            result['status'] = 'waiting' if value['hasPendingUserInput'] and value['id'] not in self.server.mcp_answered_ids else 'completed'
+            return result
+        if ident.startswith('vis-') and ident in self.server.threads: row = visibility_row(self.server.threads[ident])
         questions = [{'id': 'format', 'header': 'Format', 'question': 'Which format?', 'options': [{'label': 'JSON', 'description': 'Structured', 'value': 'json'}], 'allowCustomAnswer': True}]
         if name == 't3_thread_list':
             assert args['allProjects'] is True
             cursor = args.get('cursor', 0)
-            row['threadId'] = 'mcp-question' if cursor == 0 else 'mcp-approval'
-            row['status'] = 'waiting' if cursor else row['status']
-            result = {'threads': [row], 'nextCursor': 1 if cursor == 0 else None, 'total': 2}
+            rows = [{**row, 'threadId': 'mcp-question'}, {**row, 'threadId': 'mcp-approval', 'status': 'waiting'}]
+            if self.server.visibility:
+                rows += [visibility_row(v) for key, v in self.server.threads.items() if key.startswith('vis-')]
+            rows = [r for r in rows if not r.get('lineage', {}).get('sideChat')]
+            if not args.get('includeSubagents', True): rows = [r for r in rows if not (r.get('lineage', {}).get('relationshipToParent') == 'subagent' or r.get('lineage', {}).get('sideChat'))]
+            if args.get('statuses'): rows = [r for r in rows if r['status'] in args['statuses']]
+            result = {'threads': rows[cursor:cursor+1], 'nextCursor': cursor+1 if cursor+1 < len(rows) else None, 'total': len(rows)}
         elif name == 't3_project_list': result = {'projects': [{'id': 'mcp-project', 'title': 'MCP project'}], 'nextCursor': None}
         elif name == 't3_thread_read':
             row['worktreePath'] = '/fixture/worktree'
             row['branch'] = 'fixture-branch'
             if args.get('view') == 'activity':
                 if 'afterPosition' not in args:
-                    items = [{'position': 1, 'itemId': 'message-1', 'type': 'assistant_message', 'text': 'Sent' if self.server.mcp_sent else 'MCP reply', 'status': 'completed', 'updatedAt': now, 'textTruncated': False}]
+                    items = [{'position': 1, 'itemId': 'message-1', 'type': 'assistant_message', 'text': 'MCP reply', 'status': 'completed', 'updatedAt': now, 'textTruncated': False}]
                     more = True
-                else:
-                    assert args['afterPosition'] == 1
+                elif args['afterPosition'] == 1:
                     items = [{'position': 2, 'itemId': 'tool-1', 'type': 'command_execution', 'title': 'Fixture command', 'text': 'echo fixture', 'status': 'completed', 'updatedAt': now, 'textTruncated': False}]
                     more = False
+                elif args['afterPosition'] == 2 and self.server.mcp_sent:
+                    items = [{'position': 3, 'itemId': 'message-2', 'type': 'assistant_message', 'text': 'Sent', 'status': 'completed', 'updatedAt': now}]; more = False
+                else: items, more = [], False
             else: items, more = [], False
-            result = {'thread': row, 'recentRuns': [], 'items': items, 'hasMore': more, 'nextPosition': 1 if more else 2}
+            result = {'thread': row, 'recentRuns': [], 'items': items, 'hasMore': more, 'nextPosition': items[-1]['position'] if items else None}
+            if self.server.mcp_history_mode == 'long':
+                position = args.get('afterPosition', 0) + 1
+                result.update(items=[{'position': position, 'itemId': f'long-{position}', 'type': 'assistant_message', 'text': str(position), 'status': 'completed'}], hasMore=True, nextPosition=position)
+            elif self.server.mcp_history_mode == 'null': result.update(items=[], hasMore=True, nextPosition=None)
         elif name == 't3_pending_request':
             action = args['action']
-            if action == 'list': result = {'requestIds': ['mcp-request'] if ident == 'mcp-question' and not self.server.mcp_answered else []}
+            if action == 'list': result = {'requestIds': ['mcp-request'] if (ident == 'mcp-question' and not self.server.mcp_answered or ident.startswith('vis-') and row['status'] == 'waiting') else []}
             elif action == 'read': result = {'requestId': 'mcp-request', 'questions': questions}
             else:
                 assert args['requestId'] == 'mcp-request' and args['answers'] == {'format': 'json'}
-                self.server.mcp_answered = True
+                self.server.mcp_answered_ids.add(ident)
+                if ident == 'mcp-question': self.server.mcp_answered = True
                 result = {'sequence': 1}
-        elif name == 'orchestrator_capabilities': result = {'providers': [{'providerInstanceId': 'fixture-provider', 'driverKind': 'codex', 'displayName': 'Fixture', 'models': [{'id': 'fixture-model', 'label': 'Model'}], 'constraints': []}]}
+        elif name == 'orchestrator_capabilities': result = {'providers': [{'providerInstanceId': 'fixture-provider', 'driverKind': 'codex', 'displayName': 'Fixture', 'models': [{'id': 'fixture-model', 'label': 'Model'}], 'constraints': [], 'omittedModels': 2}]}
         elif name == 't3_thread_configure': result = {'sequence': 2}
         elif name == 't3_thread_send':
             assert args['mode'] == 'queue' and args['message'] == 'Fixture prompt' and args['clientRequestId']

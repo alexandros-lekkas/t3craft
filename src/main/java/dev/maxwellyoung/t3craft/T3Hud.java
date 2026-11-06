@@ -39,11 +39,11 @@ final class T3Hud implements HudElement {
 		if (!mod.paired() || minecraft.gui.screen() instanceof T3Screen) return;
 		T3State.Snapshot snapshot = mod.state().snapshot();
 		T3State.ThreadRow row = snapshot.focusedRow();
-		if (row == null) return;
+		if (row != null && T3Visibility.snoozedGroup(row)) row = null;
 
 		// Ongoing state only; finishing or failing is an event and the toast says it. If the focused
 		// thread is settled, surface a thread that is waiting on you instead of showing "Done".
-		T3State.ThreadRow shown = row.status() == T3State.Status.WORKING || row.status() == T3State.Status.NEEDS_YOU ? row
+		T3State.ThreadRow shown = row != null && (row.status() == T3State.Status.WORKING || row.status() == T3State.Status.NEEDS_YOU) ? row
 			// Only threads you're following; a stale approval elsewhere shouldn't own the corner.
 			: snapshot.threads().stream().filter(t -> t.status() == T3State.Status.NEEDS_YOU && mod.state().isWatched(t.id()))
 				.findFirst().orElse(null);

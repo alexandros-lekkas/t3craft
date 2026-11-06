@@ -12,6 +12,7 @@ import java.util.List;
 
 /** Pairing credentials stay in a private form, outside Minecraft's chat and narration. */
 final class T3ConnectionsScreen extends Screen {
+	private static final String INSTRUCTIONS = "1. In T3: Settings → Environments → ⋯ → Copy MCP URL.\n2. Paste it below and choose Pair machine.\n3. In the browser choose Full access, then Approve.\nAdd a legacy pairing link for the same machine too, to get approvals, review and live updates.";
 	private final T3CraftClient mod;
 	private boolean form, busy, confirming;
 	private String replacing, removing, message = "";
@@ -27,6 +28,7 @@ final class T3ConnectionsScreen extends Screen {
 	}
 	private int left() { return Math.max(20, (width - 500) / 2); }
 	private int right() { return width - left(); }
+	private int formTop() { return Math.max(96, 58 + font.split(Component.literal(INSTRUCTIONS), right() - left()).size() * (font.lineHeight + 2)); }
 	private int perPage() { return Math.max(1, (height - 134) / 52); }
 
 	@Override protected void init() {
@@ -40,12 +42,12 @@ final class T3ConnectionsScreen extends Screen {
 			}).bounds(x, height - 58, 140, 20).build());
 			addRenderableWidget(Button.builder(Component.literal("Keep machine"), b -> { confirming = false; init(); }).bounds(x + 146, height - 58, 120, 20).build());
 		} else if (form) {
-			name = new EditBox(font, x, 96, w, 20, name, Component.literal("Machine name (optional)"));
+			name = new EditBox(font, x, formTop(), w, 20, name, Component.literal("Machine name (optional)"));
 			name.setMaxLength(48); name.setHint(Component.literal("Optional machine name")); addRenderableWidget(name);
-			link = new PrivateLink(x, 134, w, link); link.setResponder(value -> tick()); addRenderableWidget(link); setInitialFocus(link);
+			link = new PrivateLink(x, formTop() + 38, w, link); link.setResponder(value -> tick()); addRenderableWidget(link); setInitialFocus(link);
 			paste = addRenderableWidget(Button.builder(Component.literal("Paste link"), b -> { if (busy) mod.reopenPairingBrowser(); else { link.setValue(minecraft.keyboardHandler.getClipboard().trim()); setFocused(link); } })
-				.bounds(x, 164, 104, 20).build());
-			pair = addRenderableWidget(Button.builder(Component.literal("Pair machine"), b -> { if (busy) mod.cancelPairing(); else submit(); }).bounds(x + 110, 164, 120, 20).build());
+				.bounds(x, formTop() + 68, 140, 20).build());
+			pair = addRenderableWidget(Button.builder(Component.literal("Pair machine"), b -> { if (busy) mod.cancelPairing(); else submit(); }).bounds(x + 146, formTop() + 68, 120, 20).build());
 			addRenderableWidget(Button.builder(Component.literal("Back"), b -> back()).bounds(right() - 60, height - 30, 60, 20).build());
 			tick();
 		} else {
@@ -105,7 +107,7 @@ final class T3ConnectionsScreen extends Screen {
 	@Override public boolean mouseScrolled(double x, double y, double horizontal, double vertical) {
 		if (form) {
 			int lines = font.split(Component.literal(message), right() - left()).size();
-			messageScroll = Math.max(0, Math.min(messageScroll - (int) (vertical * 12), Math.max(0, lines * (font.lineHeight + 2) - (height - 218))));
+			messageScroll = Math.max(0, Math.min(messageScroll - (int) (vertical * 12), Math.max(0, lines * (font.lineHeight + 2) - (height - formTop() - 122))));
 		} else if (!confirming) { page = Math.max(0, Math.min(page - (int) vertical, Math.max(0, (shown.size() - 1) / perPage()))); init(); }
 		return true;
 	}
@@ -126,11 +128,11 @@ final class T3ConnectionsScreen extends Screen {
 			wrapped(g, "Remove " + mod.machineLabel(removing) + " from this Minecraft client? Other machines stay connected. Its saved pins remain available if you pair this address again.", x, 58, w, 0xFFFFCC72);
 			wrapped(g, "This removes local access only. It does not revoke the device in T3 Code or remove the operator's shared pairing.", x, 110, w, 0xFF9CA3AF);
 		} else if (form) {
-			wrapped(g, "1. In T3: Settings → Environments → ⋯ → Copy MCP URL.\n2. Paste it below and choose Pair machine.\n3. In the browser choose Full access, then Approve.\nAdd a legacy pairing link for the same machine too, to get approvals, review and live updates.", x, 40, w, 0xFFE5E7EB);
-			g.text(font, replacing == null ? "Add a machine · name optional" : "Re-pair " + T3Hud.ellipsize(font, mod.machineLabel(replacing), w - 60), x, 82, 0xFF93C5FD, false);
-			g.text(font, "MCP URL or legacy pairing link", x, 122, 0xFF9CA3AF, false);
-			g.enableScissor(x, 188, right(), height - 30);
-			int y = 188 - messageScroll;
+			wrapped(g, INSTRUCTIONS, x, 40, w, 0xFFE5E7EB);
+			g.text(font, replacing == null ? "Add a machine · name optional" : "Re-pair " + T3Hud.ellipsize(font, mod.machineLabel(replacing), w - 60), x, formTop() - 14, 0xFF93C5FD, false);
+			g.text(font, "MCP URL or legacy pairing link", x, formTop() + 26, 0xFF9CA3AF, false);
+			g.enableScissor(x, formTop() + 92, right(), height - 30);
+			int y = formTop() + 92 - messageScroll;
 			for (var line : font.split(Component.literal(message.isEmpty() ? "Use a reachable address for another machine. No chat command needed." : message), w)) {
 				g.text(font, line, x, y, message.isEmpty() ? 0xFF9CA3AF : 0xFFFFCC72, false); y += font.lineHeight + 2;
 			}
