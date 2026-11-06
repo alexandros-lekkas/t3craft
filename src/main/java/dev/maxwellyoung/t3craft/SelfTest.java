@@ -110,14 +110,14 @@ final class SelfTest {
 				fixtureControl(minecraft, "auth-failed"); advance(Step.SETUP_AUTH, "failed A while B remains focused with a draft and pin");
 			}
 			case SETUP_AUTH -> {
-				if (ticks < 40 || mod.state().online("A-done-0") || mod.state().machines().stream().noneMatch(m -> m.owner().endsWith(":25682") && m.error() != null && m.error().contains("Settings > Connections"))) return;
+				if (ticks < 40 || mod.state().online("A-done-0") || mod.state().machines().stream().noneMatch(m -> m.owner().endsWith(":25682") && m.error() != null && m.error().contains("Settings → Environments"))) return;
 				if (!mod.state().online("B-done-0")) { finish(minecraft, "FAIL healthy peer offline"); return; }
 				T3ConnectionsScreen screen = (T3ConnectionsScreen) minecraft.gui.screen(); shot(minecraft, "machine-health-and-recovery");
 				press(screen, "Re-pair"); pasteLink(minecraft, screen, "http://127.0.0.1:25683/pair#token=fixture-pairing"); press(screen, "Pair machine");
 				advance(Step.SETUP_WRONG, "wrong-owner replacement must be refused");
 			}
 			case SETUP_WRONG -> {
-				if (ticks < 20 || !(minecraft.gui.screen() instanceof T3ConnectionsScreen screen) || !screen.messageForTest().contains("another machine")) return;
+				if (ticks < 20 || !(minecraft.gui.screen() instanceof T3ConnectionsScreen screen) || !screen.messageForTest().contains("Use Add machine")) return;
 				if (mod.environments().size() != 2 || mod.state().online("A-done-0")) { finish(minecraft, "FAIL wrong-owner re-pair changed machines"); return; }
 				pasteLink(minecraft, screen, "http://127.0.0.1:25682/pair#token=fixture-pairing"); press(screen, "Pair machine"); advance(Step.SETUP_REPAIRED, "correct fresh bootstrap repairs A");
 			}
@@ -268,7 +268,7 @@ final class SelfTest {
 			}
 			case AUTH_ERROR -> {
 				String error = mod.state().connectionError("A-done-0");
-				if (ticks < 30 || error == null || !error.contains("Settings > Connections")) return;
+				if (ticks < 30 || error == null || !error.contains("Settings → Environments")) return;
 				if (!(minecraft.gui.screen() instanceof T3Screen screen) || !"Connection QA draft".equals(screen.composerValueForTest()) || mod.state().online("A-done-0") || !mod.state().online("B-done-0")) {
 					finish(minecraft, "FAIL auth recovery scope/draft"); return;
 				}

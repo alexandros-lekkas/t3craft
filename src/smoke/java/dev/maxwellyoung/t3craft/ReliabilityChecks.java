@@ -33,7 +33,7 @@ public final class ReliabilityChecks {
 			api.thread("A-done-0", 4); // First request must negotiate before choosing the thread endpoint.
 			get(base + "/_qa/auth-failed");
 			try { api.shell(); throw new IllegalStateException("expected auth failure"); }
-			catch (T3Api.AuthException e) { check(e.getMessage().contains("Settings > Connections"), "auth recovery instruction"); }
+			catch (T3Api.AuthException e) { check(e.getMessage().contains("Settings → Environments"), "auth recovery instruction"); }
 			get(base + "/_qa/reset"); get(base + "/_qa/protocol3");
 			api.forgetProtocol();
 			try { api.shell(); throw new IllegalStateException("expected unsupported protocol"); }
