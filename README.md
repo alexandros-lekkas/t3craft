@@ -170,3 +170,4 @@ T3 Craft continues **[maxwellyoung/t3craft](https://github.com/maxwellyoung/t3cr
 Modpack mods belong to their authors. See [Credits](CREDITS.md), [third-party licenses](THIRD_PARTY_LICENSES.md) and the [provider trademark notice](docs/legal/provider-icons-NOTICE.md).
 
 <sub>MIT licensed. NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT. Not affiliated with or endorsed by T3 Tools Inc.; "T3 Code" is theirs.</sub>
+

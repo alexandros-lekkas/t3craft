@@ -16,7 +16,7 @@ public final class McpChecks {
   int port = Integer.parseInt(args[0]); base = "http://127.0.0.1:" + port; second = "http://127.0.0.1:" + (port + 1);
   try {
    oauthHappyPath(); oauthDeny(); oauthReadOnlyRejected(); supervisedGrantLimits(); readOnlyTokenToolRefusal(); cancelAndReopen();
-   sessionRestart(); incrementalHistory(); mcpOnlyViaState(); hybridHealthy(); hybridMcpDown(); hybridMcpRevoked(); hybridLegacyBroken(); twoMachineRouting(); config050Migration(); credentialFailures(); visibility(false); visibility(true);
+   sessionRestart(); incrementalHistory(); mutableHistory(); focusedDetailFailure(); mcpOnlyViaState(); hybridHealthy(); hybridMcpDown(); hybridMcpRevoked(); hybridLegacyBroken(); twoMachineRouting(); config050Migration(); credentialFailures(); visibility(false); visibility(true);
    schemaConformance();
    System.out.println("MCP checks passed: OAuth (approve/deny/read-only/limited/cancel), session recovery, per-leg health and fallbacks, refusals, schema conformance, routing and config migration.");
   } finally { reset(); }
@@ -99,6 +99,35 @@ public final class McpChecks {
   check(calls("t3_thread_read") == before + 10 && continued.getAsJsonArray("turnItems").size() == 20, "capped history resumes next fetch");
   get(base + "/_qa/mcp-history-null"); before = calls("t3_thread_read"); api.thread("null-thread", 4);
   check(calls("t3_thread_read") == before + 1, "null position stops even with hasMore");
+ }
+ static void mutableHistory() throws Exception {
+  reset(); var api = api(false);
+  for (String status : List.of("idle", "pending", "running", "waiting", "completed")) {
+   get(base + "/_qa/mcp-item?itemId=tool-1&status=" + status + "&text=" + status);
+   var detail = api.thread("mcp-question", 4);
+   var items = detail.getAsJsonArray("turnItems");
+   check(items.size() == 2, "same-position updates do not duplicate items");
+   var item = items.get(1).getAsJsonObject();
+   check(item.get("status").getAsString().equals(status) && item.get("text").getAsString().equals(status), "cached tool advances to " + status);
+   check(item.get("itemId").getAsString().equals("tool-1") && item.get("position").getAsInt() == 2, "item identity stable");
+  }
+  long before = calls("t3_thread_read"); api.thread("mcp-question", 4);
+  check(calls("t3_thread_read") == before + 1, "terminal item stops refreshing");
+ }
+ static void focusedDetailFailure() throws Exception {
+  reset(); var state = connect(api(false));
+  try {
+   get(base + "/_qa/mcp-detail-error");
+   await(() -> state.snapshot().detailError() != null, "thread error shown inline");
+   check(state.snapshot().connected() && state.machines().getFirst().online() && state.snapshot().error() == null
+     && state.online("mcp-approval"), "detail error does not take machine or peer offline");
+   check(!state.snapshot().focus().messages().isEmpty(), "cached conversation survives detail failure");
+   state.focus("mcp-approval");
+   await(() -> "mcp-approval".equals(state.snapshot().focusedId()) && state.snapshot().detailError() == null, "switch clears thread error");
+   get(base + "/_qa/mcp-detail-ok"); state.focus("mcp-question");
+   await(() -> state.snapshot().focus() != null && "mcp-question".equals(state.snapshot().focus().threadId()), "detail recovers");
+   check(state.snapshot().detailError() == null, "recovery clears inline error");
+  } finally { close(state); }
  }
  static void mcpOnlyViaState() throws Exception {
   reset(); var api = api(false); var row = row(api); check(api.publicMcp() && !api.hasLegacy(), "MCP only");
@@ -208,10 +237,18 @@ public final class McpChecks {
    await(() -> state.decisions().stream().filter(d -> List.of("vis-subagent", "vis-sidechat").contains(d.thread().id()) && d.requestId() != null).count() == 2, "hidden child decisions retained");
    var error = new AtomicReference<Exception>();
    for (String child : List.of("vis-subagent", "vis-sidechat")) {
+    state.focus(child);
+    await(() -> state.snapshot().focusedRow() != null && child.equals(state.snapshot().focusedRow().id())
+      && state.snapshot().focus() != null && !state.snapshot().focus().userInputs().isEmpty(), "hidden child focus retains request and metadata");
+    check(state.snapshot().threads().stream().noneMatch(r -> child.equals(r.id())), "focused child stays hidden");
     state.respond(child, mcp ? "mcp-request" : "shared-request", null, T3McpBackend.obj("format", "json"), error::set);
     await(() -> state.decisions().stream().noneMatch(d -> child.equals(d.thread().id()) && d.requestId() != null), "child response routes by child id");
    }
    check(error.get() == null, "hidden child answers succeed");
+   state.focus("vis-settled");
+   await(() -> state.snapshot().focusedRow() != null && "vis-settled".equals(state.snapshot().focusedRow().id())
+     && state.snapshot().focus() != null && !state.snapshot().focus().messages().isEmpty(), "settled conversation remains available");
+   check(state.snapshot().threads().stream().noneMatch(r -> "vis-settled".equals(r.id())), "focused settled thread stays hidden");
    if (mcp) check(array("/_qa/mcp-calls").asList().stream().map(JsonElement::getAsJsonObject).filter(c -> "t3_pending_request".equals(c.get("name").getAsString())).anyMatch(c -> "vis-subagent".equals(T3Protocol.string(c.getAsJsonObject("arguments"), "threadId")) && "respond".equals(T3Protocol.string(c.getAsJsonObject("arguments"), "action"))), "MCP child target recorded");
    else check(array("/_qa/dispatches").asList().stream().anyMatch(c -> "vis-sidechat".equals(T3Protocol.string(c.getAsJsonObject(), "threadId"))), "legacy child target recorded");
    var snoozed = rows.stream().filter(r -> r.id().equals("vis-snoozed-needs")).findFirst().orElseThrow();

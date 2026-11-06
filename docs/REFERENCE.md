@@ -243,3 +243,7 @@ MIT. See [LICENSE](../LICENSE).
 NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
 
 T3 Craft is an independent community project and is not affiliated with or endorsed by T3 Tools Inc. "T3 Code" is theirs; this mod only talks to it over its client protocol. The jar contains no Minecraft, Fabric, or T3 code.
+
+Office builds report their exact inclusive bounds before clearing the site. If existing blocks would be replaced, run `/t3 office confirm` to accept that same site. The whole site must be loaded. `/t3 office off` cancels queued work and hides residents without removing the blocks. Floor ownership is saved when building; rebuild after adding machines to give them floors. Older offices adopt the current pairing order once on first use.
+
+For the fixture-backed release checks, run `bash scripts/verify-ci.sh` (requires JDK 25 as a compile toolchain; Gradle and the smoke checks can run on JDK 25 or 27). It runs `verifyAll`, both protocol fixtures, launcher/installer checks and the packaged-jar contract. The separate `smoke`, `reviewProbe` and `liveCheck` tasks require an explicitly supplied live T3 pairing/project and are not CI fixtures.
