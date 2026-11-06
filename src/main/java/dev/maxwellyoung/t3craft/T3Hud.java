@@ -46,7 +46,10 @@ final class T3Hud implements HudElement {
 		T3State.ThreadRow shown = row.status() == T3State.Status.WORKING || row.status() == T3State.Status.NEEDS_YOU ? row
 			// Only threads you're following; a stale approval elsewhere shouldn't own the corner.
 			: snapshot.threads().stream().filter(t -> t.status() == T3State.Status.NEEDS_YOU && mod.state().isWatched(t.id()))
-				.findFirst().orElse(null);
+				.findFirst()
+				// Then a followed thread that's still working, so a prompt you sent before switching stays visible.
+				.or(() -> snapshot.threads().stream().filter(t -> t.status() == T3State.Status.WORKING && mod.state().isWatched(t.id())).findFirst())
+				.orElse(null);
 		long waitingAnywhere = snapshot.threads().stream().filter(t -> t.status() == T3State.Status.NEEDS_YOU).count();
 		if (shown == null && waitingAnywhere > 0) {
 			// Nothing followed is active, but threads elsewhere are waiting: just the count.
