@@ -80,7 +80,8 @@ final class T3DeskScreen extends Screen {
 			: e.kind() + " · " + e.thread().projectTitle() + "\n\n" + e.detail()
 				+ (!mod.state().online(e.thread().id()) ? "\n\nLast-known request. This machine is offline; answering is disabled." : "");
 		var lines = font.split(Component.literal(detail), Math.max(20, width - side() - 32));
-		detailScroll = Math.min(detailScroll, Math.max(0, lines.size() - Math.max(1, (height - 94) / font.lineHeight)));
+		// Rows below are lineHeight + 2 apart from y = 60; count only rows that fit whole above height - 36.
+		detailScroll = Math.min(detailScroll, Math.max(0, lines.size() - Math.max(1, (height - 94) / (font.lineHeight + 2))));
 		int y = 60;
 		for (int i = detailScroll; i < lines.size() && y < height - 36; i++, y += font.lineHeight + 2) g.text(font, lines.get(i), side() + 16, y, 0xFFE5E7EB, false);
 		g.disableScissor();
