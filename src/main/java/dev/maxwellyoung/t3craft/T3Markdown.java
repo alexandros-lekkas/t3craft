@@ -11,23 +11,17 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Just enough Markdown for agent replies in Minecraft's font: headings, lists with hanging
- * indents, inline code, code blocks, quotes, links, rules, and pipe tables. Anything else
- * falls through as plain text, so nothing is ever hidden.
+ * Agent replies as plain wrapped text in Minecraft's font, with only the lightest formatting:
+ * bold and inline code. Headings become bold lines, lists keep a bullet, code blocks keep their
+ * spacing in the code colour, and everything else is shown as it was written, so nothing is hidden.
  */
 final class T3Markdown {
-	/** One wrapped row. {@code marker} is drawn in the gutter (bullets); {@code kind} picks the backdrop. */
-	record Line(FormattedCharSequence text, int indent, String marker, Kind kind) {
-		static final Line GAP = new Line(FormattedCharSequence.EMPTY, 0, null, Kind.GAP);
+	/** One wrapped row; {@code kind} picks the spacing and colour. */
+	record Line(FormattedCharSequence text, int indent, Kind kind) {
+		static final Line GAP = new Line(FormattedCharSequence.EMPTY, 0, Kind.GAP);
 	}
 
-	enum Kind { TEXT, GAP, CODE, QUOTE, RULE, LABEL }
-
-	static final int TEXT = 0xFFE5E7EB;
-	static final int MUTED = 0xFF9CA3AF;
-	static final int HEADING = 0xFFFFFFFF;
-	static final int CODE = 0xFFF0C674;
-	static final int LINK = 0xFF7DD3FC;
+	enum Kind { TEXT, GAP, LABEL, STEPS }
 
 	private static final Pattern LIST = Pattern.compile("^(\\s*)([-*+]|\\d+[.)])\\s+(.*)$");
 	private static final Pattern HEADING_LINE = Pattern.compile("^(#{1,6})\\s+(.*)$");
@@ -36,16 +30,13 @@ final class T3Markdown {
 	private static final Pattern INLINE = Pattern.compile(
 		"`([^`]+)`"                                   // code
 			+ "|\\*\\*(.+?)\\*\\*|__(.+?)__"          // bold
-			+ "|\\[([^\\]]+)]\\(([^)\\s]+)\\)"         // link
-			+ "|~~(.+?)~~"                             // strike
-			+ "|(?<![\\w*])\\*(?![\\s*])(.+?)(?<!\\s)\\*(?![\\w*])" // italic *x*
-			+ "|(?<![\\w_])_(?![\\s_])(.+?)(?<!\\s)_(?![\\w_])");   // italic _x_
+			+ "|\\[([^\\]]+)]\\(([^)\\s]+)\\)");       // link: the label is shown, the address is not clickable here
 
 	private T3Markdown() {
 	}
 
-	/** Appends the wrapped rows for one message body. */
-	static void render(Font font, String markdown, int width, int baseColor, List<Line> out) {
+	/** Appends the wrapped rows for one message body in {@code color}; code uses {@code codeColor}. */
+	static void render(Font font, String markdown, int width, int color, int codeColor, List<Line> out) {
 		if (markdown == null) return;
 		boolean inCode = false;
 		for (String raw : markdown.replace("\t", "    ").split("\n", -1)) {
@@ -56,8 +47,7 @@ final class T3Markdown {
 			}
 			if (inCode) {
 				// Code keeps its spacing; long lines wrap rather than run off the panel.
-				Component code = Component.literal(raw.isEmpty() ? " " : raw).withColor(CODE);
-				wrap(font, code, width - 16, 8, null, Kind.CODE, out);
+				wrap(font, Component.literal(raw.isEmpty() ? " " : raw).withColor(codeColor), width - 6, 6, Kind.TEXT, out);
 				continue;
 			}
 			if (trimmed.isEmpty()) {
@@ -67,62 +57,47 @@ final class T3Markdown {
 			Matcher heading = HEADING_LINE.matcher(trimmed);
 			if (heading.matches()) {
 				gap(out);
-				wrap(font, inline(heading.group(2), HEADING).withStyle(Style.EMPTY.withBold(true)), width, 0, null, Kind.TEXT, out);
+				wrap(font, inline(heading.group(2), color, codeColor).withStyle(Style.EMPTY.withBold(true)), width, 0, Kind.TEXT, out);
 				continue;
 			}
 			if (RULE_LINE.matcher(trimmed).matches()) {
-				out.add(new Line(FormattedCharSequence.EMPTY, 0, null, Kind.RULE));
+				gap(out);
 				continue;
 			}
 			if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
 				if (TABLE_DIVIDER.matcher(trimmed).matches()) continue;
-				List<String> cells = cells(trimmed);
-				MutableComponent row = Component.empty();
-				for (int i = 0; i < cells.size(); i++) {
-					if (i > 0) row.append(Component.literal("  │  ").withColor(0xFF4B5563));
-					row.append(inline(cells.get(i), baseColor));
-				}
-				wrap(font, row, width, 0, null, Kind.TEXT, out);
+				wrap(font, inline(String.join("   ", cells(trimmed)), color, codeColor), width, 0, Kind.TEXT, out);
 				continue;
 			}
-			if (trimmed.startsWith(">")) {
-				wrap(font, inline(trimmed.replaceFirst("^>\\s?", ""), MUTED), width - 10, 10, null, Kind.QUOTE, out);
-				continue;
-			}
+			if (trimmed.startsWith(">")) trimmed = trimmed.replaceFirst("^>\\s?", "");
 			Matcher list = LIST.matcher(raw);
 			if (list.matches()) {
-				int depth = Math.min(4, list.group(1).length() / 2);
+				int depth = Math.min(3, list.group(1).length() / 2);
 				String token = list.group(2);
-				String marker = Character.isDigit(token.charAt(0)) ? token.replace(")", ".") : depth % 2 == 0 ? "•" : "◦";
-				int indent = 10 + depth * 10 + (marker.length() > 2 ? 6 : 0);
-				wrap(font, inline(list.group(3), baseColor), width - indent, indent, marker, Kind.TEXT, out);
+				String marker = Character.isDigit(token.charAt(0)) ? token.replace(")", ".") : "•";
+				int indent = depth * 8;
+				MutableComponent row = Component.literal(marker + " ").withColor(color).append(inline(list.group(3), color, codeColor));
+				wrap(font, row, width - indent, indent, Kind.TEXT, out);
 				continue;
 			}
-			wrap(font, inline(trimmed, baseColor), width, 0, null, Kind.TEXT, out);
+			wrap(font, inline(trimmed, color, codeColor), width, 0, Kind.TEXT, out);
 		}
 		while (!out.isEmpty() && out.getLast().kind() == Kind.GAP) out.removeLast();
 	}
 
 	/** Inline spans → one styled component. Unmatched markers stay as literal text. */
-	static MutableComponent inline(String text, int color) {
+	static MutableComponent inline(String text, int color, int codeColor) {
 		MutableComponent result = Component.empty();
 		Matcher m = INLINE.matcher(text);
 		int last = 0;
 		while (m.find()) {
 			if (m.start() > last) result.append(Component.literal(text.substring(last, m.start())).withColor(color));
 			if (m.group(1) != null) {
-				result.append(Component.literal(m.group(1)).withColor(CODE));
+				result.append(Component.literal(m.group(1)).withColor(codeColor));
 			} else if (m.group(2) != null || m.group(3) != null) {
-				result.append(inline(m.group(2) != null ? m.group(2) : m.group(3), color).withStyle(Style.EMPTY.withBold(true)));
-			} else if (m.group(4) != null) {
-				result.append(Component.literal(m.group(4)).withStyle(Style.EMPTY.withColor(LINK).withUnderlined(true)));
-				// Minecraft text isn't clickable here, so the destination has to be readable.
-				if (!m.group(4).equals(m.group(5))) result.append(Component.literal(" (" + m.group(5) + ")").withColor(MUTED));
-			} else if (m.group(6) != null) {
-				result.append(inline(m.group(6), MUTED).withStyle(Style.EMPTY.withStrikethrough(true)));
+				result.append(inline(m.group(2) != null ? m.group(2) : m.group(3), color, codeColor).withStyle(Style.EMPTY.withBold(true)));
 			} else {
-				String italic = m.group(7) != null ? m.group(7) : m.group(8);
-				result.append(inline(italic, color).withStyle(Style.EMPTY.withItalic(true)));
+				result.append(Component.literal(m.group(4)).withColor(color));
 			}
 			last = m.end();
 		}
@@ -147,11 +122,9 @@ final class T3Markdown {
 		return cells;
 	}
 
-	static void wrap(Font font, Component text, int width, int indent, String marker, Kind kind, List<Line> out) {
+	static void wrap(Font font, Component text, int width, int indent, Kind kind, List<Line> out) {
 		List<FormattedCharSequence> parts = font.split(text, Math.max(40, width));
-		for (int i = 0; i < parts.size(); i++) {
-			out.add(new Line(parts.get(i), indent, i == 0 ? marker : null, kind));
-		}
+		for (FormattedCharSequence part : parts) out.add(new Line(part, indent, kind));
 	}
 
 	private static void gap(List<Line> out) {

@@ -40,9 +40,22 @@ The real in-game shots the docs need. When a feature lands, the implementing PR 
 | ☐ | `laptop-desk` | Crosshair on a desk laptop | Close on the desk laptop, with the agent seated behind it | 2 |
 | ☐ | `laptop-item` | Inventory open with the laptop in the hotbar, hovered | Inventory, cropped | 3 |
 
-### Streamed T3 UI
+### The simple native UI
 
-Capture the real full app from the laptop and a real thread floating beside an agent. Native-panel captures below document the fallback, not the primary launch UI.
+The in-game UI. Taken in the dev client at **GUI scale 5** in a 2000 × 1250 window against the office fixture, with `./gradlew runClient -Pselftest=nativeui -Pworld=<office save> -Pconfig=config/office-fixture.json -Pwidth=1000 -Pheight=625 -PmcpPort=25591` (and `scripts/office/fixture.py` running). Resized to 1600 px; the office scenes are JPG.
+
+| ✓ | Shot | Scene setup | Camera | GUI |
+|:-:|:--|:--|:--|:--|
+| ☑ | `native-laptop` | Laptop open on a finished thread | Full screen | **5** |
+| ☑ | `native-laptop-needs-you` | Laptop on the thread waiting for an approval: Approve / Deny row | Full screen | **5** |
+| ☑ | `native-laptop-typing` | A message typed into the input box | Full screen | **5** |
+| ☑ | `native-laptop-sent` | After sending: the message under *You*, status Working, Stop | Full screen | **5** |
+| ☑ | `native-agent-card` | The card beside the waiting agent, world dimmed | First person at the whiteboard | **5** |
+| ☑ | `native-agent-card-typing` | Same, with a reply typed | First person | **5** |
+| ☑ | `native-agent-aim` | Crosshair on the waiting agent, before the click | First person | **5** |
+| ☑ | `native-laptop-scale2`, `native-laptop-scale3` | The laptop at the other scales | Full screen | 2, 3 |
+
+### Streamed T3 UI (opt-in, `webUi: true`)
 
 These were taken against the real local T3 in the dev client with `./gradlew runClient -PwebShowcase=<threadId>` (read-only), at a 2000 × 1250 window. They are kept at full size, unedited, because the [real T3 UI page](design/real-t3-ui.md) uses them as evidence that text is pixel-exact.
 
@@ -54,36 +67,6 @@ These were taken against the real local T3 in the dev client with `./gradlew run
 | ☑ | `ui-real-ping-jump-scale5` | Laptop after answering that ping with `: the pinged thread is open | Full screen | **5** |
 | ☑ | `ui-real-agent-card-scale5` | Agent card open on one thread, world blurred behind | Full screen | **5** |
 
-### Native panel fallback
-
-| ✓ | Shot | Scene setup | Camera | GUI |
-|:-:|:--|:--|:--|:--|
-| ☐ | `ui-panel` | Fixture with 5 active threads over 2 projects, 6 snoozed. Focused thread working, with a collapsed *Ran 3 commands* row | Full screen panel over the office | 2 |
-| ☐ | `ui-panel-laptop` | Same, opened from a desk laptop (laptop framing) | Full screen | 2 |
-| ☐ | `ui-panel-scale3` | Same as `ui-panel` | Full screen | **3** |
-| ☐ | `ui-approval` | Fixture approval: a long wrapped command | Panel, approval card in view | 2 |
-| ☐ | `ui-question` | Fixture question with 3 options | Panel, question card in view | 2 |
-| ☐ | `ui-snoozed` | Snoozed section expanded | Sidebar crop | 2 |
-| ☐ | `ui-decisions` | 3 pending requests across 2 fixture machines | Decisions screen (<kbd>J</kbd>) | 2 |
-| ☐ | `ui-review` | Fixture checkpoint with 2 files, multi-hunk | Review screen, patch with line numbers | 2 |
-| ☐ | `ui-error-strip` | Stop fixture A only | Panel with the one-line error strip and its single button | 2 |
-
-### Moments
-
-| ✓ | Shot | Scene setup | Camera | GUI |
-|:-:|:--|:--|:--|:--|
-| ☐ | `done-toast` | Fixture thread completes | In-world view with the single Done toast | 2 |
-| ☐ | `report-book` | Open the report book from that completion | Book screen | 2 |
-| ☐ | `agent-build` | `minecraft_run_command` builds something small near the office | Over-the-shoulder view of the build, toast visible | 2 |
-
-### Later: images and browser
-
-| ✓ | Shot | Scene setup | Camera | GUI |
-|:-:|:--|:--|:--|:--|
-| ☐ | `thread-image-inline` | Fixture thread with one screenshot attachment | Panel, inline thumbnail | 2 |
-| ☐ | `thread-image-viewer` | Click the thumbnail | Full-size viewer | 2 |
-| ☐ | `agent-browser-live` | Fixture or demo page in a streamable tab | Browser viewer, observe mode | 2 |
-
 ## Where each shot goes
 
 | Shot(s) | Replaces |
@@ -91,7 +74,8 @@ These were taken against the real local T3 in the dev client with `./gradlew run
 | `hero-office`, `hero-office-night` | The `<picture>` hero in the [README](../README.md) |
 | `office-*`, `agents-*` | Renders in [office.md](design/office.md) and the README's "What it feels like" |
 | `world-*` | Real shots from `-Pworldtest` in [world.md](design/world.md); the `docs/images/world-*.png` files are the design mockups |
-| `ui-real-*` | [real-t3-ui.md](design/real-t3-ui.md) and the README feature table |
+| `native-*` | [native-ui.md](design/native-ui.md) and the README feature table |
+| `ui-real-*` | [real-t3-ui.md](design/real-t3-ui.md) |
 | `ui-*` | Mockups in [ui.md](design/ui.md) |
 | `laptop-*` | The texture in [characters-and-laptop.md](design/characters-and-laptop.md) |
 | `thread-image-*`, `agent-browser-live` | [browser-and-images.md](design/browser-and-images.md) |

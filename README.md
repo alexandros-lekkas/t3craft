@@ -8,7 +8,7 @@
   WHAT TO CAPTURE (10 s, one continuous take, no cuts if possible):
     0.0–2.0  First person on the spawn path, walking toward the office door (daylight, default seed).
     2.0–3.5  Inside: three agents type at the bench. One waits at the whiteboard with an orange "needs you" tag.
-    3.5–5.0  Look at that agent and right-click. Its real T3 thread opens in a floating window.
+    3.5–5.0  Look at that agent and right-click. A small card opens beside it.
     5.0–6.5  The card reads "Run command? ./gradlew test". Press Y, and the status flips to Working.
     6.5–9.0  Cut (or turn) to the window: blocks appear one by one as the agent builds (2× speed).
     9.0–10.0 A "Done" toast slides in. Hold for 1 s.
@@ -67,8 +67,8 @@ No pairing links, no commands, no settings screens. T3 Craft finds T3 Code on yo
 <tr>
 <td width="50%" valign="top">
 
-<img src="docs/images/shots/ui-real-agent-card-scale5.png" alt="A real T3 thread in a floating card over the blurred Minecraft world">
-<b>Click an agent to talk.</b> Its real T3 thread opens in a floating card over the blurred world. It is T3 Code's own web app, streamed through a hidden Chrome and pixel-exact at every GUI scale. The laptop (or <kbd>`</kbd>) opens the full app. Without Chrome, Edge, Brave or Chromium, the native panel opens instead. <a href="docs/design/real-t3-ui.md">How it works →</a>
+<img src="docs/images/shots/native-agent-card.jpg" alt="A small native card beside an agent: its name, status, the request, an input box, Approve / Deny and Open on laptop">
+<b>Click an agent to talk.</b> A small card opens beside it: the last message or the request it is waiting on, one input box, and Approve / Deny when it needs you. The laptop (or <kbd>`</kbd>) shows your active threads and the selected one, in plain Minecraft. <a href="docs/design/native-ui.md">See the UI →</a>
 </td>
 <td width="50%" valign="top">
 <img src="docs/images/office-ground-floor.png" alt="Ground-floor cutaway: agents at the bench, one at the whiteboard">
@@ -90,7 +90,7 @@ No pairing links, no commands, no settings screens. T3 Craft finds T3 Code on yo
 <p align="center"><img src="docs/images/agents-lineup.png" alt="Agent skins: Claude, Codex, Muse, Grok, Cursor, OpenCode and a fallback" width="100%"><br>
 <sub>Agents look like players, not villagers. Each provider has its own outfits.</sub></p>
 
-**Also in the box:** a T3 laptop you right-click for the full T3 web app · real checkpoint diffs · report books when work is done · snoozed and finished threads stay out of the way, just like in T3 Code · a light Vanilla+ pack (Sodium, Lithium, AppleSkin, Mouse Tweaks…) with no shaders and no bloat.
+**Also in the box:** a T3 laptop you right-click for your threads · real checkpoint diffs · report books when work is done · snoozed and finished threads stay out of the way, just like in T3 Code · a light Vanilla+ pack (Sodium, Lithium, AppleSkin, Mouse Tweaks…) with no shaders and no bloat.
 
 ## 🧠 How it works
 
@@ -104,7 +104,7 @@ flowchart LR
   subgraph MC["Minecraft · Fabric"]
     M["T3 Craft mod"]
     O["Office at spawn<br/>agents = characters"]
-    U["Streamed T3 web UI · laptop<br/>native panel fallback"]
+    U["Laptop screen · agent card<br/>plain Minecraft UI"]
     M --> O
     M --> U
   end

@@ -533,25 +533,33 @@ public final class T3CraftClient implements ClientModInitializer {
 
 
 	/**
-	 * The panel key: T3 Code's real web app, full screen. Without a Chromium browser, or if T3's page cannot load,
-	 * the native panel opens exactly as before.
+	 * The streamed web app is opt-in ({@code webUi} in the config file); the dev showcase that captures it turns it on
+	 * for that run only. Otherwise the native screens are used and Chrome never starts.
 	 */
+	boolean webUi() { return config.webUi || System.getProperty("t3craft.webShowcase") != null; }
+
+	/** The panel key and the laptop: the native T3 screen, or T3 Code's web app when {@code webUi} is on. */
 	public void openLaptop() { openLaptop(false); }
 
-	/** {@code jump}: the player is answering a ping, so the laptop must show that thread even if it was already open on another. */
+	/** {@code jump}: the player is answering a ping, so the web laptop must show that thread even if it was already open on another. */
 	public void openLaptop(boolean jump) {
-		if (!T3WebScreen.available()) { openPanel(); return; }
+		if (!webUi() || !T3WebScreen.available()) { openPanel(); return; }
 		lastPingThread = null;
 		String focused = state.focusedThreadId();
 		Minecraft.getInstance().gui.setScreen(T3WebScreen.laptop(focused, ownerOf(focused), jump, this::openPanel));
 	}
 
-	/** Right-click an agent: that agent's T3 thread in a floating card over the blurred world. */
+	/** Click an agent: a small native card beside it, or its thread in the web app when {@code webUi} is on. */
 	public void openAgentCard(String threadId) {
 		focus(threadId);
-		if (!T3WebScreen.available()) { openPanel(); return; }
-		// A thread on another paired machine cannot be streamed from the local T3; the web view falls back to the panel for it.
-		Minecraft.getInstance().gui.setScreen(T3WebScreen.card(threadId, ownerOf(threadId), this::openPanel));
+		if (webUi() && T3WebScreen.available()) {
+			// A thread on another paired machine cannot be streamed from the local T3; the web view falls back to the panel for it.
+			Minecraft.getInstance().gui.setScreen(T3WebScreen.card(threadId, ownerOf(threadId), this::openPanel));
+			return;
+		}
+		if (!config.paired()) { openConnections(); return; }
+		lastPingThread = null;
+		Minecraft.getInstance().gui.setScreen(new T3AgentCardScreen(this, threadId));
 	}
 
 	/** The paired machine that owns {@code threadId} (its address), or null when unknown. */
@@ -592,6 +600,24 @@ public final class T3CraftClient implements ClientModInitializer {
 	 * {@code model} overrides the thread's model for this turn (and the thread from then on); null keeps it.
 	 * Returns false when nothing was sent; {@code onFailure} runs on the game thread if the request later fails.
 	 */
+	/**
+	 * Sends to a specific thread, never to whatever is focused: the focus snapshot can lag a click on another agent.
+	 * Returns false (and says so) while that thread hasn't loaded yet.
+	 */
+	public boolean sendTo(String threadId, String text, Runnable onFailure) {
+		T3State.ThreadRow target = null;
+		for (T3State.ThreadRow row : state.snapshot().threads()) if (row.id().equals(threadId)) { target = row; break; }
+		if (target == null) {
+			chat(Component.literal("That agent is still loading; try again in a moment.").withStyle(ChatFormatting.RED));
+			return false;
+		}
+		T3State.ThreadRow row = target;
+		T3Backend api = state.apiFor(row.id());
+		state.run(() -> { api.sendPrompt(row.raw(), text, null); state.watch(row.id()); },
+			e -> { reportError(e); if (onFailure != null) Minecraft.getInstance().execute(onFailure); });
+		return true;
+	}
+
 	public boolean send(String text, boolean newThread, com.google.gson.JsonObject model, Runnable onFailure) {
 		T3State.Snapshot snapshot = state.snapshot();
 		// A new thread only borrows project and settings, so any recent thread can stand in.
@@ -698,7 +724,7 @@ public final class T3CraftClient implements ClientModInitializer {
 		lastPingAt = System.currentTimeMillis();
 		if (config.books && event.status() == T3State.Status.DONE) T3Books.deliver(state, event.thread());
 		// Already looking at this thread in the panel: the sound is enough, a toast would cover it.
-		boolean viewing = minecraft.gui.screen() instanceof T3Screen || minecraft.gui.screen() instanceof T3WebScreen;
+		boolean viewing = minecraft.gui.screen() instanceof T3Screen || minecraft.gui.screen() instanceof T3AgentCardScreen || minecraft.gui.screen() instanceof T3WebScreen;
 		if (viewing && event.thread().id().equals(state.focusedThreadId())) return;
 		// Short text keeps the toast at its 190-px minimum, so it never grows over the corner status.
 		Component toastTitle = heading.copy().append(Component.literal(" · " + openKeyName() + " to open").withStyle(ChatFormatting.GRAY));

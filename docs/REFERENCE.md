@@ -20,12 +20,12 @@ It is a Fabric mod for Minecraft Java 26.3. On the client it connects to your T3
 
 ## What it does
 
-- **Panel.** Press **`** to open it. Your threads are on the left and the conversation on the right, with Markdown rendered: headings, lists, code, tables. **Enter** sends the prompt and puts you back in the game; **Shift+Enter** sends and keeps the panel open. **+ New** starts a thread. Unsent text is kept per thread.
-- **Pinned desks and projects.** Choose **Pin desk** in a thread panel to keep it in this world’s office. **Pins** lists saved pins, including unavailable or archived threads, and lets you remove them. The project filter narrows the sidebar without changing the focused conversation or unsent draft.
-- **Several machines.** Pair more than one T3 environment (a laptop and a home server, for example) and every active thread from each shares one scrolling sidebar, tagged with its machine. Click the filter row under the header to show one machine at a time. Actions go to the machine that owns the thread.
+- **Laptop.** Press **`** (or use a laptop) to open it. Your active threads are on the left (status dot, provider icon, title; snoozed folded, settled hidden) and the selected thread on the right as plain wrapped text with bold and inline code; the agent's tool activity folds into one *… N steps* line. **Enter** sends and puts you back in the game; **Shift+Enter** sends and keeps the laptop open. `/t3 new <prompt>` starts a thread. Unsent text is kept per thread. ([design](design/native-ui.md))
+- **Agent card.** Click an agent to open a small card beside it: its last message or the request it is waiting on, one input box, Approve / Deny when needed, and *Open on laptop*.
+- **Pinned desks.** `/t3 pin` keeps the focused thread in this world’s office; `/t3 pins` lists saved pins, including unavailable or archived threads, and lets you remove them.
+- **Several machines.** Pair more than one T3 environment (a laptop and a home server, for example) and every active thread from each shares one scrolling list. Actions go to the machine that owns the thread.
 - **Pings.** While an agent works or waits on you, the top-left corner shows `Thread · Working 1m 12s · step`. When it finishes, fails, or needs you, you get one toast and a note-block sound. Press **`** within a minute to open the thread that pinged.
-- **Approvals and questions.** Approve with **Y** / **N**. When an agent asks something, press **1–9** or click an option, or type your own answer.
-- **Model picker.** Click the model name in the panel header. New threads can use any provider; existing threads can switch unless the provider forbids it.
+- **Approvals and questions.** A big **Approve (Y)** / **Deny (N)** row appears above the input. When an agent asks something, press **1–9** or click an answer, or type your own.
 - **Village.** `/t3 village` turns your recent threads into villagers a few blocks ahead. Name tags show status, and particles show what they're doing: enchant glyphs while working, notes when they need you, sparkles when done. A villager that needs you shows what it's asking on its name tag, e.g. `Needs you: Bash: npm test`; right-click it to open its thread and approve. The villagers exist only on your client, and each world keeps its own village.
 - **Report books.** When a thread you started or opened in Minecraft finishes, you get a written book with the agent's reply and the files it changed. Needs command permission (op, or cheats on); `/t3 books off` turns it off.
 - **Live.** Updates stream over T3's RPC socket. If the socket drops, the mod polls until it reconnects.
@@ -180,6 +180,7 @@ Checks:
 ./gradlew runClient -Pselftest='villageflow: …'  # name-tag detail, approve by right-clicking the villager, report book
 ./gradlew runClient -Pselftest='shared: <link>'  # /t3village pair + here on the local server, right-click a real villager, off
 ./gradlew runClient -Pselftest=look|village|watch|threads [-Pfocus='<thread title>'] [-Pconfig=<path>]
+./gradlew runClient -Pselftest=nativeui -Pworld=<office save> -Pconfig=config/office-fixture.json -Pwidth=1000 -Pheight=625 -PmcpPort=25591   # captures the native laptop and agent card (scripts/office/fixture.py running)
 ```
 
 `-Pconfig` points the client at a separate pairing file, so tests can use a throwaway T3 server.

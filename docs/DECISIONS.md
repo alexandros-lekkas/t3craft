@@ -6,8 +6,9 @@ The product calls behind T3 Craft, newest first. Each one has the date, the deci
 
 | Date | Decision | Why |
 |:--|:--|:--|
+| 2026-11-06 | [Simple native Minecraft UI](#2026-11-06--simple-native-minecraft-ui) | *"It was better when it was mc, but just very simple"* |
+| 2026-11-05 | Office only; real T3 UI streamed in-game (UI part superseded) | Keep one workplace and the full T3 experience |
 | 2026-11-06 | [A lit office, day and night](#2026-11-06--a-lit-office-day-and-night) | No dark corners, no spawns, nothing modded-looking |
-| 2026-11-05 | Office only; real T3 UI streamed in-game | Keep one workplace and the full T3 experience |
 | 2026-11-05 | [Simple features, no settings or machine UI](#2026-11-05--simple-features-no-settings-or-machine-ui) | Each screen has one obvious purpose |
 | 2026-11-05 | [Zero setup: auto-connect to the local T3](#2026-11-05--zero-setup-auto-connect-to-the-local-t3) | Players shouldn't have to type commands or paste links |
 | 2026-11-05 | [No protections or confirmations](#2026-11-05--no-protections-or-confirmations) | The owner runs agents in full access by choice |
@@ -25,14 +26,17 @@ The product calls behind T3 Craft, newest first. Each one has the date, the deci
 
 ---
 
-### 2026-11-06 · A lit office, day and night
+### 2026-11-06 · Simple native Minecraft UI
 
+**Decision:** The in-game UI is native Minecraft, very simple: the default font, a vanilla container-style window, vanilla buttons and edit boxes, sized for GUI scale 5 first. The laptop shows active threads on the left and the selected thread on the right with one input box and Send, plus Approve / Deny or the answer options when the agent needs you. Clicking an agent opens a small card beside it over the lightly dimmed world. Nothing else: no tabs for activity, review, diff, pins or connections. The streamed web UI stays in the code behind `webUi: true` and is off by default. ([design](design/native-ui.md))
+**Why:** After trying the streamed web app in game, the owner said *"idk why we switched to full js ui, it was better when it was mc, but just very simple."* The earlier native panel was *"way too bold and dense"*, so this one shows fewer things, bigger and clearer.
+### 2026-11-06 · A lit office, day and night
 **Decision:** Light the office in two layers. An always-on layer (a hidden light grid, white end-rod downlights, a stair sconce, lanterns on the parapet posts and the path bollards) keeps every walkable cell at block light 11 or more and the roof and path never dark. The design's own lamps keep switching with the clock as the warm evening layer, and the fabric shades glow cream (`ochre_froglight`) rather than orange shroomlight. ([design](design/office.md#lighting))
 **Why:** The office was too dim, inside by day and everywhere by night, and an open roof at light 0 spawns mobs. Hidden light blocks and end rods are vanilla and invisible or discreet, so the ceiling stays clean.
 
 ### 2026-11-05 · Office only and streamed T3 UI
 
-**Decision:** Focus on the office only. An arrival plaza belongs to the office; multi-building expansion is out of scope. Stream the real T3 web UI in-game: the laptop opens the full app, and clicking an agent opens its thread in a floating window. The native panel is the fallback. ([how it works](design/real-t3-ui.md), [#7](https://github.com/alexandros-lekkas/t3craft/pull/7))
+**Decision:** Focus on the office only. An arrival plaza belongs to the office; multi-building expansion is out of scope. Stream the real T3 web UI in-game: the laptop opens the full app, and clicking an agent opens its thread in a floating window. ([how it works](design/real-t3-ui.md), [#7](https://github.com/alexandros-lekkas/t3craft/pull/7)) **The UI part is superseded** by the [simple native UI](#2026-11-06--simple-native-minecraft-ui); the streamed app is opt-in.
 **Why:** Preserve the actual T3 experience without rebuilding it in Minecraft widgets.
 
 ### 2026-11-05 · Simple features, no settings or machine UI
@@ -62,7 +66,7 @@ The product calls behind T3 Craft, newest first. Each one has the date, the deci
 
 ### 2026-11-05 · The T3 laptop
 
-**Decision:** Add a craftable laptop item and block. Right-click it to open the full streamed T3 web app, as an alternative to the <kbd>`</kbd> key. ([design](design/characters-and-laptop.md))
+**Decision:** Add a craftable laptop item and block. Right-click it to open the T3 laptop screen, as an alternative to the <kbd>`</kbd> key. ([design](design/characters-and-laptop.md))
 **Why:** Opening T3 becomes something you do in the world, not a hotkey you have to remember.
 
 ### 2026-11-05 · No villagers: agents are player characters
@@ -72,7 +76,7 @@ The product calls behind T3 Craft, newest first. Each one has the date, the deci
 
 ### 2026-11-05 · Calm UI, like the T3 desktop app
 
-**Decision (superseded):** Earlier native-panel styling explorations are retained for reference. The primary UI is now the real T3 web app streamed in-game; the native panel is a fallback. ([how it works](design/real-t3-ui.md), [native exploration](design/ui.md))
+**Decision (superseded twice):** Earlier native-panel styling explorations are retained for reference. The streamed web app replaced them, and the [simple native UI](#2026-11-06--simple-native-minecraft-ui) replaced that. ([native exploration](design/ui.md), [what shipped](design/native-ui.md))
 **Why:** The owner found the current panel *"way too bold and dense, can't understand anything"*.
 
 ### 2026-11-05 · Keep report books

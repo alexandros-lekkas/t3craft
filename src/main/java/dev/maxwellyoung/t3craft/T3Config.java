@@ -54,6 +54,11 @@ public final class T3Config {
 	public boolean books = true;
 	/** Lets local agents run commands through the MCP server. Off until the player opts in. */
 	public boolean agentCommands;
+	/**
+	 * Stream T3 Code's web app through a hidden Chrome instead of the native screens. Off by default, and there is
+	 * no in-game switch: edit {@code t3craft.json}. While it is off, Chrome is never started.
+	 */
+	public boolean webUi;
 
 	public boolean paired() {
 		return !environments.isEmpty();

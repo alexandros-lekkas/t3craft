@@ -1,5 +1,6 @@
 package dev.maxwellyoung.t3craft;
 
+import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
@@ -11,129 +12,132 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 
-import com.google.gson.JsonObject;
-
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The in-game T3 panel: thread list on the left, the focused conversation on the right,
- * approvals above the composer. Enter sends and drops you back into the world;
- * Shift+Enter sends and keeps the panel open.
+ * The laptop: a plain Minecraft screen. Active threads on the left (title, status dot, provider glyph; snoozed
+ * ones folded into one row, settled ones hidden), the selected thread on the right as wrapped text with one
+ * input box and Send. When the agent needs you, Approve / Deny or the answer options sit above the input.
+ * Enter sends and drops you back into the world; Shift+Enter sends and keeps the screen open; Y/N answer an
+ * approval and 1–9 pick an answer.
  */
 final class T3Screen extends Screen {
-	private static final int MARGIN = 10;
-	private static final int SIDEBAR = 150;
-	private static final int ROW = 22;
-	private static final int HEADER = 26;
-	private static final int COMPOSER = 20;
-	private static final int APPROVAL = 34;
-	private static final int NEW_WIDTH = 40;
-	private static final int FILTER = 14;
+	static final int MARGIN = 6;
+	private static final int PAD = 6;
+	private static final int ROW = 13;
+	private static final int HEADER = 12;
+	private static final int BUTTON = 18;
+	private static final int COMPOSER = 18;
+	private static final int SEND_WIDTH = 36;
+	private static final int MAX_OPTIONS = 9;
 
 	private final T3CraftClient mod;
 	private final long openedAt = System.currentTimeMillis();
 	private EditBox composer;
+	private Button send;
 	private Button approve;
 	private Button deny;
 	private Button stop;
-	private Button review;
-	private Button activity;
-	private Button pin;
+	private final List<Button> options = new ArrayList<>();
 	private String selectedRequest;
 	private T3State.Focus shownFocus;
 	private boolean newThread;
 	private final ComposerDraft composerDraft = new ComposerDraft();
+	/** Conversation rows scrolled up from the bottom. */
 	private int scroll;
-	/** Machine shown in the sidebar; null means all of them. */
-	private String envFilter;
-	private String projectFilter;
-	private record Project(String key, String label) {}
-	private int sidebarScroll;
- private boolean snoozedExpanded;
-	/** Model chosen in the picker for the next send; null keeps the thread's current model. */
-	private JsonObject pickedModel;
-	private boolean pickerOpen;
-	private int pickerScroll;
+	private int listScroll;
+	private boolean snoozedExpanded;
+	private final T3Scroll listWheel = new T3Scroll();
+	private final T3Scroll chatWheel = new T3Scroll();
 
 	// Answering the agent's questions: which request, which question, and the answers so far.
 	private String answeringRequest;
 	private int questionIndex;
 	private JsonObject answers = new JsonObject();
 	private final java.util.LinkedHashSet<String> multiPicked = new java.util.LinkedHashSet<>();
-	private final List<int[]> optionRows = new ArrayList<>();
 	/** Question sets already sent ("thread:request"), hidden until the snapshot drops them or the send fails. */
 	private final java.util.Set<String> submittedInputs = new java.util.HashSet<>();
-
-	private record PickerEntry(T3Api.Provider provider, T3Api.Model model, boolean needsNewThread) {}
 
 	private String anchorThread;
 	private int anchorWidth;
 	private int anchorCount;
 
 	private T3State.Focus cachedFocus;
+	private String cachedAgent;
 	private int cachedWidth;
 	private List<T3Markdown.Line> cachedLines = List.of();
+
+	/** Laid out once per tick and frame: the request block above the composer, as [top, approval detail rows, question rows]. */
+	private int blockTop;
+	private List<FormattedCharSequence> approvalDetail = List.of();
+	private List<FormattedCharSequence> questionText = List.of();
+	private T3State.Approval shownApproval;
+	private T3State.Question shownQuestion;
 
 	T3Screen(T3CraftClient mod) { this(mod, null); }
 
 	T3Screen(T3CraftClient mod, String selectedRequest) {
-		super(Component.literal("T3"));
+		super(Component.literal("T3 Code"));
 		this.mod = mod;
 		this.selectedRequest = selectedRequest;
 	}
 
+	// ----- Geometry (GUI pixels; sized to fit GUI scale 5 in a ~2000 px window, about 400 × 250) -----
+
+	private int listWidth() { return Math.max(110, Math.min(170, width * 3 / 10)); }
+	private int listLeft() { return MARGIN + PAD; }
+	private int listRight() { return listLeft() + listWidth(); }
+	private int listTop() { return MARGIN + PAD + HEADER + 3; }
+	private int listBottom() { return height - MARGIN - PAD; }
+	private int mainLeft() { return listRight() + PAD + 3; }
+	private int mainRight() { return width - MARGIN - PAD; }
+	private int mainTop() { return MARGIN + PAD + HEADER + 3; }
+	private int composerY() { return height - MARGIN - PAD - COMPOSER; }
+	private int visibleRows() { return Math.max(1, (listBottom() - listTop()) / ROW); }
+
 	@Override
 	protected void init() {
 		mod.state().setPanelOpen(true);
-		int mainX = MARGIN + SIDEBAR + 8;
-		int mainWidth = width - mainX - MARGIN;
-		int composerY = height - MARGIN - 12 - COMPOSER;
+		int x0 = mainLeft();
+		int x1 = mainRight();
+		int composerY = composerY();
 
 		// A resize re-runs init and the new box copies the old one's text; only the first init loads the saved draft.
 		boolean first = composer == null;
-		composer = new EditBox(font, mainX, composerY, mainWidth, COMPOSER, composer, Component.literal("Prompt"));
+		composer = new EditBox(font, x0, composerY, x1 - x0 - SEND_WIDTH - 4, COMPOSER, composer, Component.literal("Message"));
 		composer.setMaxLength(8000);
 		if (first) loadDraft();
 		updateHint();
 		addRenderableWidget(composer);
 		setInitialFocus(composer);
+		send = addRenderableWidget(Button.builder(Component.literal("Send"), b -> submit(true))
+			.bounds(x1 - SEND_WIDTH, composerY - 1, SEND_WIDTH, COMPOSER + 2).build());
 
-		// Buttons sit on the card's title row so the command gets the full second row.
-		int approvalY = composerY - APPROVAL - 2;
-		approve = addRenderableWidget(Button.builder(Component.literal("Yes (Y)"), b -> answer("accept"))
-			.bounds(mainX + mainWidth - 128, approvalY + 2, 60, 14).build());
-		deny = addRenderableWidget(Button.builder(Component.literal("No (N)"), b -> answer("decline"))
-			.bounds(mainX + mainWidth - 66, approvalY + 2, 60, 14).build());
-		stop = addRenderableWidget(Button.builder(Component.literal("Stop"), b -> mod.interrupt())
-			.bounds(width - MARGIN - 44, MARGIN + 3, 44, 18).build());
-		review = addRenderableWidget(Button.builder(Component.literal("Review"), b -> { if (shownFocus != null) mod.openReview(shownFocus.threadId()); })
-			.bounds(width - MARGIN - 102, MARGIN + 3, 54, 18).build());
-		addRenderableWidget(Button.builder(Component.literal("Decisions (" + mod.decisionsKey().getTranslatedKeyMessage().getString() + ")"), b -> mod.openDecisions())
-			.bounds(MARGIN + 5, height - MARGIN - 25, SIDEBAR - 10, 18).build());
-		pin = addRenderableWidget(Button.builder(Component.literal("Pin desk"), b -> mod.togglePin(mod.state().snapshot().focusedRow()))
-			.bounds(MARGIN + 5, height - MARGIN - 47, 78, 18).build());
-		addRenderableWidget(Button.builder(Component.literal("Pins"), b -> minecraft.gui.setScreen(new T3PinsScreen(mod)))
-			.bounds(MARGIN + 87, height - MARGIN - 47, SIDEBAR - 92, 18).build());
-		addRenderableWidget(Button.builder(Component.literal("Connections"), b -> mod.openConnections())
-			.bounds(MARGIN + 5, height - MARGIN - 69, 78, 18).build());
-		activity = addRenderableWidget(Button.builder(Component.literal("Activity"), b -> {
-			String id = mod.state().snapshot().focusedId();
-			if (id != null) minecraft.gui.setScreen(new T3ActivityScreen(mod, id));
-		}).bounds(MARGIN + 87, height - MARGIN - 69, SIDEBAR - 92, 18).build());
-		syncWidgets(mod.state().snapshot());
+		int half = (x1 - x0 - 4) / 2;
+		approve = addRenderableWidget(Button.builder(Component.literal("Approve (Y)"), b -> answer("accept")).bounds(x0, 0, half, BUTTON).build());
+		deny = addRenderableWidget(Button.builder(Component.literal("Deny (N)"), b -> answer("decline")).bounds(x1 - half, 0, half, BUTTON).build());
+		options.clear();
+		for (int i = 0; i < MAX_OPTIONS; i++) {
+			int index = i;
+			Button option = addRenderableWidget(Button.builder(Component.empty(), b -> pickOption(index)).bounds(x0, 0, x1 - x0, BUTTON).build());
+			option.visible = false;
+			options.add(option);
+		}
+		stop = addRenderableWidget(Button.builder(Component.literal("Stop"), b -> mod.interrupt()).bounds(x1 - 34, MARGIN + PAD - 3, 34, 14).build());
+		layout(mod.state().snapshot());
 		revealFocused();
 	}
 
-	/** Opening on a thread further down (a ping, a villager, /t3 open) scrolls the sidebar to it. */
+	/** Opening on a thread further down (a ping, an agent, /t3 open) scrolls the list to it. */
 	private void revealFocused() {
-		List<T3State.ThreadRow> rows = sidebarRows();
+		List<T3State.ThreadRow> rows = listRows();
 		String focused = mod.state().focusedThreadId();
 		for (int i = 0; i < rows.size(); i++) {
 			if (rows.get(i) == null || !rows.get(i).id().equals(focused)) continue;
 			int visible = visibleRows();
-			if (i < sidebarScroll || i >= sidebarScroll + visible) sidebarScroll = Math.max(0, i - visible / 2);
-			clampSidebarScroll(rows.size());
+			if (i < listScroll || i >= listScroll + visible) listScroll = Math.max(0, i - visible / 2);
+			clampListScroll(rows.size());
 			return;
 		}
 	}
@@ -151,84 +155,35 @@ final class T3Screen extends Screen {
 
 	@Override
 	public boolean isInGameUi() {
-		// Transparent backdrop instead of the menu blur: the world keeps moving behind the panel.
+		// The world keeps moving behind the panel.
 		return true;
 	}
 
 	@Override
+	public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a) {
+		graphics.fill(0, 0, width, height, T3Ui.DIM);
+	}
+
+	@Override
 	public void tick() {
-		syncWidgets(mod.state().snapshot());
+		layout(mod.state().snapshot());
 		updateHint();
 	}
 
-	private void syncWidgets(T3State.Snapshot snapshot) {
-		boolean hasApproval = currentApproval() != null;
-		boolean online = mod.state().online(snapshot.focusedId());
-		approve.active = deny.active = online;
-        T3Backend.Legs legs = mod.state().legs(snapshot.focusedId());
-        boolean legacyOk = legs == null || legs.legacy() && legs.legacyError() == null;
-        review.active = snapshot.focusedRow() != null && online && (legs == null || legs.legacy());
-        review.setTooltip(legs == null || legacyOk ? null : net.minecraft.client.gui.components.Tooltip.create(Component.literal(
-            !legs.legacy() ? T3McpBackend.LEGACY_REQUIRED : "Legacy connection unavailable: " + legs.legacyError())));
-		activity.active = !newThread && snapshot.focusedRow() != null;
-		stop.active = online;
-		approve.visible = deny.visible = hasApproval;
-		T3State.ThreadRow row = snapshot.focusedRow();
-		stop.visible = row != null && row.status() == T3State.Status.WORKING;
-		pin.active = row != null && mod.canPin() && !newThread;
-		pin.setMessage(Component.literal(mod.pinned(row) ? "Unpin desk" : "Pin desk"));
+	/** Rows of the list: active threads, then one "Snoozed" row (null) that unfolds the snoozed ones. */
+	private List<T3State.ThreadRow> listRows() {
+		List<T3State.ThreadRow> all = mod.state().snapshot().threads();
+		List<T3State.ThreadRow> result = new ArrayList<>(all.stream().filter(r -> !T3Visibility.snoozedGroup(r)).toList());
+		List<T3State.ThreadRow> snoozed = all.stream().filter(T3Visibility::snoozedGroup).toList();
+		if (!snoozed.isEmpty()) { result.add(null); if (snoozedExpanded) result.addAll(snoozed); }
+		return result;
 	}
 
-	/** Filter identities use owner URLs; duplicate names remain independent. */
-	private List<String> machines() {
-		return mod.state().snapshot().threads().stream().map(T3State.ThreadRow::ownerKey).distinct().sorted().toList();
+	private void clampListScroll(int total) {
+		listScroll = Math.max(0, Math.min(listScroll, total - visibleRows()));
 	}
 
-	private List<Project> projects() {
-		java.util.Map<String, Project> projects = new java.util.LinkedHashMap<>();
-		boolean showMachine = envFilter == null && machines().size() > 1;
-		for (T3State.ThreadRow row : mod.state().snapshot().threads()) {
-			if (envFilter != null && !envFilter.equals(row.ownerKey())) continue;
-			String key = OfficeRoster.projectKey(row);
-			String label = row.projectTitle() + (showMachine ? " · " + mod.machineLabel(row.ownerKey()) : "");
-			projects.putIfAbsent(key, new Project(key, label));
-		}
-		return projects.values().stream().sorted(java.util.Comparator.comparing(Project::label)).toList();
-	}
-
- private List<T3State.ThreadRow> sidebarRows() {
-  List<T3State.ThreadRow> filtered = mod.state().snapshot().threads().stream()
-   .filter(r -> envFilter == null || envFilter.equals(r.ownerKey()))
-   .filter(r -> projectFilter == null || projectFilter.equals(OfficeRoster.projectKey(r))).toList();
-  List<T3State.ThreadRow> result = new java.util.ArrayList<>(filtered.stream().filter(r -> !T3Visibility.snoozedGroup(r)).toList());
-  List<T3State.ThreadRow> snoozed = filtered.stream().filter(T3Visibility::snoozedGroup).toList();
-  if (!snoozed.isEmpty()) { result.add(null); if (snoozedExpanded) result.addAll(snoozed); }
-  return result;
- }
-
-	private int projectTop() { return MARGIN + HEADER + (machines().size() > 1 ? FILTER : 0); }
-	private int listTop() { return projectTop() + (projects().size() > 1 ? FILTER : 0); }
-	private void cycleMachine() {
-		List<String> machines = machines();
-		int at = envFilter == null ? -1 : machines.indexOf(envFilter);
-		envFilter = at + 1 < machines.size() ? machines.get(at + 1) : null;
-		projectFilter = null; sidebarScroll = 0; revealFocused();
-	}
-	private void cycleProject() {
-		List<Project> projects = projects();
-		int at = -1;
-		for (int i = 0; i < projects.size(); i++) if (projects.get(i).key().equals(projectFilter)) at = i;
-		projectFilter = at + 1 < projects.size() ? projects.get(at + 1).key() : null;
-		sidebarScroll = 0; revealFocused();
-	}
-
-	private int visibleRows() {
-		return Math.max(1, (height - MARGIN - 72 - listTop()) / ROW);
-	}
-
-	private void clampSidebarScroll(int total) {
-		sidebarScroll = Math.max(0, Math.min(sidebarScroll, total - visibleRows()));
-	}
+	// ----- Drafts -----
 
 	private String draftKey() {
 		return newThread ? "new" : mod.state().focusedThreadId();
@@ -271,18 +226,19 @@ final class T3Screen extends Screen {
 		T3State.ThreadRow row = mod.state().snapshot().focusedRow();
 		String hint = newThread
 			? "New thread in " + (row == null ? "this project" : row.projectTitle()) + "…"
-			: "Ask " + (row == null ? "the agent" : "\"" + row.title() + "\"") + "…";
+			: "Message " + (row == null ? "the agent" : T3Ui.provider(mod, row)) + "…";
 		T3State.Question question = currentQuestion();
 		if (question != null && !newThread) {
 			hint = question.options().isEmpty() ? "Type your answer…"
 				: "Press 1–" + Math.min(9, question.options().size()) + (question.allowCustomAnswer() ? ", or type your own answer" : "")
 				+ (question.multiSelect() ? ", then Enter" : "") + "…";
 		}
-		composer.setHint(Component.literal(hint).withColor(0xFF6B7280));
+		composer.setHint(Component.literal(hint).withColor(0xFF7A7A7A));
 	}
 
+	// ----- Requests (approvals and questions) -----
 
-	/** The desk's chosen request only matters while it is pending; once answered, the next request shows. */
+	/** The chosen request only matters while it is pending; once answered, the next request shows. */
 	private void dropAnsweredSelection(T3State.Focus focus) {
 		if (selectedRequest == null || !focus.threadId().equals(mod.state().focusedThreadId())) return;
 		boolean pending = focus.approvals().stream().anyMatch(a -> a.requestId().equals(selectedRequest))
@@ -291,7 +247,7 @@ final class T3Screen extends Screen {
 	}
 
 	private T3State.Approval currentApproval() {
-		var focus = shownFocus;
+		T3State.Focus focus = shownFocus;
 		if (focus == null) return null;
 		dropAnsweredSelection(focus);
 		if (focus.approvals().isEmpty()) return null;
@@ -366,82 +322,89 @@ final class T3Screen extends Screen {
 		answerQuestion(values);
 	}
 
-	/** Used by the dev self-test: presses a number key on the question card. */
+	// ----- Dev self-test hooks -----
+
+	/** Presses a number key on the question block. */
 	void pressOption(int number) {
 		keyPressed(new KeyEvent(InputConstants.KEY_1 + number - 1, 0, 0));
 	}
 
-	/** Used by the dev self-test. */
-	boolean requestCardVisibleForTest() { return questionBox != null || approvalBox != null; }
+	boolean requestCardVisibleForTest() { return shownApproval != null || shownQuestion != null; }
 
 	void setComposerForTest(String text) {
 		composer.setValue(text);
 	}
 
-	/** Used by the dev self-test. */
 	String composerValueForTest() {
 		return composer.getValue();
 	}
 
-	/** Used by the dev self-test: same as clicking the machine filter row. */
-	String cycleMachineForTest() { cycleMachine(); return envFilter == null ? null : mod.machineLabel(envFilter); }
+	/** The list has no machine filter any more; kept so older self-tests still run. */
+	String cycleMachineForTest() { return null; }
 
-	/** Used by the dev self-test: whether the focused thread's row is within the visible window. */
+	/** Whether the focused thread's row is within the visible window. */
 	boolean focusedRowVisibleForTest() {
-		List<T3State.ThreadRow> rows = sidebarRows();
+		List<T3State.ThreadRow> rows = listRows();
 		for (int i = 0; i < rows.size(); i++) {
-			if (rows.get(i) != null && rows.get(i).id().equals(mod.state().focusedThreadId())) return i >= sidebarScroll && i < sidebarScroll + visibleRows();
+			if (rows.get(i) != null && rows.get(i).id().equals(mod.state().focusedThreadId())) return i >= listScroll && i < listScroll + visibleRows();
 		}
 		return false;
 	}
 
-	/** Used by the dev self-test: rows in the sidebar under the current filter. */
 	int sidebarCountForTest() {
-		return (int) sidebarRows().stream().filter(java.util.Objects::nonNull).count();
+		return (int) listRows().stream().filter(java.util.Objects::nonNull).count();
 	}
 
-	/** Used by the dev self-test: the same path as the mouse wheel over the sidebar. */
+	/** The same path as the mouse wheel over the list. */
 	void scrollSidebarForTest(int notches) {
-		for (int i = 0; i < Math.abs(notches); i++) mouseScrolled(MARGIN + 5, height / 2.0, 0, notches > 0 ? -1 : 1);
+		for (int i = 0; i < Math.abs(notches); i++) mouseScrolled(listLeft() + 5, height / 2.0, 0, notches > 0 ? -1 : 1);
 	}
 
-	/** Used by the dev self-test: same as clicking + New. */
+	/** Same as clicking a thread in the list. */
+	void selectThreadForTest(String id) { select(id); }
+
 	void startNewThread() {
 		if (!newThread) switchDraft(() -> newThread = true);
 	}
 
-	/** Used by the dev self-test. */
-	void openPicker() {
-		pickerOpen = true;
-	}
+	/** There is no model picker on the laptop any more; kept so older self-tests still run. */
+	void openPicker() { }
 
-	/** Used by the dev self-test to drive the real composer path. */
+	/** Drives the real composer path. */
 	void typeAndSubmit(String text, boolean stayOpen) {
 		composer.setValue(text);
 		submit(stayOpen);
 	}
+
+	// ----- Input -----
 
 	private void submit(boolean stayOpen) {
 		String text = composer.getValue().trim();
 		if (text.isEmpty()) return;
 		String key = draftKey();
 		// Nothing was sent (no thread to send to): keep the text and the panel.
-		if (!mod.send(text, newThread, pickedModel, () -> restoreFailedSend(mod, key, text))) return;
+		if (!mod.send(text, newThread, null, () -> restoreFailedSend(mod, key, text))) return;
 		composerDraft.sent(mod::saveDraft);
 		composer.setValue("");
 		newThread = false;
-		pickedModel = null;
 		scroll = 0;
 		updateHint();
 		if (!stayOpen) onClose();
 	}
 
+	private void select(String id) {
+		switchDraft(() -> {
+			mod.focus(id);
+			selectedRequest = null;
+			newThread = false;
+		});
+		scroll = 0;
+		updateHint();
+		setFocused(composer);
+	}
+
 	@Override
 	public boolean keyPressed(KeyEvent event) {
-		if (pickerOpen && event.isEscape()) {
-			pickerOpen = false;
-			return true;
-		}
 		T3State.Question question = newThread ? null : currentQuestion();
 		boolean composerEmpty = composer.getValue().isEmpty();
 		if (question != null && composerEmpty && event.key() >= InputConstants.KEY_1 && event.key() <= InputConstants.KEY_9) {
@@ -462,8 +425,9 @@ final class T3Screen extends Screen {
 			submit(event.hasShiftDown());
 			return true;
 		}
-		if (composerEmpty && (event.key() == InputConstants.KEY_Y || event.key() == InputConstants.KEY_N)
-			&& approve.visible) {
+		// Y/N only when you are not typing in the composer, and never as part of a Ctrl/Alt/Cmd chord.
+		boolean chord = event.hasControlDown() || event.hasAltDown() || (event.modifiers() & 0x8) != 0;
+		if (composerEmpty && !composer.isFocused() && !chord && (event.key() == InputConstants.KEY_Y || event.key() == InputConstants.KEY_N) && approve.visible) {
 			answer(event.key() == InputConstants.KEY_Y ? "accept" : "decline");
 			return true;
 		}
@@ -481,7 +445,7 @@ final class T3Screen extends Screen {
 			return true;
 		}
 		if (composer.getValue().isEmpty() && (typesOpenKey(event.codepoint())
-			|| (approve.visible && (event.codepoint() == 'y' || event.codepoint() == 'n' || event.codepoint() == 'Y' || event.codepoint() == 'N')))) {
+			|| (approve.visible && !composer.isFocused() && (event.codepoint() == 'y' || event.codepoint() == 'n' || event.codepoint() == 'Y' || event.codepoint() == 'N')))) {
 			return true;
 		}
 		return super.charTyped(event);
@@ -500,517 +464,222 @@ final class T3Screen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-		if (pickerOpen) {
-			int[] box = pickerBox();
-			if (event.x() >= box[0] && event.x() < box[2] && event.y() >= box[1] && event.y() < box[3]) {
-				int index = (int) ((event.y() - box[1] - 2) / PICKER_ROW) + pickerScroll;
-				List<Object> rows = pickerRows();
-				if (index >= 0 && index < rows.size() && rows.get(index) instanceof PickerEntry entry) {
-					pickedModel = T3Api.modelSelection(entry.provider().instanceId(), entry.model().slug());
-					if (entry.needsNewThread() && !newThread) switchDraft(() -> newThread = true);
-					updateHint();
-					pickerOpen = false;
-					setFocused(composer);
-				}
-				return true;
-			}
-			pickerOpen = false;
-			return true;
-		}
-		if (chipContains(event.x(), event.y())) {
-			pickerOpen = true;
-			pickerScroll = 0;
-			return true;
-		}
-		for (int[] optionRow : optionRows) {
-			if (event.x() >= optionRow[0] && event.x() < optionRow[2] && event.y() >= optionRow[1] && event.y() < optionRow[3]) {
-				pickOption(optionRow[4]);
-				return true;
-			}
-		}
-		List<T3State.ThreadRow> rows = sidebarRows();
-		int listTop = listTop();
-		List<String> machines = machines();
-		if (machines.size() > 1 && event.x() >= MARGIN && event.x() < MARGIN + SIDEBAR
-			&& event.y() >= MARGIN + HEADER && event.y() < projectTop()) {
-			cycleMachine(); return true;
-		}
-		if (projects().size() > 1 && event.x() >= MARGIN && event.x() < MARGIN + SIDEBAR
-			&& event.y() >= projectTop() && event.y() < listTop) {
-			cycleProject(); return true;
-		}
-		if (event.x() >= MARGIN && event.x() < MARGIN + SIDEBAR && event.y() >= listTop
-			&& event.y() < listTop + visibleRows() * ROW) {
-			int index = (int) ((event.y() - listTop) / ROW) + sidebarScroll;
+		if (event.x() >= listLeft() && event.x() < listRight() && event.y() >= listTop() && event.y() < listTop() + visibleRows() * ROW) {
+			List<T3State.ThreadRow> rows = listRows();
+			int index = (int) ((event.y() - listTop()) / ROW) + listScroll;
 			if (index < rows.size()) {
-				if (rows.get(index) == null) { snoozedExpanded = !snoozedExpanded; clampSidebarScroll(sidebarRows().size()); return true; }
-				String id = rows.get(index).id();
-				switchDraft(() -> {
-					mod.focus(id);
-					selectedRequest = null;
-					newThread = false;
-				});
-				pickedModel = null;
-				pickerOpen = false;
-				scroll = 0;
-				updateHint();
+				if (rows.get(index) == null) { snoozedExpanded = !snoozedExpanded; clampListScroll(listRows().size()); return true; }
+				select(rows.get(index).id());
 				return true;
 			}
-		}
-		if (event.x() >= MARGIN + SIDEBAR - NEW_WIDTH && event.x() < MARGIN + SIDEBAR && event.y() >= MARGIN && event.y() < MARGIN + HEADER) {
-			switchDraft(() -> newThread = !newThread);
-			setFocused(composer);
-			return true;
 		}
 		return super.mouseClicked(event, doubleClick);
 	}
 
 	@Override
 	public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {
-		if (!pickerOpen && x < MARGIN + SIDEBAR) {
-			sidebarScroll -= (int) Math.signum(scrollY) * 2;
-			clampSidebarScroll(sidebarRows().size());
+		if (x < listRight() + PAD) {
+			listScroll -= listWheel.rows(scrollY * 2);
+			clampListScroll(listRows().size());
 			return true;
 		}
-		if (pickerOpen) {
-			int visible = (pickerBox()[3] - pickerBox()[1] - 4) / PICKER_ROW;
-			pickerScroll = Math.max(0, Math.min(pickerRows().size() - visible, pickerScroll - (int) Math.signum(scrollY) * 2));
-			return true;
-		}
-		// Clamped when the card is drawn.
-		if (inside(questionBox, x, y)) {
-			questionScroll = Math.max(0, questionScroll - (int) Math.signum(scrollY) * font.lineHeight * 2);
-			return true;
-		}
-		if (inside(approvalBox, x, y)) {
-			approvalScroll = Math.max(0, approvalScroll - (int) Math.signum(scrollY) * 2);
-			return true;
-		}
-		scroll = Math.max(0, scroll + (int) Math.signum(scrollY) * 3);
+		scroll = Math.max(0, scroll + chatWheel.rows(scrollY * 3));
 		return true;
+	}
+
+	// ----- Drawing -----
+
+	/** Places the request block (approval or question) above the composer and sets every widget's visibility. */
+	private void layout(T3State.Snapshot snapshot) {
+		shownFocus = snapshot.focus();
+		T3State.ThreadRow row = snapshot.focusedRow();
+		boolean online = mod.state().online(snapshot.focusedId());
+		int x0 = mainLeft();
+		int x1 = mainRight();
+		int width = x1 - x0;
+		int composerY = composerY();
+		int roomTop = mainTop() + 4 * font.lineHeight; // the conversation always keeps a few rows
+
+		shownApproval = newThread ? null : currentApproval();
+		shownQuestion = newThread || shownApproval != null ? null : currentQuestion();
+		approve.visible = deny.visible = shownApproval != null;
+		approve.active = deny.active = online;
+		for (Button option : options) option.visible = false;
+		stop.visible = row != null && row.status() == T3State.Status.WORKING && online && !newThread;
+		send.active = online || newThread;
+		approvalDetail = List.of();
+		questionText = List.of();
+
+		int top = composerY - 4;
+		if (shownApproval != null) {
+			top -= BUTTON;
+			approve.setY(top);
+			deny.setY(top);
+			List<FormattedCharSequence> detail = font.split(Component.literal(shownApproval.detail() == null ? "" : shownApproval.detail()), width);
+			int roomRows = Math.max(1, (top - 4 - font.lineHeight - roomTop) / font.lineHeight);
+			approvalDetail = detail.subList(0, Math.min(detail.size(), Math.min(4, roomRows)));
+			top -= 3 + approvalDetail.size() * font.lineHeight + font.lineHeight + 2;
+		} else if (shownQuestion != null) {
+			int count = Math.min(shownQuestion.options().size(), MAX_OPTIONS);
+			List<FormattedCharSequence> text = font.split(Component.literal(shownQuestion.question() == null ? "" : shownQuestion.question()), width);
+			int roomRows = Math.max(1, (composerY - 4 - count * (BUTTON + 2) - font.lineHeight - roomTop) / font.lineHeight);
+			questionText = text.subList(0, Math.min(text.size(), Math.min(3, roomRows)));
+			for (int i = count - 1; i >= 0; i--) {
+				top -= BUTTON + 2;
+				Button option = options.get(i);
+				T3State.Option choice = shownQuestion.options().get(i);
+				String prefix = (i + 1) + "  " + (shownQuestion.multiSelect() ? (multiPicked.contains(choice.value()) ? "[x] " : "[ ] ") : "");
+				option.setMessage(Component.literal(T3Hud.ellipsize(font, prefix + choice.label(), width - 12)));
+				option.setY(top);
+				option.visible = true;
+				option.active = online;
+			}
+			top -= 2 + questionText.size() * font.lineHeight + font.lineHeight + 2;
+		}
+		blockTop = top;
 	}
 
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a) {
 		T3State.Snapshot snapshot = mod.state().snapshot();
-		shownFocus = snapshot.focus();
-		mouseXCache = mouseX;
-		mouseYCache = mouseY;
-		extractSidebar(graphics, snapshot, mouseX, mouseY);
-		extractConversation(graphics, snapshot);
+		layout(snapshot);
+		T3Ui.panel(graphics, MARGIN, MARGIN, width - MARGIN, height - MARGIN);
+		T3Ui.dividerVertical(graphics, listRight() + PAD / 2, MARGIN + PAD, height - MARGIN - PAD);
+		extractList(graphics, snapshot, mouseX, mouseY);
+		extractThread(graphics, snapshot);
 		super.extractRenderState(graphics, mouseX, mouseY, a);
-		extractModelChip(graphics, snapshot, mouseX, mouseY);
-		if (pickerOpen) {
-			graphics.nextStratum();
-			extractPicker(graphics, mouseX, mouseY);
-		}
 	}
 
-	private void extractSidebar(GuiGraphicsExtractor graphics, T3State.Snapshot snapshot, int mouseX, int mouseY) {
-		int x0 = MARGIN;
-		int x1 = MARGIN + SIDEBAR;
-		graphics.fill(x0, MARGIN, x1, height - MARGIN, 0xC0101014);
-		graphics.text(font, "T3 Code", x0 + 8, MARGIN + 8, 0xFFFFFFFF, false);
-		int connection = snapshot.connected() ? 0xFF4ADE80 : snapshot.error() == null ? 0xFF9CA3AF : 0xFFF87171;
-		graphics.fill(x0 + 12 + font.width("T3 Code"), MARGIN + 10, x0 + 16 + font.width("T3 Code"), MARGIN + 14, connection);
-		// Lives in the header so it stays reachable however many threads there are.
-		boolean newHovered = mouseX >= x1 - NEW_WIDTH && mouseX < x1 && mouseY >= MARGIN && mouseY < MARGIN + HEADER;
-		if (newThread) graphics.fill(x1 - NEW_WIDTH, MARGIN + 3, x1 - 3, MARGIN + HEADER - 5, 0x40FFFFFF);
-		else if (newHovered) graphics.fill(x1 - NEW_WIDTH, MARGIN + 3, x1 - 3, MARGIN + HEADER - 5, 0x20FFFFFF);
-		graphics.text(font, "+ New", x1 - NEW_WIDTH + 5, MARGIN + 8, 0xFFE5E7EB, false);
+	private void extractList(GuiGraphicsExtractor graphics, T3State.Snapshot snapshot, int mouseX, int mouseY) {
+		int x0 = listLeft();
+		int x1 = listRight();
+		int y = MARGIN + PAD;
+		graphics.text(font, "T3 Code", x0 + 1, y + 1, T3Ui.TITLE, false);
+		int connection = snapshot.connected() ? 0xFF3FB950 : snapshot.error() == null ? T3Ui.IDLE : T3Ui.FAILED;
+		T3Ui.dot(graphics, x0 + 4 + font.width("T3 Code") + 4, y + 3, connection);
 
-		List<String> machines = machines();
-		if (envFilter != null && !machines.contains(envFilter)) envFilter = null;
-		if (projectFilter != null && projects().stream().noneMatch(p -> p.key().equals(projectFilter))) projectFilter = null;
-		List<T3State.ThreadRow> rows = sidebarRows();
-		int top = listTop();
-		if (machines.size() > 1) {
-			boolean hovered = mouseX >= x0 && mouseX < x1 && mouseY >= MARGIN + HEADER && mouseY < projectTop();
-			if (hovered) graphics.fill(x0 + 2, MARGIN + HEADER - 2, x1 - 2, projectTop() - 1, 0x20FFFFFF);
-			String label = (envFilter == null ? "All machines" : mod.machineLabel(envFilter)) + " · " + rows.size() + " ▾";
-			graphics.text(font, T3Hud.ellipsize(font, label, SIDEBAR - 16), x0 + 8, MARGIN + HEADER + 1, 0xFF9CA3AF, false);
-		}
-
-		if (projects().size() > 1) {
-			boolean hovered = mouseX >= x0 && mouseX < x1 && mouseY >= projectTop() && mouseY < top;
-			if (hovered) graphics.fill(x0 + 2, projectTop(), x1 - 2, top - 1, 0x20FFFFFF);
-			String label = projectFilter == null ? "All projects" : projects().stream().filter(p -> p.key().equals(projectFilter)).findFirst().map(Project::label).orElse("All projects");
-			graphics.text(font, T3Hud.ellipsize(font, label + " ▾", SIDEBAR - 16), x0 + 8, projectTop() + 1, 0xFF9CA3AF, false);
-		}
-
-		clampSidebarScroll(rows.size());
+		List<T3State.ThreadRow> rows = listRows();
+		clampListScroll(rows.size());
 		int visible = visibleRows();
-		int y = top;
+		int top = listTop();
 		String focused = mod.state().focusedThreadId();
-		for (int i = sidebarScroll; i < rows.size() && i < sidebarScroll + visible; i++) {
+		y = top;
+		for (int i = listScroll; i < rows.size() && i < listScroll + visible; i++) {
 			T3State.ThreadRow row = rows.get(i);
-            if (row == null) {
-                graphics.text(font, (snoozedExpanded ? "▾ " : "▸ ") + "Snoozed", x0 + 8, y + 6, 0xFF9CA3AF, false);
-                y += ROW; continue;
-            }
 			boolean hovered = mouseX >= x0 && mouseX < x1 && mouseY >= y && mouseY < y + ROW;
-			if (row.id().equals(focused) && !newThread) graphics.fill(x0 + 2, y, x1 - 2, y + ROW, 0x40FFFFFF);
-			else if (hovered) graphics.fill(x0 + 2, y, x1 - 2, y + ROW, 0x20FFFFFF);
+			if (row == null) {
+				if (hovered) graphics.fill(x0, y, x1, y + ROW, 0x18000000);
+				graphics.text(font, (snoozedExpanded ? "▾ " : "▸ ") + "Snoozed", x0 + 3, y + 2, T3Ui.MUTED, false);
+				y += ROW;
+				continue;
+			}
+			boolean selected = row.id().equals(focused) && !newThread;
+			if (selected) graphics.fill(x0, y, x1, y + ROW, 0x30000000);
+			else if (hovered) graphics.fill(x0, y, x1, y + ROW, 0x18000000);
 			boolean online = mod.state().online(row.id());
-			graphics.fill(x0 + 8, y + 5, x0 + 12, y + 9, online ? T3Hud.color(row.status()) : 0xFF6B7280);
-			graphics.text(font, T3Hud.ellipsize(font, (mod.pinned(row) ? "* " : "") + row.title(), SIDEBAR - 24), x0 + 16, y + 3, 0xFFE5E7EB, false);
-			// The machine is in the filter row when filtering, so it's only repeated per row for "All".
-			String machine = row.environment() == null || envFilter != null ? "" : mod.machineLabel(row.ownerKey()) + " · ";
-			String meta = (online ? "" : "Offline · ") + T3Hud.label(row.status()) + " · " + row.projectTitle() + (machine.isEmpty() ? "" : " · " + mod.machineLabel(row.ownerKey()));
-			graphics.text(font, T3Hud.ellipsize(font, meta, SIDEBAR - 24), x0 + 16, y + 12, 0xFF6B7280, false);
+			T3Ui.dot(graphics, x0 + 3, y + 4, T3Ui.statusColor(row.status(), online));
+			graphics.text(font, T3Ui.glyph(mod, row), x0 + 11, y + 2, 0xFFFFFFFF, false);
+			graphics.text(font, T3Hud.ellipsize(font, row.title(), x1 - x0 - 24), x0 + 22, y + 2, selected ? T3Ui.TITLE : T3Ui.TEXT, false);
 			y += ROW;
+		}
+		if (rows.isEmpty()) {
+			graphics.text(font, snapshot.connected() ? "No active threads." : "Connecting…", x0 + 3, top + 2, T3Ui.MUTED, false);
 		}
 		// Scroll thumb when the list overflows.
 		if (rows.size() > visible) {
-			int trackTop = top;
-			int trackHeight = visible * ROW;
-			int thumbHeight = Math.max(10, trackHeight * visible / rows.size());
-			int thumbTop = trackTop + (trackHeight - thumbHeight) * sidebarScroll / Math.max(1, rows.size() - visible);
-			graphics.fill(x1 - 4, thumbTop, x1 - 2, thumbTop + thumbHeight, 0x60FFFFFF);
+			int track = visible * ROW;
+			int thumb = Math.max(8, track * visible / rows.size());
+			int at = top + (track - thumb) * listScroll / Math.max(1, rows.size() - visible);
+			graphics.fill(x1 + 1, at, x1 + 3, at + thumb, 0x60000000);
 		}
 	}
 
-	private void extractConversation(GuiGraphicsExtractor graphics, T3State.Snapshot snapshot) {
-		// Early returns below draw no cards, so last frame's hit boxes must not survive them.
-		optionRows.clear();
-		questionBox = null;
-		approvalBox = null;
-		int x0 = MARGIN + SIDEBAR + 8;
-		int x1 = width - MARGIN;
-		graphics.fill(x0, MARGIN, x1, height - MARGIN, 0xB0101014);
-
+	private void extractThread(GuiGraphicsExtractor graphics, T3State.Snapshot snapshot) {
+		int x0 = mainLeft();
+		int x1 = mainRight();
+		int y = MARGIN + PAD;
 		T3State.ThreadRow row = snapshot.focusedRow();
 		T3State.Focus focus = snapshot.focus();
+
 		if (!snapshot.connected() && row == null) {
-			String message = snapshot.error() == null ? "Connecting to T3…" : snapshot.error();
-			graphics.textWithWordWrap(font, Component.literal(message), x0 + 10, MARGIN + 10, x1 - x0 - 20, 0xFFF87171);
+			String message = snapshot.error() == null ? "Connecting to T3 Code…" : snapshot.error();
+			graphics.textWithWordWrap(font, Component.literal(message), x0, y + 1, x1 - x0, snapshot.error() == null ? T3Ui.MUTED : T3Ui.FAILED);
 			return;
 		}
 		if (row == null && !newThread) {
-			String hint = snapshot.threads().isEmpty() ? "No threads yet. Click + New to start one." : "Pick a thread on the left, or click + New.";
-			graphics.text(font, hint, x0 + 10, MARGIN + 10, 0xFF9CA3AF, false);
+			graphics.text(font, snapshot.threads().isEmpty() ? "No threads yet." : "Pick a thread on the left.", x0, y + 1, T3Ui.MUTED, false);
 			return;
 		}
 		if (row == null) row = snapshot.threads().isEmpty() ? null : snapshot.threads().getFirst();
 		if (row == null) return;
 
+		// Header: the title, and the status at the right end in its colour.
+		boolean online = mod.state().online(row.id());
+		String status = newThread ? "" : T3Ui.status(row, online);
+		int statusWidth = font.width(status);
+		int statusRight = stop.visible ? stop.getX() - 6 : x1;
+		graphics.text(font, status, statusRight - statusWidth, y + 1, T3Ui.statusColor(row.status(), online), false);
 		String title = newThread ? "New thread" : row.title();
-		graphics.text(font, T3Hud.ellipsize(font, title, chipX() - x0 - 20), x0 + 10, MARGIN + 6, 0xFFFFFFFF, false);
-		String status = mod.state().online(row.id()) ? T3Hud.label(row.status()) : "Offline · last-known status";
-		if (row.status() == T3State.Status.WORKING) status += " " + T3Hud.elapsed(row.workingSince()) + (row.step() == null ? "" : " · " + row.step());
-		String meta = (row.environment() == null ? "" : mod.machineLabel(row.ownerKey()) + " · ") + row.projectTitle() + " · ";
-		graphics.text(font, T3Hud.ellipsize(font, status + " · " + meta, chipX() - x0 - 20), x0 + 10, MARGIN + 16,
-			mod.state().online(row.id()) ? T3Hud.color(row.status()) : 0xFF9CA3AF, false);
-		graphics.horizontalLine(x0, x1 - 1, MARGIN + HEADER, 0x30FFFFFF);
+		graphics.text(font, T3Hud.ellipsize(font, title, statusRight - statusWidth - 8 - x0), x0, y + 1, T3Ui.TITLE, false);
+		T3Ui.dividerHorizontal(graphics, x0, x1, y + HEADER);
 
-		T3State.Approval approval = currentApproval();
-		boolean hasApproval = approval != null;
-		int composerY = height - MARGIN - 12 - COMPOSER;
-		T3State.Question question = newThread ? null : currentQuestion();
-		int cardWidth = x1 - x0 - 24;
-		// The cards share what's above the composer but always leave the conversation a few lines.
-		int room = Math.max(0, composerY - 6 - (MARGIN + HEADER + 4) - 3 * font.lineHeight);
-		List<FormattedCharSequence> detail = hasApproval
-			? font.split(Component.literal(approval.detail() == null ? "" : approval.detail()), cardWidth) : List.of();
-		int approvalHeight = !hasApproval ? 0
-			: Math.max(APPROVAL, Math.min(25 + detail.size() * font.lineHeight, question == null ? room : room / 2));
-		int questionHeight = question == null ? 0
-			: Math.min(questionCardHeight(question, cardWidth), Math.max(3 * font.lineHeight + 12, room - approvalHeight));
-		int bottom = composerY - 6 - approvalHeight - questionHeight;
-		int top = MARGIN + HEADER + 4;
-		String connectionError = mod.state().connectionError(row.id());
-		if (connectionError == null) connectionError = snapshot.detailError();
-		if (connectionError != null) {
-			int errorHeight = Math.min(Math.max(0, bottom - top - 10), font.split(Component.literal(connectionError), x1 - x0 - 20).size() * font.lineHeight + 8);
+		int top = mainTop();
+		int bottom = blockTop - 2;
+		String error = mod.state().connectionError(row.id());
+		if (error == null) error = snapshot.detailError();
+		if (error != null) {
+			List<FormattedCharSequence> lines = font.split(Component.literal(error), x1 - x0);
+			int errorHeight = Math.min(Math.max(0, bottom - top - 2 * font.lineHeight), lines.size() * font.lineHeight + 2);
 			graphics.enableScissor(x0, top, x1, top + errorHeight);
-			graphics.fill(x0, top, x1, top + errorHeight, 0x802C1818);
-			graphics.textWithWordWrap(font, Component.literal(connectionError), x0 + 10, top + 4, x1 - x0 - 20, 0xFFFFA9A9);
+			for (int i = 0; i < lines.size(); i++) graphics.text(font, lines.get(i), x0, top + 1 + i * font.lineHeight, T3Ui.FAILED, false);
 			graphics.disableScissor();
-			top += errorHeight + 6;
+			top += errorHeight + 4;
 		}
 
-		if (!pickerOpen && !newThread && focus != null && focus.threadId().equals(row.id()) && bottom > top) {
-			List<T3Markdown.Line> lines = lines(focus, x1 - x0 - 28);
-			// scroll counts lines up from the bottom, so while reading back, rows streaming in below
-			// would push the view; move it by the same amount to keep the same lines on screen.
-			if (scroll > 0 && focus.threadId().equals(anchorThread) && x1 - x0 - 28 == anchorWidth && lines.size() > anchorCount) {
+		if (!newThread && focus != null && focus.threadId().equals(row.id()) && bottom > top) {
+			int width = x1 - x0 - 2;
+			List<T3Markdown.Line> lines = lines(focus, T3Ui.provider(mod, row), width);
+			// scroll counts rows up from the bottom, so while reading back, rows streaming in below
+			// would push the view; move it by the same amount to keep the same rows on screen.
+			if (scroll > 0 && focus.threadId().equals(anchorThread) && width == anchorWidth && lines.size() > anchorCount) {
 				scroll += lines.size() - anchorCount;
 			}
 			anchorThread = focus.threadId();
-			anchorWidth = x1 - x0 - 28;
+			anchorWidth = width;
 			anchorCount = lines.size();
-			int visible = Math.max(1, (bottom - top) / font.lineHeight);
-			scroll = Math.min(scroll, Math.max(0, lines.size() - visible));
-			int end = lines.size() - scroll;
-			int start = Math.max(0, end - visible);
-			graphics.enableScissor(x0, top, x1, bottom);
-			int y = bottom - (end - start) * font.lineHeight;
-			for (int i = start; i < end; i++) {
-				T3Markdown.Line line = lines.get(i);
-				int textX = x0 + 10 + line.indent();
-				switch (line.kind()) {
-					case RULE -> graphics.horizontalLine(x0 + 10, x1 - 12, y + 4, 0x40FFFFFF);
-					case CODE -> graphics.fill(x0 + 10, y - 1, x1 - 12, y + font.lineHeight, 0x70000000);
-					case QUOTE -> graphics.fill(x0 + 10, y - 1, x0 + 12, y + font.lineHeight, 0x60FFFFFF);
-					default -> {
-					}
-				}
-				if (line.marker() != null) {
-					graphics.text(font, line.marker(), textX - 4 - font.width(line.marker()), y, T3Markdown.MUTED, false);
-				}
-				graphics.text(font, line.text(), textX, y, T3Markdown.TEXT, false);
-				y += font.lineHeight;
+			scroll = Math.min(scroll, Math.max(0, lines.size() - 1));
+			if (lines.isEmpty()) graphics.text(font, row.status() == T3State.Status.WORKING ? "Working…" : "No messages yet.", x0, top + 1, T3Ui.MUTED, false);
+			else scroll = T3Ui.drawLines(graphics, font, lines, x0, x1, top, bottom, scroll);
+		} else if (newThread) {
+			graphics.text(font, "Type the first message below.", x0, top + 1, T3Ui.MUTED, false);
+		}
+
+		// The request block, laid out by layout(): the buttons are widgets, the words are drawn here.
+		int blockY = blockTop;
+		if (shownApproval != null) {
+			T3Ui.dividerHorizontal(graphics, x0, x1, blockY - 2);
+			graphics.text(font, "Approve " + shownApproval.kind() + "?", x0, blockY + 2, T3Ui.NEEDS_YOU, false);
+			for (int i = 0; i < approvalDetail.size(); i++) {
+				graphics.text(font, approvalDetail.get(i), x0, blockY + 2 + font.lineHeight + i * font.lineHeight, T3Ui.TEXT, false);
 			}
-			graphics.disableScissor();
-			if (lines.isEmpty()) graphics.text(font, "No messages yet.", x0 + 10, top + 4, 0xFF6B7280, false);
-		}
-
-		optionRows.clear();
-		questionBox = null;
-		if (question != null) {
-			extractQuestion(graphics, question, x0, x1, composerY - approvalHeight - questionHeight - 2, questionHeight, mouseXCache, mouseYCache);
-		}
-		approvalBox = null;
-		if (hasApproval) {
-			int y = composerY - approvalHeight - 2;
-			// The card grows with the command, so its buttons follow its title row.
-			approve.setY(y + 2);
-			deny.setY(y + 2);
-			graphics.fill(x0 + 6, y, x1 - 6, y + approvalHeight - 2, 0x40FFB02E);
-			graphics.text(font, "Approve " + approval.kind() + "?", x0 + 12, y + 5, 0xFFFFB02E, false);
-			int rows = Math.max(1, (approvalHeight - 25) / font.lineHeight);
-			if (!approval.requestId().equals(scrolledApproval)) {
-				scrolledApproval = approval.requestId();
-				approvalScroll = 0;
-			}
-			approvalScroll = Math.max(0, Math.min(approvalScroll, detail.size() - rows));
-			for (int i = 0; i < rows && approvalScroll + i < detail.size(); i++) {
-				graphics.text(font, detail.get(approvalScroll + i), x0 + 12, y + 18 + i * font.lineHeight, 0xFFE5E7EB, false);
-			}
-			scrollThumb(graphics, x1 - 10, y + 18, rows * font.lineHeight, rows, detail.size(), approvalScroll);
-			approvalBox = new int[] {x0 + 6, y, x1 - 6, y + approvalHeight - 2};
-		}
-
-        String gap = focus == null ? null : focus.unsupported();
-        String footer = gap != null && question == null && !hasApproval ? gap : "Enter send · Shift+Enter stay · " + (hasApproval ? "Y/N answer · " : "") + "Esc play";
-		graphics.text(font, T3Hud.ellipsize(font, footer, x1 - x0 - 4), x0 + 2, height - MARGIN - 10, 0xFF6B7280, false);
-	}
-
-	private int mouseXCache;
-	private int mouseYCache;
-	/** Where the cards were last drawn, so the wheel over one scrolls it instead of the conversation. */
-	private int[] approvalBox;
-	private int[] questionBox;
-	private int approvalScroll;
-	private int questionScroll;
-	private String scrolledApproval;
-	private String scrolledQuestion;
-
-	private static boolean inside(int[] box, double x, double y) {
-		return box != null && x >= box[0] && x < box[2] && y >= box[1] && y < box[3];
-	}
-
-	/** Same thin thumb as the sidebar's, shown only when a card's content overflows. */
-	private static void scrollThumb(GuiGraphicsExtractor graphics, int x, int top, int track, int visible, int total, int offset) {
-		if (total <= visible || track <= 0) return;
-		int thumb = Math.max(6, track * visible / total);
-		int at = top + (track - thumb) * offset / Math.max(1, total - visible);
-		graphics.fill(x, at, x + 2, at + thumb, 0x60FFFFFF);
-	}
-
-	private int questionCardHeight(T3State.Question question, int width) {
-		int lines = 1 + font.split(Component.literal(question.question() == null ? "" : question.question()), width).size();
-		// + one line for the key hint (the input's own placeholder is hidden while it has focus).
-		return 8 + lines * font.lineHeight + question.options().size() * (font.lineHeight + 2) + 4 + font.lineHeight + 2;
-	}
-
-	/** {@code height} may be less than the card's full height; then the question and options scroll between header and key hint. */
-	private void extractQuestion(GuiGraphicsExtractor graphics, T3State.Question question, int x0, int x1, int y, int height, int mouseX, int mouseY) {
-		T3State.UserInput input = currentInput();
-		int width = x1 - x0 - 24;
-		List<FormattedCharSequence> text = font.split(Component.literal(question.question() == null ? "" : question.question()), width);
-		int body = text.size() * font.lineHeight + 2 + question.options().size() * (font.lineHeight + 2);
-		int bodyTop = y + 4 + font.lineHeight;
-		int bodyBottom = bodyTop + body - (questionCardHeight(question, width) - height);
-		String scrollKey = answeringRequest + "#" + questionIndex;
-		if (!scrollKey.equals(scrolledQuestion)) {
-			scrolledQuestion = scrollKey;
-			questionScroll = 0;
-		}
-		questionScroll = Math.max(0, Math.min(questionScroll, body - (bodyBottom - bodyTop)));
-		graphics.fill(x0 + 6, y, x1 - 6, y + height, 0x405EA8FF);
-		questionBox = new int[] {x0 + 6, y, x1 - 6, y + height};
-		String step = input != null && input.questions().size() > 1 ? "  " + (questionIndex + 1) + "/" + input.questions().size() : "";
-		graphics.text(font, (question.header() == null ? "Question" : question.header()) + step, x0 + 12, y + 4, 0xFF93C5FD, false);
-		graphics.enableScissor(x0 + 6, bodyTop, x1 - 6, bodyBottom);
-		int lineY = bodyTop - questionScroll;
-		for (var part : text) {
-			graphics.text(font, part, x0 + 12, lineY, 0xFFE5E7EB, false);
-			lineY += font.lineHeight;
-		}
-		lineY += 2;
-		for (int i = 0; i < question.options().size(); i++) {
-			T3State.Option option = question.options().get(i);
-			int rowTop = lineY - 1;
-			int rowBottom = lineY + font.lineHeight + 1;
-			// Rows scrolled out of the card can't be hovered or clicked.
-			int hitTop = Math.max(rowTop, bodyTop);
-			int hitBottom = Math.min(rowBottom, bodyBottom);
-			boolean hovered = mouseX >= x0 + 8 && mouseX < x1 - 8 && mouseY >= hitTop && mouseY < hitBottom;
-			boolean picked = multiPicked.contains(option.value());
-			if (hovered || picked) graphics.fill(x0 + 8, rowTop, x1 - 8, rowBottom, picked ? 0x505EA8FF : 0x25FFFFFF);
-			String key = (i < 9 ? String.valueOf(i + 1) : " ") + (question.multiSelect() ? (picked ? " [x] " : " [ ] ") : "  ");
-			graphics.text(font, key, x0 + 12, lineY, 0xFFFFB02E, false);
-			int labelX = x0 + 12 + font.width(key);
-			String label = option.label();
-			graphics.text(font, T3Hud.ellipsize(font, label, x1 - labelX - 14), labelX, lineY, 0xFFFFFFFF, false);
-			if (option.description() != null && !option.description().isBlank()) {
-				int descX = labelX + font.width(label) + 6;
-				if (descX < x1 - 40) {
-					graphics.text(font, T3Hud.ellipsize(font, "— " + option.description(), x1 - descX - 14), descX, lineY, 0xFF9CA3AF, false);
-				}
-			}
-			if (hitTop < hitBottom) optionRows.add(new int[] {x0 + 8, hitTop, x1 - 8, hitBottom, i});
-			lineY += font.lineHeight + 2;
-		}
-		graphics.disableScissor();
-		scrollThumb(graphics, x1 - 10, bodyTop, bodyBottom - bodyTop, bodyBottom - bodyTop, body, questionScroll);
-		lineY = bodyBottom;
-		String keys = question.options().isEmpty() ? "Type your answer below, then Enter"
-			: "Press 1–" + Math.min(9, question.options().size()) + (question.multiSelect() ? ", then Enter" : "")
-			+ (question.allowCustomAnswer() ? ", or type your own" : "");
-		graphics.text(font, T3Hud.ellipsize(font, keys, width), x0 + 12, lineY + 1, 0xFF9CA3AF, false);
-	}
-
-	private static final int PICKER_ROW = 11;
-	private static final int PICKER_WIDTH = 210;
-
-	/** The model the next send will use: the picked one, else the thread's. */
-	private JsonObject effectiveModel() {
-		if (pickedModel != null) return pickedModel;
-		T3State.ThreadRow row = mod.state().snapshot().focusedRow();
-		if (row == null || !row.raw().has("modelSelection") || !row.raw().get("modelSelection").isJsonObject()) return null;
-		return row.raw().getAsJsonObject("modelSelection");
-	}
-
-	private String modelLabel(JsonObject selection) {
-		if (selection == null) return "Model";
-		String instanceId = selection.get("instanceId").getAsString();
-		String slug = selection.get("model").getAsString();
-		for (T3Api.Provider provider : mod.state().providers()) {
-			if (!provider.instanceId().equals(instanceId)) continue;
-			for (T3Api.Model model : provider.models()) if (model.slug().equals(slug)) return model.name();
-		}
-		return slug;
-	}
-
-	// The chip's right edge stays put whether or not Stop is showing.
-	private int chipRight() {
-		return width - MARGIN - 110;
-	}
-
-	private int chipX() {
-		return chipRight() - font.width(chipLabel()) - 10;
-	}
-
-	/** A long model name is cut so the chip keeps to half the header and never reaches the sidebar. */
-	private String chipLabel() {
-		int max = Math.max(40, (chipRight() - (MARGIN + SIDEBAR + 8)) / 2);
-		return T3Hud.ellipsize(font, modelLabel(effectiveModel()), max - 10 - font.width(" ▾")) + " ▾";
-	}
-
-	private boolean chipContains(double x, double y) {
-		return x >= chipX() && x < chipRight() && y >= MARGIN + 4 && y < MARGIN + 20;
-	}
-
-	private void extractModelChip(GuiGraphicsExtractor graphics, T3State.Snapshot snapshot, int mouseX, int mouseY) {
-		if (snapshot.focusedRow() == null) return;
-		String label = chipLabel();
-		boolean hovered = chipContains(mouseX, mouseY);
-		graphics.fill(chipX(), MARGIN + 4, chipRight(), MARGIN + 20, pickerOpen || hovered ? 0x50FFFFFF : 0x28FFFFFF);
-		graphics.text(font, label, chipX() + 5, MARGIN + 8, pickedModel != null ? 0xFFFFB02E : 0xFFE5E7EB, false);
-	}
-
-	/** Provider headers (String) and selectable models (PickerEntry), in display order. */
-	private List<Object> pickerRows() {
-		List<Object> rows = new ArrayList<>();
-		T3State.ThreadRow row = mod.state().snapshot().focusedRow();
-		JsonObject current = row == null ? null : row.raw().getAsJsonObject("modelSelection");
-		boolean started = row != null && row.raw().has("latestTurn") && !row.raw().get("latestTurn").isJsonNull();
-		String currentInstance = current == null ? null : current.get("instanceId").getAsString();
-		boolean currentLocked = mod.state().providers().stream()
-			.anyMatch(p -> p.instanceId().equals(currentInstance) && p.requiresNewThreadForModelChange());
-		for (T3Api.Provider provider : mod.state().providers()) {
-			rows.add(provider.name());
-			for (T3Api.Model model : provider.models()) {
-				boolean same = current != null && provider.instanceId().equals(currentInstance)
-					&& model.slug().equals(current.get("model").getAsString());
-				// Same rule as T3's composer: only providers that forbid switching force a new thread.
-				boolean needsNewThread = !newThread && started && !same && (currentLocked || provider.requiresNewThreadForModelChange());
-				rows.add(new PickerEntry(provider, model, needsNewThread));
+		} else if (shownQuestion != null) {
+			T3Ui.dividerHorizontal(graphics, x0, x1, blockY - 2);
+			T3State.UserInput input = currentInput();
+			String step = input != null && input.questions().size() > 1 ? "  " + (questionIndex + 1) + "/" + input.questions().size() : "";
+			graphics.text(font, (shownQuestion.header() == null ? "Question" : shownQuestion.header()) + step, x0, blockY + 2, T3Ui.NEEDS_YOU, false);
+			for (int i = 0; i < questionText.size(); i++) {
+				graphics.text(font, questionText.get(i), x0, blockY + 2 + font.lineHeight + i * font.lineHeight, T3Ui.TEXT, false);
 			}
 		}
-		return rows;
 	}
 
-	private int[] pickerBox() {
-		int x1 = chipRight();
-		int x0 = x1 - PICKER_WIDTH;
-		int y0 = MARGIN + 21;
-		int maxBottom = height - MARGIN - 12 - COMPOSER - 4;
-		int rows = Math.max(1, pickerRows().size());
-		return new int[] {x0, y0, x1, Math.min(maxBottom, y0 + 4 + rows * PICKER_ROW)};
-	}
-
-	private void extractPicker(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
-		int[] box = pickerBox();
-		graphics.fill(box[0], box[1], box[2], box[3], 0xFF16161C);
-		graphics.outline(box[0], box[1], box[2] - box[0], box[3] - box[1], 0x40FFFFFF);
-		List<Object> rows = pickerRows();
-		if (rows.isEmpty()) {
-			graphics.text(font, "Loading models…", box[0] + 6, box[1] + 4, 0xFF9CA3AF, false);
-			return;
-		}
-		JsonObject selected = effectiveModel();
-		int visible = (box[3] - box[1] - 4) / PICKER_ROW;
-		graphics.enableScissor(box[0], box[1], box[2], box[3]);
-		for (int i = 0; i < visible && i + pickerScroll < rows.size(); i++) {
-			Object entry = rows.get(i + pickerScroll);
-			int y = box[1] + 2 + i * PICKER_ROW;
-			if (entry instanceof String header) {
-				graphics.text(font, header, box[0] + 6, y + 2, 0xFF6B7280, false);
-				continue;
-			}
-			PickerEntry pick = (PickerEntry) entry;
-			boolean isSelected = selected != null && pick.provider().instanceId().equals(selected.get("instanceId").getAsString())
-				&& pick.model().slug().equals(selected.get("model").getAsString());
-			if (mouseX >= box[0] && mouseX < box[2] && mouseY >= y && mouseY < y + PICKER_ROW) {
-				graphics.fill(box[0] + 1, y, box[2] - 1, y + PICKER_ROW, 0x30FFFFFF);
-			}
-			String suffix = pick.needsNewThread() ? "  new thread" : "";
-			String name = T3Hud.ellipsize(font, pick.model().name(), PICKER_WIDTH - 24 - font.width(suffix));
-			graphics.text(font, (isSelected ? "• " : "  ") + name, box[0] + 8, y + 2, isSelected ? 0xFFFFFFFF : 0xFFD1D5DB, false);
-			if (!suffix.isEmpty()) graphics.text(font, suffix, box[2] - 6 - font.width(suffix), y + 2, 0xFF6B7280, false);
-		}
-		graphics.disableScissor();
-	}
-
-	/** Rendered conversation rows, rebuilt only when the focus snapshot or width changes. */
-	private List<T3Markdown.Line> lines(T3State.Focus focus, int width) {
-		if (focus == cachedFocus && width == cachedWidth) return cachedLines;
-		List<T3Markdown.Line> lines = new ArrayList<>();
-		for (T3State.Message message : focus.messages()) {
-			boolean user = "user".equals(message.role());
-			if (!lines.isEmpty()) lines.add(T3Markdown.Line.GAP);
-			Component label = Component.literal(user ? "You" : "Agent").withStyle(style -> style.withBold(true)
-				.withColor(user ? 0xFF93C5FD : 0xFFA7F3D0));
-			T3Markdown.wrap(font, label, width, 0, null, T3Markdown.Kind.LABEL, lines);
-			String text = message.text() + (message.streaming() ? " ▍" : "");
-			T3Markdown.render(font, text, width - 8, user ? 0xFFD1D5DB : T3Markdown.TEXT, lines);
-		}
+	/** Rendered conversation rows, rebuilt only when the focus snapshot, agent name or width changes. */
+	private List<T3Markdown.Line> lines(T3State.Focus focus, String agent, int width) {
+		if (focus == cachedFocus && width == cachedWidth && agent.equals(cachedAgent)) return cachedLines;
+		cachedLines = T3Ui.conversation(font, agent, focus, width);
 		cachedFocus = focus;
+		cachedAgent = agent;
 		cachedWidth = width;
-		cachedLines = lines;
-		return lines;
+		return cachedLines;
 	}
 }

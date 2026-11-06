@@ -23,14 +23,14 @@ Two small changes make the office feel like a real place. Agents look like **pla
 | Walking | Between zones | Normal walk |
 | Offline | Wherever they were | Greyed out, still |
 
-Right-click an agent to open its real T3 thread in a streamed floating window. The name tag shows the thread title and a short status.
+Right-click an agent to open a small card beside it ([the simple native UI](native-ui.md)). The name tag shows the thread title and a short status.
 
 ## The T3 laptop
 
 <p align="center"><img src="../images/laptop-texture.png" width="192" alt="T3 laptop texture: dark screen with mint code lines, slate keyboard"></p>
 
 - **You get one automatically** the first time you join a T3 world, so there's nothing to craft or type. You can also craft it: three glass panes on top, iron + redstone + iron in the middle, and three iron ingots on the bottom.
-- **Right-click it** anywhere to open the full real T3 web app streamed in-game ([see the UI](ui.md)). <kbd>`</kbd> still works.
+- **Right-click it** anywhere to open the laptop screen ([see the UI](native-ui.md)). <kbd>`</kbd> still works.
 - **Every desk has a laptop.** Clicking one opens the thread of the agent sitting there. An empty desk starts a new thread.
 - It's a vanilla paper item with a custom model, so T3 Craft can still join vanilla servers.
 

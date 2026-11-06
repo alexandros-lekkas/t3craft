@@ -111,6 +111,70 @@ final class SelfTest {
 
 
  }
+ /**
+  * Captures the simple native UI at the current GUI scale in an existing office world against the office fixture
+  * ({@code scripts/office/fixture.py}): aim at the agent that needs you and click it (card), type into the card,
+  * the laptop on a finished thread, the laptop on the waiting thread (Approve / Deny), a typed message, the
+  * message sent, then the laptop once more at GUI scale 2.
+  */
+ private int nativeTick;
+ private static final String NATIVE_MESSAGE = "Add a dark mode toggle to the settings page";
+ private void nativeUiVisual(Minecraft mc) {
+  if (mc.player == null || mc.level == null || !mod.state().snapshot().connected()) { if (ticks > 1200) { T3CraftClient.LOGGER.error("NATIVE_UI failed to load world/fixture; closing test client"); mc.stop(); } return; }
+  mc.options.pauseOnLostFocus = false;
+  nativeTick++;
+  var o = mod.villageAnchor();
+  if (o == null) { if (nativeTick > 400) { T3CraftClient.LOGGER.error("NATIVE_UI no office in this world"); mc.stop(); } return; }
+  if (nativeTick == 20) { visualCommand(mc, "difficulty peaceful"); visualCommand(mc, "time set 1000"); visualCommand(mc, "weather clear"); visualCommand(mc, "gamemode creative"); }
+  if (nativeTick == 300) {
+   var a = mod.village().brainForTest().agents().values().stream().filter(v -> v.status == T3State.Status.NEEDS_YOU).findFirst().orElseThrow();
+   targetThread = a.threadId;
+   visualCamera(mc, o, a.x - 1.4, a.y() + .3, a.z - 2.0, a.x, a.y() + 1.5, a.z);
+  }
+  if (nativeTick == 340) {
+   var a = mod.village().brainForTest().agents().get(targetThread);
+   mc.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, new net.minecraft.world.phys.Vec3(o.getX() + a.x, o.getY() + a.y() + 1.4, o.getZ() + a.z));
+   if (mc.gui.hud.isHidden()) mc.gui.hud.toggle();
+  }
+  if (nativeTick == 370) shot(mc, "native-agent-aim");
+  if (nativeTick == 380) {
+   if (!(mc.hitResult instanceof net.minecraft.world.phys.EntityHitResult hit) || !targetThread.equals(mod.village().threadsByEntity().get(hit.getEntity().getId()))) throw new IllegalStateException("Crosshair missed the waiting agent: " + mc.hitResult);
+   net.minecraft.client.KeyMapping.click(mc.options.keyUse.getDefaultKey());
+  }
+  if (nativeTick == 420) {
+   if (!(mc.gui.screen() instanceof T3AgentCardScreen card) || !card.approvalVisibleForTest()) throw new IllegalStateException("Agent click did not open the card with its approval: " + mc.gui.screen());
+   T3CraftClient.LOGGER.info("NATIVE_UI PASS use-key on the waiting agent opens the native card with Approve / Deny");
+   shot(mc, "native-agent-card");
+  }
+  if (nativeTick == 440) ((T3AgentCardScreen) mc.gui.screen()).setInputForTest("Looks good, run the full suite too");
+  if (nativeTick == 470) shot(mc, "native-agent-card-typing");
+  if (nativeTick == 480) { ((T3AgentCardScreen) mc.gui.screen()).setInputForTest(""); mc.gui.setScreen(null); mod.focus("office-6"); }
+  if (nativeTick == 500) mod.openLaptop();
+  if (nativeTick == 540) {
+   if (!(mc.gui.screen() instanceof T3Screen)) throw new IllegalStateException("Laptop did not open the native screen: " + mc.gui.screen());
+   shot(mc, "native-laptop");
+  }
+  if (nativeTick == 560) ((T3Screen) mc.gui.screen()).selectThreadForTest(targetThread);
+  if (nativeTick == 600) {
+   if (!((T3Screen) mc.gui.screen()).requestCardVisibleForTest()) throw new IllegalStateException("Waiting thread shows no Approve / Deny");
+   shot(mc, "native-laptop-needs-you");
+  }
+  if (nativeTick == 620) { T3Screen s = (T3Screen) mc.gui.screen(); s.selectThreadForTest("office-6"); s.setComposerForTest(NATIVE_MESSAGE); }
+  if (nativeTick == 660) shot(mc, "native-laptop-typing");
+  if (nativeTick == 670) ((T3Screen) mc.gui.screen()).typeAndSubmit(NATIVE_MESSAGE, true);
+  if (nativeTick == 740) {
+   var focus = mod.state().snapshot().focus();
+   if (focus == null || focus.messages().stream().noneMatch(m -> "user".equals(m.role()) && NATIVE_MESSAGE.equals(m.text()))) throw new IllegalStateException("Sent message did not come back from the fixture: " + lastMessage(mod.state().snapshot()));
+   T3CraftClient.LOGGER.info("NATIVE_UI PASS message sent from the laptop and shown as the player's");
+   shot(mc, "native-laptop-sent");
+  }
+  if (nativeTick == 760) { mc.options.guiScale().set(2); mc.resizeGui(); }
+  if (nativeTick == 800) shot(mc, "native-laptop-scale2");
+  if (nativeTick == 810) { mc.options.guiScale().set(3); mc.resizeGui(); }
+  if (nativeTick == 850) shot(mc, "native-laptop-scale3");
+  if (nativeTick == 860) { mc.options.guiScale().set(5); mc.resizeGui(); mc.gui.setScreen(null); }
+  if (nativeTick == 880) { T3CraftClient.LOGGER.info("NATIVE_UI PASS all captures taken"); mc.stop(); }
+ }
  private static void visualCommand(Minecraft mc,String command){var server=mc.getSingleplayerServer();if(server!=null)server.execute(()->server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(),command));}
  private static void visualCamera(Minecraft mc,net.minecraft.core.BlockPos o,double x,double y,double z,double tx,double ty,double tz){
   mc.gui.setScreen(null);if(!mc.gui.hud.isHidden())mc.gui.hud.toggle();
@@ -168,6 +232,7 @@ final class SelfTest {
 	void tick(Minecraft minecraft) {
 		ticks++;
 		if (prompt.equals("office-a")) { officeVisual(minecraft); return; }
+		if (prompt.equals("nativeui")) { nativeUiVisual(minecraft); return; }
 		if (prompt.equals("skin-spike")) { skinSpike(minecraft); return; }
 		if (step == Step.DONE) return;
 		if (--deadline == 0) finish(minecraft, "FAIL timed out at " + step);
@@ -225,7 +290,7 @@ final class SelfTest {
 				if (ticks < 40 || !(minecraft.gui.screen() instanceof T3ConnectionsScreen screen) || screen.formForTest() || !mod.state().online("B-done-0")) return;
 				if (!mod.state().online("A-done-0") || mod.environments().size() != 2) { finish(minecraft, "FAIL second pairing disrupted A"); return; }
 				mod.focus("B-done-0"); press(screen, "Done");
-				T3Screen panel = (T3Screen) minecraft.gui.screen(); panel.setComposerForTest("Keep my healthy-machine draft"); press(panel, "Pin desk"); press(panel, "Connections");
+				T3Screen panel = (T3Screen) minecraft.gui.screen(); panel.setComposerForTest("Keep my healthy-machine draft"); mod.togglePin(mod.state().snapshot().focusedRow()); mod.openConnections();
 				fixtureControl(minecraft, "auth-failed"); advance(Step.SETUP_AUTH, "failed A while B remains focused with a draft and pin");
 			}
 			case SETUP_AUTH -> {
@@ -262,7 +327,7 @@ final class SelfTest {
 				if (mod.environments().size() != 1 || !mod.state().online("B-done-0") || mod.state().apiFor("A-done-0") != null || !mod.officePreferences().pins.stream().anyMatch(p -> p.threadId().equals("B-done-0"))) { finish(minecraft, "FAIL saved connections/pin restart"); return; }
 				T3ConnectionsScreen screen = (T3ConnectionsScreen) minecraft.gui.screen();
 				press(screen, "Add machine"); pasteLink(minecraft, screen, "http://127.0.0.1:25682/pair#token=delayed-fixture"); press(screen, "Pair machine"); pendingPair = screen; press(screen, "Back");
-				press((T3Screen) minecraft.gui.screen(), "Connections"); screen = (T3ConnectionsScreen) minecraft.gui.screen();
+				mod.openConnections(); screen = (T3ConnectionsScreen) minecraft.gui.screen();
 				press(screen, "Remove"); press(screen, "Remove locally"); advance(Step.SETUP_LAST, "last removal during an unfinished pairing");
 			}
 			case SETUP_LAST -> {
@@ -294,8 +359,8 @@ final class SelfTest {
 					finish(minecraft, "FAIL churn moved pinned desk or replaced villager"); return;
 				}
 				T3Screen screen = (T3Screen) minecraft.gui.screen();
-				click(screen, 30, 55); // Real project filter row under the machine filter.
-				if (screen.sidebarCountForTest() >= 32 || screen.sidebarCountForTest() == 0 || !"A-done-0".equals(mod.state().focusedThreadId()) || !"Office QA draft".equals(screen.composerValueForTest())) {
+				// The simple laptop has no project filter; the list shows every active thread.
+				if (screen.sidebarCountForTest() == 0 || !"A-done-0".equals(mod.state().focusedThreadId()) || !"Office QA draft".equals(screen.composerValueForTest())) {
 					finish(minecraft, "FAIL project filter changed focus/draft or mixed projects"); return;
 				}
 				advance(Step.STABLE_CAPTURE, "project filter kept focused thread and draft");
@@ -1124,7 +1189,7 @@ final class SelfTest {
 					}
 					mod.focus("A-done-0"); mod.openPanel();
 					T3Screen screen = (T3Screen) minecraft.gui.screen(); screen.setComposerForTest("Office QA draft");
-					click(screen, 40, screen.height - 49);
+					mod.togglePin(mod.state().snapshot().focusedRow());
 					if (!mod.pinned(snapshot.threads().stream().filter(r -> r.id().equals("A-done-0")).findFirst().orElseThrow())) {
 						finish(minecraft, "FAIL Pin desk button"); return;
 					}

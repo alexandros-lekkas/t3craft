@@ -2,9 +2,9 @@
 
 How T3 Craft talks to T3 Code, and where each piece runs. This page is kept short. The code is the detail.
 
-## Streamed UI direction
+## UI direction
 
-The primary UI streams the real T3 web app in-game through a hidden Chrome over the DevTools Protocol ([how it works](design/real-t3-ui.md)). The laptop opens the full app; clicking an agent opens its thread in a floating window. The native panel remains the fallback. The backend architecture below supports world state and that fallback; it does not replace the web app.
+The in-game UI is plain Minecraft ([the simple native UI](design/native-ui.md)): the laptop screen lists active threads and shows the selected one with one input box, and clicking an agent opens a small card beside it. Both read `T3State` and act through `T3Backend`. The streamed web app ([how it works](design/real-t3-ui.md)) stays behind `webUi: true` in the config file and is off by default; Chrome never starts while it is off.
 
 ## The big picture
 

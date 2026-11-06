@@ -36,7 +36,7 @@ final class T3Hud implements HudElement {
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
 		Minecraft minecraft = Minecraft.getInstance();
-		if (!mod.paired() || minecraft.gui.screen() instanceof T3Screen) return;
+		if (!mod.paired() || minecraft.gui.screen() instanceof T3Screen || minecraft.gui.screen() instanceof T3AgentCardScreen) return;
 		T3State.Snapshot snapshot = mod.state().snapshot();
 		T3State.ThreadRow row = snapshot.focusedRow();
 		if (row != null && T3Visibility.snoozedGroup(row)) row = null;

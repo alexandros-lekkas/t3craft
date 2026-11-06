@@ -1,5 +1,7 @@
 # The real T3 Code UI in Minecraft
 
+> **Status:** opt-in. The in-game UI is now the [simple native UI](native-ui.md). Set `"webUi": true` in `config/t3craft.json` to stream the web app instead; while it is off, Chrome is never started.
+
 T3 Craft shows **T3 Code's own web app**, not a redrawn copy. T3 already serves its UI locally at `http://127.0.0.1:3773`. The mod opens that page in a hidden Chrome and streams it into a Minecraft screen over the Chrome DevTools Protocol. Mouse, wheel and keyboard go back to the page. Every T3 feature (sidebar, diffs, review, model picker, settings) shows up in game the day T3 ships it.
 
 All screenshots below are real, unedited Minecraft screenshots (F2 equivalent). They were taken in the dev client at **GUI scale 5** in a **2000 × 1250** window, against the real local T3 (nightly `0.1.7-nightly.20261103.4119`). The capture was read-only: nothing was sent to any thread.
