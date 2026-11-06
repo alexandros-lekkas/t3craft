@@ -42,10 +42,16 @@ final class ServerOffice {
 	}
 
 	List<String> floors() {
-		return config.environments.stream().map(e -> config.labelFor(T3Config.ownerKey(e.baseUrl))).toList();
+		return owners().stream().map(config::labelFor).toList();
 	}
 
-	List<String> owners() { return config.environments.stream().map(e -> T3Config.ownerKey(e.baseUrl)).toList(); }
+	List<String> owners() {
+		if (config.sharedOfficePreferences.floorOwners == null) {
+			config.sharedOfficePreferences.floorOwners = config.environments.stream().map(e -> T3Config.ownerKey(e.baseUrl)).toList();
+			save.run();
+		}
+		return config.sharedOfficePreferences.floorOwners;
+	}
 
 	boolean pin(String threadId, boolean remove) {
 		if (remove) {
@@ -62,16 +68,47 @@ final class ServerOffice {
 		return config.serverOffice == null ? null : new BlockPos(config.serverOffice[0], config.serverOffice[1], config.serverOffice[2]);
 	}
 
-	/** Builds the office with its door a few blocks south of {@code feet} (same placement as the client). */
-	void build(MinecraftServer server, BlockPos feet) {
+	private record Pending(BlockPos origin, List<String> owners, List<String> labels) {}
+	private final Map<String, Pending> pending = new HashMap<>();
+
+	int build(CommandSourceStack source, boolean confirm) {
+		MinecraftServer server = source.getServer();
+		if (source.getLevel() != server.overworld()) {
+			source.sendFailure(net.minecraft.network.chat.Component.literal("The shared office belongs in the overworld.")); return 0;
+		}
+		if (!config.paired()) {
+			source.sendFailure(net.minecraft.network.chat.Component.literal("Pair the server first: /t3village pair <link>")); return 0;
+		}
+		String requester = source.getTextName();
+		List<String> owners = config.environments.stream().map(e -> T3Config.ownerKey(e.baseUrl)).toList();
+		Pending request = confirm ? pending.remove(requester) : new Pending(BlockPos.containing(source.getPosition()).offset(-10, 0, 5), owners, owners.stream().map(config::labelFor).toList());
+		if (request == null) {
+			source.sendFailure(net.minecraft.network.chat.Component.literal("Run /t3office build first to select a site.")); return 0;
+		}
+		var blueprint = T3Office.blueprint(request.labels());
+		var bounds = OfficeSite.bounds(request.origin(), blueprint);
+		source.sendSuccess(() -> net.minecraft.network.chat.Component.literal("Office bounds: " + bounds.describe()), false);
+		if (!OfficeSite.loaded(server.overworld(), request.origin(), blueprint)) {
+			pending.remove(requester);
+			source.sendFailure(net.minecraft.network.chat.Component.literal("The entire site must be loaded and inside the world's height limits.")); return 0;
+		}
+		if (!confirm && OfficeSite.occupied(server.overworld(), bounds, origin(), T3Office.blueprint(floors()))) {
+			pending.put(requester, request);
+			source.sendFailure(net.minecraft.network.chat.Component.literal("This site contains existing blocks. Run /t3office build confirm to replace them at these exact bounds.")); return 0;
+		}
+		pending.remove(requester);
 		clear(server);
-		BlockPos origin = new BlockPos(feet.getX() - 10, feet.getY(), feet.getZ() + 5);
+		config.sharedOfficePreferences.floorOwners = request.owners();
+		BlockPos origin = request.origin();
 		config.serverOffice = new int[] {origin.getX(), origin.getY(), origin.getZ()};
 		save.run();
-		run(server, origin, T3Office.blueprint(floors()));
+		run(server, origin, blueprint);
+		source.sendSuccess(() -> net.minecraft.network.chat.Component.literal("Suite 408 is up; the agents are walking in."), true);
+		return 1;
 	}
 
 	void off(MinecraftServer server) {
+		pending.clear();
 		clear(server);
 		config.serverOffice = null;
 		save.run();
@@ -121,9 +158,11 @@ final class ServerOffice {
 	}
 
 	private void sync(MinecraftServer server, ServerLevel level, BlockPos o) {
+		T3State.Snapshot snapshot = state.snapshot();
 		List<String> floors = floors();
+		config.sharedOfficePreferences.normalize();
 		Map<String, Integer> previousDesks = Map.copyOf(config.sharedOfficePreferences.desks);
-		for (OfficeBrain.Agent gone : brain.sync(state.snapshot().threads(), owners(), config.sharedOfficePreferences)) {
+		for (OfficeBrain.Agent gone : brain.sync(snapshot.threads(), owners(), config.sharedOfficePreferences, snapshot.machines().stream().filter(T3State.MachineHealth::online).map(T3State.MachineHealth::owner).collect(java.util.stream.Collectors.toSet()))) {
 			Villager villager = villagers.remove(gone.threadId);
 			if (villager != null) villager.discard();
 		}
@@ -156,21 +195,24 @@ final class ServerOffice {
 				villager.setCustomName(VillageLayout.label(row, state.waitingDetail(row.id()), state.online(row.id())));
 			}
 		}
+		// Invalidate updates while their chunks are unloaded.
 		for (int floor = 0; floor < Math.max(1, floors.size()); floor++) {
 			String machine = floor < owners().size() ? owners().get(floor) : null;
 			List<T3Office.Note> notes = state.snapshot().threads().stream().filter(row -> row.status() == T3State.Status.NEEDS_YOU)
 				.filter(row -> row.ownerKey().equals(machine))
 				.map(row -> new T3Office.Note(row.title(), state.waitingDetail(row.id()))).toList();
 			String key = notes.toString();
+			if (!OfficeSite.loaded(level, o, T3Office.whiteboard(floor, notes))) { boards.remove(floor); continue; }
 			if (!key.equals(boards.get(floor))) {
-				boards.put(floor, key);
 				run(server, o, T3Office.whiteboard(floor, notes));
+				boards.put(floor, key);
 			}
 		}
 		boolean dark = NycSun.isNight(Instant.now());
+		if (!OfficeSite.loaded(level, o, T3Office.lamps(floors.size(), dark))) { night = null; return; }
 		if (night == null || night != dark) {
-			night = dark;
 			run(server, o, T3Office.lamps(floors.size(), dark));
+			night = dark;
 		}
 	}
 

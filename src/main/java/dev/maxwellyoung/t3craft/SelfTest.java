@@ -240,7 +240,7 @@ final class SelfTest {
 					finish(minecraft, "FAIL shared pin moved or leaked into client preferences"); return;
 				}
 				shot(minecraft, "shared-stable-office");
-				minecraft.player.connection.sendCommand("tp @s " + pin.getX() + " " + Math.ceil(pin.getY()) + " " + (pin.getZ() + 2.5));
+				ClientCommands.send("tp @s " + pin.getX() + " " + Math.ceil(pin.getY()) + " " + (pin.getZ() + 2.5));
 				advance(Step.SHARED_TARGET, "checking shared resident without a local village");
 			}
 			case SHARED_TARGET -> {
@@ -258,7 +258,7 @@ final class SelfTest {
 				if (ticks < 30) return;
 				if (!(minecraft.gui.screen() instanceof T3Screen) || !"A-done-0".equals(mod.state().focusedThreadId())) { finish(minecraft, "FAIL shared villager interaction without local anchor"); return; }
 				shot(minecraft, "shared-resident-panel"); minecraft.gui.setScreen(null);
-				minecraft.player.connection.sendCommand("t3office unpin A-done-0");
+				ClientCommands.send("t3office unpin A-done-0");
 				advance(Step.SHARED_UNPIN, "shared resident opened its owned thread");
 			}
 			case SHARED_UNPIN -> {
@@ -503,11 +503,12 @@ final class SelfTest {
 			case SILK_WORLD -> {
 				if (ticks == 40) {
 					// The office goes just south of here; spawn is ten blocks further back, facing the facade (yaw 0 = south).
-					minecraft.player.connection.sendCommand("tp @s ~ ~ ~ 0 0");
+					ClientCommands.send("tp @s ~ ~ ~ 0 0");
 					mod.buildOffice();
-					minecraft.player.connection.sendCommand("setworldspawn ~ ~ ~-10 0 0");
-					minecraft.player.connection.sendCommand("tp @s ~ ~ ~-10 0 -12");
-					built = false;
+				if (!mod.office().building()) { finish(minecraft, "FAIL plain-field office was not accepted in one step"); return; }
+					ClientCommands.send("setworldspawn ~ ~ ~-10 0 0");
+					ClientCommands.send("tp @s ~ ~ ~-10 0 -12");
+					built = true;
 				}
 				if (ticks <= 45) return;
 				if (mod.office().building()) {
@@ -528,6 +529,7 @@ final class SelfTest {
 					return;
 				}
 				mod.buildOffice();
+				if (!mod.office().building()) { finish(minecraft, "FAIL plain-field office was not accepted in one step"); return; }
 				advance(Step.OFFICE, "building the office at " + minecraft.player.blockPosition().toShortString());
 			}
 			case OFFICE -> {
@@ -590,13 +592,13 @@ final class SelfTest {
 				if (ticks == 540) shot(minecraft, "office-seats");
 				// Night: the lamps as they come on after New York sunset.
 				if (ticks == 545) {
-					minecraft.player.connection.sendCommand("time set midnight");
+					ClientCommands.send("time set midnight");
 					mod.office().send(o, T3Office.lamps(mod.floors().size(), true));
 					view(minecraft, o, 7, 4.6, 0.6, 7, 1, 29);
 				}
 				if (ticks == 590) shot(minecraft, "office-night");
 				if (ticks == 595) {
-					minecraft.player.connection.sendCommand("time set day");
+					ClientCommands.send("time set day");
 					mod.office().send(o, T3Office.lamps(mod.floors().size(), NycSun.isNight(java.time.Instant.now())));
 				}
 				if (ticks >= 600) {
@@ -640,7 +642,7 @@ final class SelfTest {
 					}
 					minecraft.player.getAbilities().flying = false;
 					minecraft.player.onUpdateAbilities();
-					minecraft.player.connection.sendCommand("tp @s " + (villager.getX() + 2) + " " + (villager.getY() - villager.getY() % 1) + " " + villager.getZ());
+					ClientCommands.send("tp @s " + (villager.getX() + 2) + " " + (villager.getY() - villager.getY() % 1) + " " + villager.getZ());
 				}
 				if (ticks == 42) {
 					var villager = villagerFor(minecraft, row.id());
@@ -693,11 +695,11 @@ final class SelfTest {
 			}
 			case OFFICE_SHARED_PAIR -> {
 				if (ticks == 1) {
-					minecraft.player.connection.sendCommand("t3office off");
-					minecraft.player.connection.sendCommand("t3village pair " + prompt.substring(prompt.indexOf(':') + 1).strip());
+					ClientCommands.send("t3office off");
+					ClientCommands.send("t3village pair " + prompt.substring(prompt.indexOf(':') + 1).strip());
 				}
 				if (ticks == 200) {
-					minecraft.player.connection.sendCommand("t3office build");
+					ClientCommands.send("t3office build");
 					advance(Step.OFFICE_SHARED_BUILD, "paired the server and built the shared office");
 				}
 			}
@@ -732,7 +734,7 @@ final class SelfTest {
 					targetEntity = target.getId();
 					// Empty hand (a held book would open instead), walk up, then right-click the real villager.
 					minecraft.player.getInventory().setSelectedSlot(8);
-					minecraft.player.connection.sendCommand("tp @s " + (target.getX() + 1.5) + " " + target.getY() + " " + target.getZ());
+					ClientCommands.send("tp @s " + (target.getX() + 1.5) + " " + target.getY() + " " + target.getZ());
 				}
 				if (ticks == 40 && minecraft.level.getEntity(targetEntity) instanceof Villager target) {
 					minecraft.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, target.getEyePosition());
@@ -766,7 +768,7 @@ final class SelfTest {
 				if (!name.contains(expected)) return; // the name refreshes every half second
 				T3CraftClient.LOGGER.info("SELFTEST villager nametag: '{}' (waiting on '{}')", name, detail);
 				targetEntity = villager.getId();
-				minecraft.player.connection.sendCommand("tp @s " + (villager.getX() + 2.5) + " " + villager.getY() + " " + villager.getZ());
+				ClientCommands.send("tp @s " + (villager.getX() + 2.5) + " " + villager.getY() + " " + villager.getZ());
 				advance(Step.VFLOW_CLICK, "needs you: " + detail);
 			}
 			case VFLOW_CLICK -> {
@@ -820,13 +822,13 @@ final class SelfTest {
 				}
 				long unique = ids.stream().distinct().count();
 				T3CraftClient.LOGGER.info("SELFTEST shared villagers after restart: {} ({} unique)", ids.size(), unique);
-				minecraft.player.connection.sendCommand("t3village off");
+				ClientCommands.send("t3village off");
 				finish(minecraft, !ids.isEmpty() && ids.size() == unique && ids.size() <= 8 ? "PASS (no duplicates after restart)"
 					: "FAIL " + ids.size() + " villagers, " + unique + " unique");
 			}
 			case SHARED_PAIR -> {
 				if (ticks < 200) return;
-				minecraft.player.connection.sendCommand("t3village here");
+				ClientCommands.send("t3village here");
 				advance(Step.SHARED_CHECK, "placed the shared village");
 			}
 			case SHARED_CHECK -> {
@@ -846,7 +848,7 @@ final class SelfTest {
 					}
 					shot(minecraft, "shared-village");
 					targetEntity = target.getId();
-					minecraft.player.connection.sendCommand("tp @s " + (target.getX() + 2.5) + " " + target.getY() + " " + target.getZ());
+					ClientCommands.send("tp @s " + (target.getX() + 2.5) + " " + target.getY() + " " + target.getZ());
 				}
 				if (ticks == 120 && minecraft.level.getEntity(targetEntity) instanceof Villager target) {
 					minecraft.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, target.position().add(0, 1.2, 0));
@@ -868,7 +870,7 @@ final class SelfTest {
 						finish(minecraft, "PASS (shared village, kept)");
 						return;
 					}
-					minecraft.player.connection.sendCommand("t3village off");
+					ClientCommands.send("t3village off");
 				}
 				if (ticks == 200) {
 					long left = minecraft.level.getEntities((net.minecraft.world.entity.Entity) null, minecraft.player.getBoundingBox().inflate(40),
@@ -898,14 +900,14 @@ final class SelfTest {
 				// Test world only: daylight, creative, and hover above the canopy looking slightly down,
 				// so whatever the agent builds "in front of me" is in the screenshot.
 				if (ticks == 1) {
-					minecraft.player.connection.sendCommand("time set day");
-					minecraft.player.connection.sendCommand("weather clear");
-					minecraft.player.connection.sendCommand("gamemode creative");
+					ClientCommands.send("time set day");
+					ClientCommands.send("weather clear");
+					ClientCommands.send("gamemode creative");
 				}
 				if (ticks == 30) {
 					minecraft.player.getAbilities().flying = true;
 					minecraft.player.onUpdateAbilities();
-					minecraft.player.connection.sendCommand("tp @s ~ ~6 ~ ~ 18");
+					ClientCommands.send("tp @s ~ ~6 ~ ~ 18");
 				}
 				if (ticks >= 30 && ticks % 10 == 0 && !minecraft.player.getAbilities().flying) {
 					minecraft.player.getAbilities().flying = true;
@@ -926,7 +928,7 @@ final class SelfTest {
 					return;
 				}
 				// Exactly what a player types; Fabric routes client commands from sendCommand.
-				minecraft.player.connection.sendCommand("t3 pair " + prompt.substring(5).strip());
+				ClientCommands.send("t3 pair " + prompt.substring(5).strip());
 				advance(Step.PAIR_WAIT, "typed /t3 pair <link>");
 			}
 			case PAIR_WAIT -> {
@@ -991,8 +993,8 @@ final class SelfTest {
 					}
 					if ("stable-office-restore".equals(prompt)) { advance(Step.STABLE_RESTORE, "checking saved identity after client restart"); return; }
 					if ("stable-shared".equals(prompt)) {
-						minecraft.player.connection.sendCommand("t3office build");
-						minecraft.player.connection.sendCommand("t3office pin A-done-0");
+						ClientCommands.send("t3office build");
+						ClientCommands.send("t3office pin A-done-0");
 						advance(Step.SHARED_STABLE, "building operator-owned shared office"); return;
 					}
 					mod.focus("A-done-0"); mod.openPanel();
@@ -1001,7 +1003,8 @@ final class SelfTest {
 					if (!mod.pinned(snapshot.threads().stream().filter(r -> r.id().equals("A-done-0")).findFirst().orElseThrow())) {
 						finish(minecraft, "FAIL Pin desk button"); return;
 					}
-					minecraft.player.connection.sendCommand("gamemode creative"); mod.buildOffice();
+					ClientCommands.send("gamemode creative"); mod.buildOffice();
+					if (!mod.office().building()) { finish(minecraft, "FAIL plain-field office was not accepted in one step"); return; }
 					advance(Step.STABLE_SITE, "pinned old thread through panel and built office"); return;
 				}
 
@@ -1022,10 +1025,11 @@ final class SelfTest {
 				}
 
 				if ("desk-review".equals(prompt) || "release-review".equals(prompt)) {
-					minecraft.player.connection.sendCommand("gamemode creative");
-					minecraft.player.connection.sendCommand("time set day");
-					minecraft.player.connection.sendCommand("weather clear");
+					ClientCommands.send("gamemode creative");
+					ClientCommands.send("time set day");
+					ClientCommands.send("weather clear");
 					mod.buildOffice();
+				if (!mod.office().building()) { finish(minecraft, "FAIL plain-field office was not accepted in one step"); return; }
 					advance("release-review".equals(prompt) ? Step.RELEASE_SITE : Step.DESK_SITE, "building in the isolated QA world");
 					return;
 				}
@@ -1039,24 +1043,24 @@ final class SelfTest {
 				}
 				if ("watch".equals(prompt)) {
 					// Local test world: daylight, creative, and let the agent under test build.
-					minecraft.player.connection.sendCommand("time set day");
-					minecraft.player.connection.sendCommand("gamemode creative");
+					ClientCommands.send("time set day");
+					ClientCommands.send("gamemode creative");
 					// Above the canopy, looking down ahead, so screenshots show what gets built.
-					minecraft.player.connection.sendCommand("tp @s ~ ~14 ~ ~ 40");
+					ClientCommands.send("tp @s ~ ~14 ~ ~ 40");
 					mod.setAgentCommands(true);
 					advance(Step.WATCH, "watching; screenshot every 15s");
 					return;
 				}
 				if (prompt.startsWith("villageflow:") || prompt.startsWith("shared:") || prompt.startsWith("shared-keep:")) {
 					// Local test server only: daylight, creative, and an empty hand so right-clicks reach villagers.
-					minecraft.player.connection.sendCommand("time set day");
-					minecraft.player.connection.sendCommand("gamemode creative");
+					ClientCommands.send("time set day");
+					ClientCommands.send("gamemode creative");
 					minecraft.player.getInventory().setSelectedSlot(8);
 					// So the report-book check can only pass on a book from this run.
-					minecraft.player.connection.sendCommand("clear @s minecraft:written_book");
+					ClientCommands.send("clear @s minecraft:written_book");
 					if (prompt.startsWith("shared")) {
-						minecraft.player.connection.sendCommand("t3village off");
-						minecraft.player.connection.sendCommand("t3village pair " + prompt.substring(prompt.indexOf(':') + 1).strip());
+						ClientCommands.send("t3village off");
+						ClientCommands.send("t3village pair " + prompt.substring(prompt.indexOf(':') + 1).strip());
 						advance(Step.SHARED_PAIR, "pairing the server");
 					} else {
 						mod.placeVillage(3);
@@ -1067,18 +1071,18 @@ final class SelfTest {
 				}
 				if ("silkworld".equals(prompt)) {
 					// One-time setup of a showcase world: the office right here at spawn, door just ahead.
-					minecraft.player.connection.sendCommand("gamemode creative");
-					minecraft.player.connection.sendCommand("time set day");
-					minecraft.player.connection.sendCommand("weather clear");
+					ClientCommands.send("gamemode creative");
+					ClientCommands.send("time set day");
+					ClientCommands.send("weather clear");
 					advance(Step.SILK_WORLD, "building the office at spawn");
 					return;
 				}
 				if ("office".equals(prompt) || flow || sharedOffice) {
-					minecraft.player.connection.sendCommand("time set day");
-					minecraft.player.connection.sendCommand("weather clear");
-					minecraft.player.connection.sendCommand("gamemode creative");
+					ClientCommands.send("time set day");
+					ClientCommands.send("weather clear");
+					ClientCommands.send("gamemode creative");
 					// Fresh ground away from earlier builds.
-					minecraft.player.connection.sendCommand("spreadplayers ~160 ~ 1 20 false @s");
+					ClientCommands.send("spreadplayers ~160 ~ 1 20 false @s");
 					advance(Step.OFFICE_SITE, "moving to fresh ground");
 					return;
 				}
@@ -1094,7 +1098,7 @@ final class SelfTest {
 				}
 				if ("village".equals(prompt)) {
 					// Local test server only: daylight for readable screenshots.
-					minecraft.player.connection.sendCommand("time set day");
+					ClientCommands.send("time set day");
 					mod.placeVillage(2);
 					advance(Step.VILLAGE, "village placed");
 					return;
@@ -1309,7 +1313,7 @@ final class SelfTest {
 	}
 
 	private static void view(Minecraft minecraft, net.minecraft.core.BlockPos o, double x, double y, double z, double tx, double ty, double tz) {
-		minecraft.player.connection.sendCommand("tp @s " + (o.getX() + x) + " " + (o.getY() + y) + " " + (o.getZ() + z)
+		ClientCommands.send("tp @s " + (o.getX() + x) + " " + (o.getY() + y) + " " + (o.getZ() + z)
 			+ " facing " + (o.getX() + tx) + " " + (o.getY() + ty) + " " + (o.getZ() + tz));
 	}
 

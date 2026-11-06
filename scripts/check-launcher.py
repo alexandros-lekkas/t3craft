@@ -41,7 +41,7 @@ with tempfile.TemporaryDirectory(prefix='t3craft-launcher-check-') as folder:
         p.write_text('#!/bin/sh\n' + body + '\n')
         p.chmod(0o755)
     (root / 'jdk/bin').mkdir(parents=True)
-    (root / 'jdk/bin/java').write_text('#!/bin/sh\nexit 0\n')
+    (root / 'jdk/bin/java').write_text('#!/bin/sh\necho \'openjdk version "25.0.1"\' >&2\n')
     (root / 'jdk/bin/java').chmod(0o755)
     server = root / 'console.py'
     server.write_text('''import socket,sys
@@ -71,6 +71,17 @@ os.execv(sys.executable,[sys.executable,str(Path(__file__).with_name('console.py
 ''')
     wrapper.chmod(0o755)
     env = {**os.environ, 'PATH': str(root / 'bin') + ':' + os.environ['PATH'], 'JAVA_HOME': str(root / 'jdk')}
+    # Reject a preset old JDK before starting a server, and serialize simultaneous launchers.
+    java = root / 'jdk/bin/java'
+    java.write_text('#!/bin/sh\necho \'openjdk version "24.0.1"\' >&2\n')
+    result = subprocess.run(['bash', str(root / 'scripts/launch-macos.sh')], env=env, capture_output=True, text=True, timeout=10)
+    assert result.returncode == 1, 'old JAVA_HOME was accepted'
+    java.write_text('#!/bin/sh\necho \'openjdk version "25.0.1"\' >&2\n')
+    lock_root = root / 'locks'; lock_root.mkdir()
+    lock = lock_root / ('t3craft-launcher-' + str(os.getuid()) + '.lock'); lock.mkdir()
+    result = subprocess.run(['bash', str(root / 'scripts/launch-macos.sh')], env={**env, 'TMPDIR': str(lock_root)}, capture_output=True, text=True, timeout=10)
+    assert result.returncode == 1 and lock.is_dir(), 'second launch did not respect the lock'
+    lock.rmdir()
     peers = []
     try:
         # A second console server intentionally matches the old broad pkill expression.

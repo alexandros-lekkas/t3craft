@@ -84,10 +84,11 @@ public final class T3CraftClient implements ClientModInitializer {
 		new T3Mcp(() -> config.agentCommands).start();
 		village = new T3Village(this);
 		ClientTickEvents.START_CLIENT_TICK.register(village::tick);
+		ClientTickEvents.START_CLIENT_TICK.register(ClientCommands::tick);
 		ClientTickEvents.START_CLIENT_TICK.register(office::tick);
 		ClientTickEvents.END_CLIENT_TICK.register(village::animate);
 		net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents.ALLOW_GAME.register(
-			(message, overlay) -> overlay || !(T3Books.isOwnFeedback(message.getString()) || office.hideFeedback(message.getString())));
+			(message, overlay) -> overlay || !(T3Books.isOwnFeedback(message.getString()) || office.hideFeedback(message)));
 		SelfTest selfTest = SelfTest.fromSystemProperty(this);
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			if (selfTest != null) selfTest.tick(client);
@@ -148,10 +149,22 @@ public final class T3CraftClient implements ClientModInitializer {
 
 	/** One office floor per paired machine, bottom up. */
 	List<String> floors() {
-		return config.environments.stream().map(e -> config.labelFor(T3Config.ownerKey(e.baseUrl))).toList();
+		return floorOwners().stream().map(config::labelFor).toList();
 	}
 
-	List<String> floorOwners() { return config.environments.stream().map(e -> T3Config.ownerKey(e.baseUrl)).toList(); }
+	List<String> floorOwners() {
+		OfficeRoster.Preferences prefs = officePreferences();
+		if (prefs.floorOwners == null) {
+			prefs.floorOwners = pairedOwners();
+			if (officeMode()) saveOfficePreferences();
+		}
+		return prefs.floorOwners;
+	}
+
+	private List<String> pairedOwners() { return config.environments.stream().map(e -> T3Config.ownerKey(e.baseUrl)).toList(); }
+
+	private record PendingOffice(Object level, Object connection, net.minecraft.core.BlockPos origin, List<String> owners, List<String> labels) {}
+	private PendingOffice pendingOffice;
 
 	OfficeRoster.Preferences officePreferences() {
 		String world = worldKey();
@@ -178,18 +191,70 @@ public final class T3CraftClient implements ClientModInitializer {
 	}
 
 	/** Builds the Silk office just south of the player (door facing them) and moves this world's village into it. */
-	void buildOffice() {
-		var player = Minecraft.getInstance().player;
+	void buildOffice() { buildOffice(false); }
+
+	private void buildOffice(boolean confirm) {
+		var minecraft = Minecraft.getInstance();
+		var player = minecraft.player;
 		String world = worldKey();
 		if (player == null || world == null) return;
-		var feet = player.blockPosition();
-		// The entry door (10, -2) ends up a few blocks south of the player, logo board above it facing them.
-		var origin = new net.minecraft.core.BlockPos(feet.getX() - 10, feet.getY(), feet.getZ() + 5);
+		PendingOffice request = pendingOffice;
+		if (confirm) {
+			if (request == null || request.level() != minecraft.level || request.connection() != minecraft.getConnection()) {
+				pendingOffice = null;
+				chat(Component.literal("No office site to confirm in this world. Run /t3 office first.")); return;
+			}
+		} else {
+			var feet = player.blockPosition();
+			var owners = pairedOwners();
+			request = new PendingOffice(minecraft.level, minecraft.getConnection(), feet.offset(-10, 0, 5), owners,
+				owners.stream().map(config::labelFor).toList());
+		}
+		var origin = request.origin();
+		var blueprint = T3Office.blueprint(request.labels());
+		var bounds = OfficeSite.bounds(origin, blueprint);
+		chat(Component.literal("Office bounds: " + bounds.describe()));
+		if (!OfficeSite.loaded(minecraft.level, origin, blueprint)) {
+			pendingOffice = null;
+			chat(Component.literal("The entire site must be loaded and inside the world's height limits.")); return;
+		}
+		if (!confirm && OfficeSite.occupied(minecraft.level, bounds, officeMode() ? villageAnchor() : null, T3Office.blueprint(floors()))) {
+			pendingOffice = request;
+			chat(Component.literal("This site contains existing blocks (including any containers). Run /t3 office confirm to replace them at these exact bounds.")); return;
+		}
+		pendingOffice = null;
+		var oldVillage = config.villages.get(world);
+		boolean oldOffice = config.officeWorlds.contains(world);
+		var oldOwners = officePreferences().floorOwners;
 		config.villages.put(world, new int[] {origin.getX(), origin.getY(), origin.getZ()});
 		config.officeWorlds.add(world);
-		config.save(configPath);
+		officePreferences().floorOwners = List.copyOf(request.owners());
+		if (!config.save(configPath)) {
+			if (oldVillage == null) config.villages.remove(world); else config.villages.put(world, oldVillage);
+			if (!oldOffice) config.officeWorlds.remove(world);
+			officePreferences().floorOwners = oldOwners;
+			chat(Component.literal("Could not save office settings; no blocks were changed.")); return;
+		}
+		office.build(origin, request.labels());
 		village.clear();
-		office.build(origin, floors());
+		chat(Component.literal("Office build accepted. Needs command permission (op). Rebuild to add floors for newly paired machines."));
+	}
+
+	private int officeOff() {
+		String world = worldKey();
+		var oldVillage = world == null ? null : config.villages.get(world);
+		boolean oldOffice = world != null && config.officeWorlds.contains(world);
+		if (world != null) { config.officeWorlds.remove(world); config.villages.remove(world); }
+		if (!config.save(configPath)) {
+			if (oldVillage != null) config.villages.put(world, oldVillage);
+			if (oldOffice) config.officeWorlds.add(world);
+			chat(Component.literal("Could not save office settings; office kept.")); return 0;
+		}
+		pendingOffice = null;
+		office.clear();
+		village.clear();
+		chat(Component.literal("Office residents hidden; building blocks kept."));
+		return 1;
 	}
 
 	/** Puts the agent village a few blocks in front of the player. */
@@ -203,9 +268,14 @@ public final class T3CraftClient implements ClientModInitializer {
 		String world = worldKey();
 		if (world == null) return;
 		var ahead = player.blockPosition().relative(player.getDirection(), distance);
-		config.villages.put(world, new int[] {ahead.getX(), ahead.getY(), ahead.getZ()});
-		config.officeWorlds.remove(world);
-		config.save(configPath);
+		var previous = config.villages.put(world, new int[] {ahead.getX(), ahead.getY(), ahead.getZ()});
+		boolean wasOffice = config.officeWorlds.remove(world);
+		if (!config.save(configPath)) {
+			if (previous == null) config.villages.remove(world); else config.villages.put(world, previous);
+			if (wasOffice) config.officeWorlds.add(world);
+			chat(Component.literal("Could not save village settings; village kept.")); return;
+		}
+		office.clear();
 		village.clear();
 	}
 
@@ -449,12 +519,9 @@ public final class T3CraftClient implements ClientModInitializer {
 				.then(literal("off").executes(ctx -> setBooks(false))))
 			.then(literal("pin").executes(ctx -> { togglePin(state.snapshot().focusedRow()); return 1; }))
 			.then(literal("pins").executes(ctx -> { Minecraft.getInstance().gui.setScreen(new T3PinsScreen(this)); return 1; }))
-			.then(literal("office").executes(ctx -> {
-				buildOffice();
-				chat(Component.literal("Building suite 408 in front of you. Your agents move in once it's done: working ones at the table, "
-					+ "ones that need you at the whiteboard, finished ones on the beanbags. Needs command permission (op)."));
-				return 1;
-			}))
+			.then(literal("office").executes(ctx -> { buildOffice(); return 1; })
+				.then(literal("confirm").executes(ctx -> { buildOffice(true); return 1; }))
+				.then(literal("off").executes(ctx -> officeOff())))
 			.then(literal("village")
 				.executes(ctx -> {
 					placeVillage();

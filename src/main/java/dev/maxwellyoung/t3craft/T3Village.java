@@ -31,6 +31,7 @@ final class T3Village {
 	private final Map<Integer, String> threadByEntity = new HashMap<>();
 	private ClientLevel level;
 	private int ticks;
+	private int nextDecorationAttempt;
 	private int nextId = FIRST_ID;
 	// Office mode: the brain decides where agents go; this mirrors them onto client-side villagers.
 	private final OfficeBrain brain = new OfficeBrain();
@@ -139,8 +140,9 @@ final class T3Village {
 	private void syncOffice(T3State.Snapshot snapshot, BlockPos o) {
 		List<String> floors = mod.floors();
 		OfficeRoster.Preferences prefs = mod.officePreferences();
+		prefs.normalize();
 		Map<String, Integer> previousDesks = Map.copyOf(prefs.desks);
-		for (OfficeBrain.Agent gone : brain.sync(snapshot.threads(), mod.floorOwners(), prefs)) {
+		for (OfficeBrain.Agent gone : brain.sync(snapshot.threads(), mod.floorOwners(), prefs, snapshot.machines().stream().filter(T3State.MachineHealth::online).map(T3State.MachineHealth::owner).collect(java.util.stream.Collectors.toSet()))) {
 			Villager villager = villagers.remove(gone.threadId);
 			if (villager != null) {
 				threadByEntity.remove(villager.getId());
@@ -149,8 +151,10 @@ final class T3Village {
 		}
 		if (!previousDesks.equals(prefs.desks)) mod.saveOfficePreferences();
 		for (OfficeBrain.Agent agent : brain.agents().values()) {
+			if (!level.isLoaded(o.offset((int) agent.x, (int) agent.y(), (int) agent.z))) continue;
 			Villager villager = villagers.get(agent.threadId);
-			if (villager == null) {
+			if (villager == null || villager.isRemoved() || level.getEntity(villager.getId()) != villager) {
+				if (villager != null) threadByEntity.remove(villager.getId());
 				villager = new Villager(EntityTypes.VILLAGER, level);
 				villager.setId(nextId--);
 				villager.setNoAi(true);
@@ -167,23 +171,27 @@ final class T3Village {
 				villager.setCustomName(VillageLayout.label(row, mod.state().waitingDetail(row.id()), mod.state().online(row.id())));
 			}
 		}
-		// Each floor's whiteboard: who needs you and what for (only when it changes).
+		if (mod.office().building() || ticks < nextDecorationAttempt) return;
+		nextDecorationAttempt = ticks + 100;
+		// Retry after chunk reloads; never resend unchanged content on a timer.
+		// Each floor's whiteboard: who needs you and what for.
 		for (int floor = 0; floor < Math.max(1, floors.size()); floor++) {
 			String machine = floor < mod.floorOwners().size() ? mod.floorOwners().get(floor) : null;
 			List<T3Office.Note> notes = snapshot.threads().stream().filter(row -> row.status() == T3State.Status.NEEDS_YOU)
 				.filter(row -> row.ownerKey().equals(machine))
 				.map(row -> new T3Office.Note(row.title(), mod.state().waitingDetail(row.id()))).toList();
 			String key = notes.toString();
+			if (!OfficeSite.loaded(level, o, T3Office.whiteboard(floor, notes))) { boards.remove(floor); continue; }
 			if (!key.equals(boards.get(floor))) {
-				boards.put(floor, key);
-				mod.office().send(o, T3Office.whiteboard(floor, notes));
+				int index = floor;
+				mod.office().send(o, T3Office.whiteboard(floor, notes), () -> boards.put(index, key));
 			}
 		}
 		// Lamps on after New York sunset, off in the morning.
 		boolean dark = NycSun.isNight(Instant.now());
+		if (!OfficeSite.loaded(level, o, T3Office.lamps(floors.size(), dark))) { night = null; return; }
 		if (night == null || night != dark) {
-			night = dark;
-			mod.office().send(o, T3Office.lamps(floors.size(), dark));
+			mod.office().send(o, T3Office.lamps(floors.size(), dark), () -> night = dark);
 		}
 	}
 
@@ -227,7 +235,8 @@ final class T3Village {
 			int y = VillageLayout.standY(level, column);
 
 			Villager villager = villagers.get(row.id());
-			if (villager == null) {
+			if (villager == null || villager.isRemoved() || level.getEntity(villager.getId()) != villager) {
+				if (villager != null) threadByEntity.remove(villager.getId());
 				villager = new Villager(EntityTypes.VILLAGER, level);
 				villager.setId(nextId--);
 				villager.setNoAi(true);

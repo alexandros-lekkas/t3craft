@@ -40,7 +40,7 @@ Draft copy for the T3 Craft project page on Modrinth. Nothing here is published 
 ```markdown
 **T3 Craft puts [T3 Code](https://t3.codes) inside Minecraft.** Send a prompt to your coding agent, go back to mining, and get one ping when it finishes, needs an approval, or has a question. Approve commands and answer questions without leaving the game. Agents can even see and build in your world.
 
-![The T3 panel in Minecraft](https://raw.githubusercontent.com/maxwellyoung/t3craft/main/docs/panel.jpg)
+![The T3 panel in Minecraft](https://raw.githubusercontent.com/alexandros-lekkas/t3craft/main/docs/panel.jpg)
 
 > You need T3 Code running on a machine you control (your laptop, a home server). T3 Craft talks to it the same way the T3 mobile app does. Verified against **T3 Code nightly 0.0.46-nightly.20261004.2644**; legacy (protocol 1) servers are also supported.
 

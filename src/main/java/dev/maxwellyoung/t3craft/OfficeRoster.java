@@ -17,6 +17,8 @@ final class OfficeRoster {
 	}
 	static final class Preferences {
 		List<Pin> pins = new ArrayList<>();
+		// Null only for offices built before floor ownership was persisted.
+		List<String> floorOwners;
 		Map<String, Integer> desks = new LinkedHashMap<>();
 		boolean pinned(T3State.ThreadRow row) { return pins.stream().anyMatch(p -> p.key().equals(key(row))); }
 		boolean pin(T3State.ThreadRow row) {
@@ -28,6 +30,7 @@ final class OfficeRoster {
 		void normalize() {
 			if (pins == null) pins = new ArrayList<>();
 			if (desks == null) desks = new LinkedHashMap<>();
+			desks.entrySet().removeIf(e -> e.getKey() == null || e.getKey().indexOf('\n') < 1 || e.getKey().endsWith("\n") || e.getValue() == null || e.getValue() < 0 || e.getValue() >= DESKS);
 			pins.removeIf(p -> p == null || p.owner() == null || p.threadId() == null);
 		}
 	}
@@ -38,6 +41,10 @@ final class OfficeRoster {
 
 	/** Input is already newest first. Reserve pins, then waiting and working threads. */
 	static List<Resident> sync(List<T3State.ThreadRow> rows, List<String> owners, Preferences prefs) {
+		return sync(rows, owners, prefs, Set.copyOf(owners));
+	}
+
+	static List<Resident> sync(List<T3State.ThreadRow> rows, List<String> owners, Preferences prefs, Set<String> knownOwners) {
 		prefs.normalize();
 		List<Resident> result = new ArrayList<>();
 		Set<String> retain = new HashSet<>();
@@ -61,10 +68,10 @@ final class OfficeRoster {
 				int desk = assigned.get(key); prefs.desks.put(key, desk); retain.add(key); result.add(new Resident(row, desk));
 			}
 		}
-		// Preserve a pin through empty reconnect snapshots. An unavailable pin has no resident,
+		// Only authoritative owner snapshots may prune desks; preserve pins even then. An unavailable pin has no resident,
 		// so its desk may be used temporarily; on return pins win any slot conflict.
 		for (Pin pin : prefs.pins) retain.add(pin.key());
-		prefs.desks.keySet().retainAll(retain);
+		prefs.desks.keySet().removeIf(key -> knownOwners.contains(key.substring(0, key.indexOf('\n'))) && !retain.contains(key));
 		return result;
 	}
 }

@@ -21,7 +21,13 @@ cd "$REPO"
 PORT="$(sed -n 's/^server-port=//p' "$SERVER_DIR/server.properties" 2>/dev/null)"
 PORT="${PORT:-25565}"
 
-notify() { osascript -e "display notification \"$1\" with title \"$TITLE\"" >/dev/null 2>&1; }
+notify() {
+  osascript - "$1" "$TITLE" >/dev/null 2>&1 <<'APPLESCRIPT'
+on run argv
+  display notification (item 1 of argv) with title (item 2 of argv)
+end run
+APPLESCRIPT
+}
 
 if [ -z "${JAVA_HOME:-}" ] && ! JAVA_HOME="$(/usr/libexec/java_home -v 25+ 2>/dev/null)"; then
   osascript -e 'display alert "T3 Craft needs Java 25 or newer" message "Install a JDK (for example Temurin 25) and open T3 Craft again."' >/dev/null
@@ -31,7 +37,19 @@ if [ ! -x "$JAVA_HOME/bin/java" ]; then
   notify "JAVA_HOME does not point to a JDK. Set it to Java 25 or newer."
   exit 1
 fi
+java_major="$("$JAVA_HOME/bin/java" -version 2>&1 | sed -n 's/.*version "\([0-9]*\).*/\1/p' | head -1)"
+if ! [[ "$java_major" =~ ^[0-9]+$ ]] || [ "$java_major" -lt 25 ]; then
+  notify "T3 Craft needs Java 25 or newer. Check JAVA_HOME."
+  exit 1
+fi
 export JAVA_HOME
+
+launch_lock="${TMPDIR:-/tmp}/t3craft-launcher-$UID.lock"
+if ! mkdir "$launch_lock" 2>/dev/null; then
+  notify "A launcher is already running. If it crashed, remove $launch_lock and retry."
+  exit 1
+fi
+trap 'rmdir "$launch_lock"' EXIT
 
 if pgrep -f "java.*dli.env=client" >/dev/null; then
   notify "Minecraft is already running."
@@ -75,18 +93,23 @@ cleanup() {
   # Only this runServer invocation reads this pipe. `stop` saves its world before exiting.
   printf 'stop\n' >&3
   for _ in $(seq 1 20); do
-    owns_job || break
+    if ! owns_job && ! owns_server; then break; fi
     sleep 1
   done
-  if owns_job; then
-    owns_server && kill -TERM "$owned_server_pid" 2>/dev/null
-    kill -TERM "$server_job_pid" 2>/dev/null
-  fi
+  owns_server && kill -TERM "$owned_server_pid" 2>/dev/null
+  owns_job && kill -TERM "$server_job_pid" 2>/dev/null
+  for _ in $(seq 1 5); do
+    if ! owns_job && ! owns_server; then break; fi
+    sleep 1
+  done
+  owns_server && kill -KILL "$owned_server_pid" 2>/dev/null
+  owns_job && kill -KILL "$server_job_pid" 2>/dev/null
+  wait "$server_job_pid" 2>/dev/null || true
   exec 3>&-
   rm -f "$server_input_dir/stdin"
   rmdir "$server_input_dir"
 }
-trap cleanup EXIT
+trap 'cleanup; rmdir "$launch_lock"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
@@ -109,7 +132,7 @@ if ! lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
     sleep 2
   done
   if ! owns_server; then
-    osascript -e "display alert \"The world didn't start\" message \"See $LOGS/server.log\"" >/dev/null
+    notify "The world did not start. See $LOGS/server.log"
     exit 1
   fi
 fi
