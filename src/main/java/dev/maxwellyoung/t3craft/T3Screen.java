@@ -43,6 +43,7 @@ final class T3Screen extends Screen {
 	private String selectedRequest;
 	private T3State.Focus shownFocus;
 	private boolean newThread;
+	private final ComposerDraft composerDraft = new ComposerDraft();
 	private int scroll;
 	/** Machine shown in the sidebar; null means all of them. */
 	private String envFilter;
@@ -60,8 +61,14 @@ final class T3Screen extends Screen {
 	private JsonObject answers = new JsonObject();
 	private final java.util.LinkedHashSet<String> multiPicked = new java.util.LinkedHashSet<>();
 	private final List<int[]> optionRows = new ArrayList<>();
+	/** Question sets already sent ("thread:request"), hidden until the snapshot drops them or the send fails. */
+	private final java.util.Set<String> submittedInputs = new java.util.HashSet<>();
 
 	private record PickerEntry(T3Api.Provider provider, T3Api.Model model, boolean needsNewThread) {}
+
+	private String anchorThread;
+	private int anchorWidth;
+	private int anchorCount;
 
 	private T3State.Focus cachedFocus;
 	private int cachedWidth;
@@ -82,9 +89,11 @@ final class T3Screen extends Screen {
 		int mainWidth = width - mainX - MARGIN;
 		int composerY = height - MARGIN - 12 - COMPOSER;
 
+		// A resize re-runs init and the new box copies the old one's text; only the first init loads the saved draft.
+		boolean first = composer == null;
 		composer = new EditBox(font, mainX, composerY, mainWidth, COMPOSER, composer, Component.literal("Prompt"));
 		composer.setMaxLength(8000);
-		if (composer.getValue().isEmpty()) composer.setValue(mod.draft(draftKey()));
+		if (first) loadDraft();
 		updateHint();
 		addRenderableWidget(composer);
 		setInitialFocus(composer);
@@ -99,7 +108,7 @@ final class T3Screen extends Screen {
 			.bounds(width - MARGIN - 44, MARGIN + 3, 44, 18).build());
 		review = addRenderableWidget(Button.builder(Component.literal("Review"), b -> { if (shownFocus != null) mod.openReview(shownFocus.threadId()); })
 			.bounds(width - MARGIN - 102, MARGIN + 3, 54, 18).build());
-		addRenderableWidget(Button.builder(Component.literal("Decisions (J)"), b -> mod.openDecisions())
+		addRenderableWidget(Button.builder(Component.literal("Decisions (" + mod.decisionsKey().getTranslatedKeyMessage().getString() + ")"), b -> mod.openDecisions())
 			.bounds(MARGIN + 5, height - MARGIN - 25, SIDEBAR - 10, 18).build());
 		pin = addRenderableWidget(Button.builder(Component.literal("Pin desk"), b -> mod.togglePin(mod.state().snapshot().focusedRow()))
 			.bounds(MARGIN + 5, height - MARGIN - 47, 78, 18).build());
@@ -130,7 +139,7 @@ final class T3Screen extends Screen {
 
 	@Override
 	public void removed() {
-		mod.saveDraft(draftKey(), composer.getValue());
+		parkDraft();
 		mod.state().setPanelOpen(false);
 	}
 
@@ -216,6 +225,39 @@ final class T3Screen extends Screen {
 		return newThread ? "new" : mod.state().focusedThreadId();
 	}
 
+	/** Every change of what the composer is for: park the text as the old target's draft, switch, load the new one's. */
+	private void switchDraft(Runnable change) {
+		parkDraft();
+		change.run();
+		loadDraft();
+		updateHint();
+	}
+
+	private void loadDraft() {
+		composer.setValue(mod.draft(draftKey()));
+		composerDraft.load(draftKey());
+	}
+
+	private void parkDraft() {
+		composerDraft.park(draftKey(), composer.getValue(), mod::draft, mod::saveDraft);
+	}
+
+	/** A send failed after the composer was cleared: the text goes back in front of whatever is there now. */
+	private static void restoreFailedSend(T3CraftClient mod, String key, String text) {
+		if (net.minecraft.client.Minecraft.getInstance().gui.screen() instanceof T3Screen open) {
+			if ("new".equals(key) && !open.newThread && open.composer.getValue().isBlank()) open.switchDraft(() -> open.newThread = true);
+			if (java.util.Objects.equals(key, open.draftKey())) {
+				open.composer.setValue(joinDraft(text, open.composer.getValue()));
+				return;
+			}
+		}
+		mod.saveDraft(key, joinDraft(text, mod.draft(key)));
+	}
+
+	private static String joinDraft(String restored, String current) {
+		return current.isBlank() || current.equals(restored) ? restored : restored + " " + current;
+	}
+
 	private void updateHint() {
 		T3State.ThreadRow row = mod.state().snapshot().focusedRow();
 		String hint = newThread
@@ -231,9 +273,19 @@ final class T3Screen extends Screen {
 	}
 
 
+	/** The desk's chosen request only matters while it is pending; once answered, the next request shows. */
+	private void dropAnsweredSelection(T3State.Focus focus) {
+		if (selectedRequest == null || !focus.threadId().equals(mod.state().focusedThreadId())) return;
+		boolean pending = focus.approvals().stream().anyMatch(a -> a.requestId().equals(selectedRequest))
+			|| focus.userInputs().stream().anyMatch(i -> i.requestId().equals(selectedRequest));
+		if (!pending) selectedRequest = null;
+	}
+
 	private T3State.Approval currentApproval() {
 		var focus = shownFocus;
-		if (focus == null || focus.approvals().isEmpty()) return null;
+		if (focus == null) return null;
+		dropAnsweredSelection(focus);
+		if (focus.approvals().isEmpty()) return null;
 		return selectedRequest == null ? focus.approvals().getFirst()
 			: focus.approvals().stream().filter(a -> a.requestId().equals(selectedRequest)).findFirst().orElse(null);
 	}
@@ -247,8 +299,13 @@ final class T3Screen extends Screen {
 	private T3State.UserInput currentInput() {
 		T3State.Focus focus = shownFocus;
 		if (focus == null || focus.userInputs().isEmpty() || !mod.state().online(focus.threadId())) return null;
-		T3State.UserInput input = selectedRequest == null ? focus.userInputs().getFirst()
-			: focus.userInputs().stream().filter(i -> i.requestId().equals(selectedRequest)).findFirst().orElse(null);
+		dropAnsweredSelection(focus);
+		String prefix = focus.threadId() + ":";
+		submittedInputs.removeIf(key -> key.startsWith(prefix) && focus.userInputs().stream().noneMatch(i -> key.equals(prefix + i.requestId())));
+		List<T3State.UserInput> open = focus.userInputs().stream().filter(i -> !submittedInputs.contains(prefix + i.requestId())).toList();
+		if (open.isEmpty()) return null;
+		T3State.UserInput input = selectedRequest == null ? open.getFirst()
+			: open.stream().filter(i -> i.requestId().equals(selectedRequest)).findFirst().orElse(null);
 		if (input == null) return null;
 		if (!(focus.threadId() + ":" + input.requestId()).equals(answeringRequest)) {
 			answeringRequest = focus.threadId() + ":" + input.requestId();
@@ -273,7 +330,11 @@ final class T3Screen extends Screen {
 		multiPicked.clear();
 		questionIndex++;
 		if (questionIndex >= input.questions().size()) {
-			mod.answer(shownFocus.threadId(), input, answers);
+			// Until the snapshot drops it, the request is still listed; don't start it over from question 1.
+			String key = shownFocus.threadId() + ":" + input.requestId();
+			submittedInputs.add(key);
+			if (input.requestId().equals(selectedRequest)) selectedRequest = null;
+			mod.answer(shownFocus.threadId(), input, answers, () -> submittedInputs.remove(key));
 			answeringRequest = null;
 		}
 		updateHint();
@@ -335,8 +396,7 @@ final class T3Screen extends Screen {
 
 	/** Used by the dev self-test: same as clicking + New. */
 	void startNewThread() {
-		newThread = true;
-		updateHint();
+		if (!newThread) switchDraft(() -> newThread = true);
 	}
 
 	/** Used by the dev self-test. */
@@ -353,8 +413,10 @@ final class T3Screen extends Screen {
 	private void submit(boolean stayOpen) {
 		String text = composer.getValue().trim();
 		if (text.isEmpty()) return;
-		mod.send(text, newThread, pickedModel);
-		mod.saveDraft(draftKey(), "");
+		String key = draftKey();
+		// Nothing was sent (no thread to send to): keep the text and the panel.
+		if (!mod.send(text, newThread, pickedModel, () -> restoreFailedSend(mod, key, text))) return;
+		composerDraft.sent(mod::saveDraft);
 		composer.setValue("");
 		newThread = false;
 		pickedModel = null;
@@ -394,7 +456,7 @@ final class T3Screen extends Screen {
 			answer(event.key() == InputConstants.KEY_Y ? "accept" : "decline");
 			return true;
 		}
-		if (composerEmpty && event.key() == InputConstants.KEY_GRAVE && System.currentTimeMillis() - openedAt > 250) {
+		if (composerEmpty && openKeyCloses() && mod.openKey().matches(event) && System.currentTimeMillis() - openedAt > 250) {
 			onClose();
 			return true;
 		}
@@ -403,15 +465,26 @@ final class T3Screen extends Screen {
 
 	@Override
 	public boolean charTyped(CharacterEvent event) {
-		// Swallow the ` that opened the panel, digits that picked an option, and Y/N that answered an approval.
+		// Swallow the open key's character (` by default), digits that picked an option, and Y/N that answered an approval.
 		if (composer.getValue().isEmpty() && !newThread && currentQuestion() != null && event.codepoint() >= '1' && event.codepoint() <= '9') {
 			return true;
 		}
-		if (composer.getValue().isEmpty() && (event.codepoint() == '`'
+		if (composer.getValue().isEmpty() && (typesOpenKey(event.codepoint())
 			|| (approve.visible && (event.codepoint() == 'y' || event.codepoint() == 'n' || event.codepoint() == 'Y' || event.codepoint() == 'N')))) {
 			return true;
 		}
 		return super.charTyped(event);
+	}
+
+	/** Whether this character is what the open key types, so pressing it to open or close never lands in the composer. */
+	private boolean typesOpenKey(int codepoint) {
+		return openKeyCloses() && mod.openKeyName().equalsIgnoreCase(Character.toString(codepoint));
+	}
+
+	/** Bound to a letter or digit, the open key would eat the first character of a prompt, so then only Esc closes. */
+	private boolean openKeyCloses() {
+		String name = mod.openKeyName();
+		return name.codePointCount(0, name.length()) != 1 || !Character.isLetterOrDigit(name.codePointAt(0));
 	}
 
 	@Override
@@ -423,7 +496,7 @@ final class T3Screen extends Screen {
 				List<Object> rows = pickerRows();
 				if (index >= 0 && index < rows.size() && rows.get(index) instanceof PickerEntry entry) {
 					pickedModel = T3Api.modelSelection(entry.provider().instanceId(), entry.model().slug());
-					if (entry.needsNewThread()) newThread = true;
+					if (entry.needsNewThread() && !newThread) switchDraft(() -> newThread = true);
 					updateHint();
 					pickerOpen = false;
 					setFocused(composer);
@@ -459,11 +532,12 @@ final class T3Screen extends Screen {
 			&& event.y() < listTop + visibleRows() * ROW) {
 			int index = (int) ((event.y() - listTop) / ROW) + sidebarScroll;
 			if (index < rows.size()) {
-				mod.saveDraft(draftKey(), composer.getValue());
-				mod.focus(rows.get(index).id());
-				selectedRequest = null;
-				newThread = false;
-				composer.setValue(mod.draft(draftKey()));
+				String id = rows.get(index).id();
+				switchDraft(() -> {
+					mod.focus(id);
+					selectedRequest = null;
+					newThread = false;
+				});
 				pickedModel = null;
 				pickerOpen = false;
 				scroll = 0;
@@ -472,8 +546,7 @@ final class T3Screen extends Screen {
 			}
 		}
 		if (event.x() >= MARGIN + SIDEBAR - NEW_WIDTH && event.x() < MARGIN + SIDEBAR && event.y() >= MARGIN && event.y() < MARGIN + HEADER) {
-			newThread = !newThread;
-			updateHint();
+			switchDraft(() -> newThread = !newThread);
 			setFocused(composer);
 			return true;
 		}
@@ -490,6 +563,15 @@ final class T3Screen extends Screen {
 		if (pickerOpen) {
 			int visible = (pickerBox()[3] - pickerBox()[1] - 4) / PICKER_ROW;
 			pickerScroll = Math.max(0, Math.min(pickerRows().size() - visible, pickerScroll - (int) Math.signum(scrollY) * 2));
+			return true;
+		}
+		// Clamped when the card is drawn.
+		if (inside(questionBox, x, y)) {
+			questionScroll = Math.max(0, questionScroll - (int) Math.signum(scrollY) * font.lineHeight * 2);
+			return true;
+		}
+		if (inside(approvalBox, x, y)) {
+			approvalScroll = Math.max(0, approvalScroll - (int) Math.signum(scrollY) * 2);
 			return true;
 		}
 		scroll = Math.max(0, scroll + (int) Math.signum(scrollY) * 3);
@@ -573,6 +655,10 @@ final class T3Screen extends Screen {
 	}
 
 	private void extractConversation(GuiGraphicsExtractor graphics, T3State.Snapshot snapshot) {
+		// Early returns below draw no cards, so last frame's hit boxes must not survive them.
+		optionRows.clear();
+		questionBox = null;
+		approvalBox = null;
 		int x0 = MARGIN + SIDEBAR + 8;
 		int x1 = width - MARGIN;
 		graphics.fill(x0, MARGIN, x1, height - MARGIN, 0xB0101014);
@@ -601,11 +687,20 @@ final class T3Screen extends Screen {
 			mod.state().online(row.id()) ? T3Hud.color(row.status()) : 0xFF9CA3AF, false);
 		graphics.horizontalLine(x0, x1 - 1, MARGIN + HEADER, 0x30FFFFFF);
 
-		boolean hasApproval = currentApproval() != null;
+		T3State.Approval approval = currentApproval();
+		boolean hasApproval = approval != null;
 		int composerY = height - MARGIN - 12 - COMPOSER;
 		T3State.Question question = newThread ? null : currentQuestion();
-		int questionHeight = question == null ? 0 : questionCardHeight(question, x1 - x0 - 24);
-		int bottom = composerY - 6 - (hasApproval ? APPROVAL : 0) - questionHeight;
+		int cardWidth = x1 - x0 - 24;
+		// The cards share what's above the composer but always leave the conversation a few lines.
+		int room = Math.max(0, composerY - 6 - (MARGIN + HEADER + 4) - 3 * font.lineHeight);
+		List<FormattedCharSequence> detail = hasApproval
+			? font.split(Component.literal(approval.detail() == null ? "" : approval.detail()), cardWidth) : List.of();
+		int approvalHeight = !hasApproval ? 0
+			: Math.max(APPROVAL, Math.min(25 + detail.size() * font.lineHeight, question == null ? room : room / 2));
+		int questionHeight = question == null ? 0
+			: Math.min(questionCardHeight(question, cardWidth), Math.max(3 * font.lineHeight + 12, room - approvalHeight));
+		int bottom = composerY - 6 - approvalHeight - questionHeight;
 		int top = MARGIN + HEADER + 4;
 		String connectionError = mod.state().connectionError(row.id());
 		if (connectionError != null) {
@@ -617,8 +712,16 @@ final class T3Screen extends Screen {
 			top += errorHeight + 6;
 		}
 
-		if (!pickerOpen && !newThread && focus != null && focus.threadId().equals(row.id())) {
+		if (!pickerOpen && !newThread && focus != null && focus.threadId().equals(row.id()) && bottom > top) {
 			List<T3Markdown.Line> lines = lines(focus, x1 - x0 - 28);
+			// scroll counts lines up from the bottom, so while reading back, rows streaming in below
+			// would push the view; move it by the same amount to keep the same lines on screen.
+			if (scroll > 0 && focus.threadId().equals(anchorThread) && x1 - x0 - 28 == anchorWidth && lines.size() > anchorCount) {
+				scroll += lines.size() - anchorCount;
+			}
+			anchorThread = focus.threadId();
+			anchorWidth = x1 - x0 - 28;
+			anchorCount = lines.size();
 			int visible = Math.max(1, (bottom - top) / font.lineHeight);
 			scroll = Math.min(scroll, Math.max(0, lines.size() - visible));
 			int end = lines.size() - scroll;
@@ -646,16 +749,29 @@ final class T3Screen extends Screen {
 		}
 
 		optionRows.clear();
+		questionBox = null;
 		if (question != null) {
-			extractQuestion(graphics, question, x0, x1, composerY - (hasApproval ? APPROVAL : 0) - questionHeight - 2, mouseXCache, mouseYCache);
+			extractQuestion(graphics, question, x0, x1, composerY - approvalHeight - questionHeight - 2, questionHeight, mouseXCache, mouseYCache);
 		}
+		approvalBox = null;
 		if (hasApproval) {
-			T3State.Approval approval = currentApproval();
-			int y = composerY - APPROVAL - 2;
-			graphics.fill(x0 + 6, y, x1 - 6, y + APPROVAL - 2, 0x40FFB02E);
+			int y = composerY - approvalHeight - 2;
+			// The card grows with the command, so its buttons follow its title row.
+			approve.setY(y + 2);
+			deny.setY(y + 2);
+			graphics.fill(x0 + 6, y, x1 - 6, y + approvalHeight - 2, 0x40FFB02E);
 			graphics.text(font, "Approve " + approval.kind() + "?", x0 + 12, y + 5, 0xFFFFB02E, false);
-			String detail = approval.detail() == null ? "" : approval.detail();
-			graphics.text(font, T3Hud.ellipsize(font, detail, x1 - x0 - 24), x0 + 12, y + 18, 0xFFE5E7EB, false);
+			int rows = Math.max(1, (approvalHeight - 25) / font.lineHeight);
+			if (!approval.requestId().equals(scrolledApproval)) {
+				scrolledApproval = approval.requestId();
+				approvalScroll = 0;
+			}
+			approvalScroll = Math.max(0, Math.min(approvalScroll, detail.size() - rows));
+			for (int i = 0; i < rows && approvalScroll + i < detail.size(); i++) {
+				graphics.text(font, detail.get(approvalScroll + i), x0 + 12, y + 18 + i * font.lineHeight, 0xFFE5E7EB, false);
+			}
+			scrollThumb(graphics, x1 - 10, y + 18, rows * font.lineHeight, rows, detail.size(), approvalScroll);
+			approvalBox = new int[] {x0 + 6, y, x1 - 6, y + approvalHeight - 2};
 		}
 
 		String footer = "Enter send · Shift+Enter stay · " + (hasApproval ? "Y/N answer · " : "") + "Esc play";
@@ -664,6 +780,25 @@ final class T3Screen extends Screen {
 
 	private int mouseXCache;
 	private int mouseYCache;
+	/** Where the cards were last drawn, so the wheel over one scrolls it instead of the conversation. */
+	private int[] approvalBox;
+	private int[] questionBox;
+	private int approvalScroll;
+	private int questionScroll;
+	private String scrolledApproval;
+	private String scrolledQuestion;
+
+	private static boolean inside(int[] box, double x, double y) {
+		return box != null && x >= box[0] && x < box[2] && y >= box[1] && y < box[3];
+	}
+
+	/** Same thin thumb as the sidebar's, shown only when a card's content overflows. */
+	private static void scrollThumb(GuiGraphicsExtractor graphics, int x, int top, int track, int visible, int total, int offset) {
+		if (total <= visible || track <= 0) return;
+		int thumb = Math.max(6, track * visible / total);
+		int at = top + (track - thumb) * offset / Math.max(1, total - visible);
+		graphics.fill(x, at, x + 2, at + thumb, 0x60FFFFFF);
+	}
 
 	private int questionCardHeight(T3State.Question question, int width) {
 		int lines = 1 + font.split(Component.literal(question.question() == null ? "" : question.question()), width).size();
@@ -671,15 +806,27 @@ final class T3Screen extends Screen {
 		return 8 + lines * font.lineHeight + question.options().size() * (font.lineHeight + 2) + 4 + font.lineHeight + 2;
 	}
 
-	private void extractQuestion(GuiGraphicsExtractor graphics, T3State.Question question, int x0, int x1, int y, int mouseX, int mouseY) {
+	/** {@code height} may be less than the card's full height; then the question and options scroll between header and key hint. */
+	private void extractQuestion(GuiGraphicsExtractor graphics, T3State.Question question, int x0, int x1, int y, int height, int mouseX, int mouseY) {
 		T3State.UserInput input = currentInput();
 		int width = x1 - x0 - 24;
-		int height = questionCardHeight(question, width);
+		List<FormattedCharSequence> text = font.split(Component.literal(question.question() == null ? "" : question.question()), width);
+		int body = text.size() * font.lineHeight + 2 + question.options().size() * (font.lineHeight + 2);
+		int bodyTop = y + 4 + font.lineHeight;
+		int bodyBottom = bodyTop + body - (questionCardHeight(question, width) - height);
+		String scrollKey = answeringRequest + "#" + questionIndex;
+		if (!scrollKey.equals(scrolledQuestion)) {
+			scrolledQuestion = scrollKey;
+			questionScroll = 0;
+		}
+		questionScroll = Math.max(0, Math.min(questionScroll, body - (bodyBottom - bodyTop)));
 		graphics.fill(x0 + 6, y, x1 - 6, y + height, 0x405EA8FF);
+		questionBox = new int[] {x0 + 6, y, x1 - 6, y + height};
 		String step = input != null && input.questions().size() > 1 ? "  " + (questionIndex + 1) + "/" + input.questions().size() : "";
 		graphics.text(font, (question.header() == null ? "Question" : question.header()) + step, x0 + 12, y + 4, 0xFF93C5FD, false);
-		int lineY = y + 4 + font.lineHeight;
-		for (var part : font.split(Component.literal(question.question() == null ? "" : question.question()), width)) {
+		graphics.enableScissor(x0 + 6, bodyTop, x1 - 6, bodyBottom);
+		int lineY = bodyTop - questionScroll;
+		for (var part : text) {
 			graphics.text(font, part, x0 + 12, lineY, 0xFFE5E7EB, false);
 			lineY += font.lineHeight;
 		}
@@ -688,7 +835,10 @@ final class T3Screen extends Screen {
 			T3State.Option option = question.options().get(i);
 			int rowTop = lineY - 1;
 			int rowBottom = lineY + font.lineHeight + 1;
-			boolean hovered = mouseX >= x0 + 8 && mouseX < x1 - 8 && mouseY >= rowTop && mouseY < rowBottom;
+			// Rows scrolled out of the card can't be hovered or clicked.
+			int hitTop = Math.max(rowTop, bodyTop);
+			int hitBottom = Math.min(rowBottom, bodyBottom);
+			boolean hovered = mouseX >= x0 + 8 && mouseX < x1 - 8 && mouseY >= hitTop && mouseY < hitBottom;
 			boolean picked = multiPicked.contains(option.value());
 			if (hovered || picked) graphics.fill(x0 + 8, rowTop, x1 - 8, rowBottom, picked ? 0x505EA8FF : 0x25FFFFFF);
 			String key = (i < 9 ? String.valueOf(i + 1) : " ") + (question.multiSelect() ? (picked ? " [x] " : " [ ] ") : "  ");
@@ -702,9 +852,12 @@ final class T3Screen extends Screen {
 					graphics.text(font, T3Hud.ellipsize(font, "— " + option.description(), x1 - descX - 14), descX, lineY, 0xFF9CA3AF, false);
 				}
 			}
-			optionRows.add(new int[] {x0 + 8, rowTop, x1 - 8, rowBottom, i});
+			if (hitTop < hitBottom) optionRows.add(new int[] {x0 + 8, hitTop, x1 - 8, hitBottom, i});
 			lineY += font.lineHeight + 2;
 		}
+		graphics.disableScissor();
+		scrollThumb(graphics, x1 - 10, bodyTop, bodyBottom - bodyTop, bodyBottom - bodyTop, body, questionScroll);
+		lineY = bodyBottom;
 		String keys = question.options().isEmpty() ? "Type your answer below, then Enter"
 			: "Press 1–" + Math.min(9, question.options().size()) + (question.multiSelect() ? ", then Enter" : "")
 			+ (question.allowCustomAnswer() ? ", or type your own" : "");
@@ -739,7 +892,13 @@ final class T3Screen extends Screen {
 	}
 
 	private int chipX() {
-		return chipRight() - font.width(modelLabel(effectiveModel()) + " ▾") - 10;
+		return chipRight() - font.width(chipLabel()) - 10;
+	}
+
+	/** A long model name is cut so the chip keeps to half the header and never reaches the sidebar. */
+	private String chipLabel() {
+		int max = Math.max(40, (chipRight() - (MARGIN + SIDEBAR + 8)) / 2);
+		return T3Hud.ellipsize(font, modelLabel(effectiveModel()), max - 10 - font.width(" ▾")) + " ▾";
 	}
 
 	private boolean chipContains(double x, double y) {
@@ -748,7 +907,7 @@ final class T3Screen extends Screen {
 
 	private void extractModelChip(GuiGraphicsExtractor graphics, T3State.Snapshot snapshot, int mouseX, int mouseY) {
 		if (snapshot.focusedRow() == null) return;
-		String label = modelLabel(effectiveModel()) + " ▾";
+		String label = chipLabel();
 		boolean hovered = chipContains(mouseX, mouseY);
 		graphics.fill(chipX(), MARGIN + 4, chipRight(), MARGIN + 20, pickerOpen || hovered ? 0x50FFFFFF : 0x28FFFFFF);
 		graphics.text(font, label, chipX() + 5, MARGIN + 8, pickedModel != null ? 0xFFFFB02E : 0xFFE5E7EB, false);
