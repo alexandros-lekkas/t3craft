@@ -4,12 +4,12 @@
 	"version": "${version}",
 	"name": "T3 Craft",
 	"description": "Talk to your T3 Code threads from inside Minecraft, then keep playing while the agent works.",
-	"authors": ["Maxwell Young"],
+	"authors": ["Maxwell Young", "Alexandros Lekkas"],
 	"license": "MIT",
 	"contact": {
-		"homepage": "https://github.com/maxwellyoung/t3craft",
-		"sources": "https://github.com/maxwellyoung/t3craft",
-		"issues": "https://github.com/maxwellyoung/t3craft/issues"
+		"homepage": "https://github.com/alexandros-lekkas/t3craft",
+		"sources": "https://github.com/alexandros-lekkas/t3craft",
+		"issues": "https://github.com/alexandros-lekkas/t3craft/issues"
 	},
 	"icon": "assets/t3craft/icon.png",
 	"environment": "*",
@@ -21,6 +21,6 @@
 		"fabricloader": ">=0.19.5",
 		"minecraft": "~26.3",
 		"java": ">=25",
-		"fabric-api": "*"
+		"fabric-api": ">=0.161.0"
 	}
 }

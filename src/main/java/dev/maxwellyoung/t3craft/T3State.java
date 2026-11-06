@@ -53,7 +53,7 @@ public final class T3State {
 		}
 	}
 
-	public record Snapshot(boolean connected, String error, List<ThreadRow> threads, String focusedId, Focus focus) {
+	public record Snapshot(boolean connected, String error, List<ThreadRow> threads, String focusedId, Focus focus, List<MachineHealth> machines) {
 		public ThreadRow focusedRow() {
 			if (focusedId == null) return null;
 			for (ThreadRow row : threads) if (row.id().equals(focusedId)) return row;
@@ -85,8 +85,7 @@ public final class T3State {
 	private volatile Map<String, String> connectionErrors = Map.of();
 	private volatile List<String> offlineMachines = List.of();
 	public record MachineHealth(String owner, String label, boolean online, boolean live, int protocol, int threads, String error) {}
-	private volatile List<MachineHealth> machines = List.of();
-	List<MachineHealth> machines() { return machines; }
+	List<MachineHealth> machines() { return snapshot.machines(); }
 
 	List<T3Decisions.Entry> decisions() { return decisions; }
 	public boolean online(String threadId) { return threadId != null && onlineThreads.getOrDefault(threadId, false); }
@@ -122,7 +121,7 @@ public final class T3State {
 	private Focus focusDetail;
 
 	private volatile String focusedThreadId;
-	private volatile Snapshot snapshot = new Snapshot(false, null, List.of(), null, null);
+	private volatile Snapshot snapshot = new Snapshot(false, null, List.of(), null, null, List.of());
 	private volatile boolean panelOpen;
 	private volatile boolean refreshSoon;
 	private long tick;
@@ -203,12 +202,12 @@ public final class T3State {
 			waitingFetchedAt.clear();
 			decisions = List.of();
 			onlineThreads = Map.of();
-			connectionErrors = Map.of(); machines = List.of(); offlineMachines = List.of();
+			connectionErrors = Map.of(); offlineMachines = List.of();
 			focusDetail = null;
 			List<Env> next = new ArrayList<>();
 			for (Connection connection : connections) next.add(new Env(connection.api(), connection.label()));
 			envs = List.copyOf(next);
-			snapshot = new Snapshot(false, null, List.of(), focusedThreadId, null);
+			snapshot = new Snapshot(false, null, List.of(), focusedThreadId, null, List.of());
 			maintainSafely();
 		});
 	}
@@ -624,12 +623,12 @@ public final class T3State {
 		}
 		onlineThreads = Map.copyOf(health);
 		connectionErrors = Map.copyOf(errors);
-		machines = current.stream().map(env -> new MachineHealth(env.api.ownerKey(), env.label,
+		List<MachineHealth> machines = current.stream().map(env -> new MachineHealth(env.api.ownerKey(), env.label,
 			env.error == null && (env.shellLive || env.shellLoaded), env.shellLive, env.api.negotiatedProtocol(), env.threads.size(), env.error)).toList();
 		offlineMachines = current.stream().filter(env -> env.error != null || !env.shellLoaded && !env.shellLive)
 			.map(env -> env.label).toList();
 		decisions = T3Decisions.collect(rows, waitingThreads);
-		snapshot = new Snapshot(connected, error, List.copyOf(visible.values()), focusedThreadId, focus);
+		snapshot = new Snapshot(connected, error, List.copyOf(visible.values()), focusedThreadId, focus, machines);
 		events.forEach(onEvent);
 	}
 

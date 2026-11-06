@@ -11,6 +11,20 @@ import java.util.Map;
 /** Spatial acceptance checks use synthetic rows and disposable owner-only configuration. */
 public final class OfficeChecks {
 	public static void main(String[] args) throws Exception {
+		checkPlacement();
+		CommandBudget budget = new CommandBudget();
+		int spam = 0, sends = 0;
+		for (int tick = 0; tick < 24000; tick++) {
+			budget.tick(); spam = Math.max(0, spam - 1);
+			for (int producer = 0; producer < 8; producer++) if (budget.acquire(tick * 50_000_000L)) { spam += 20; sends++; }
+			check(spam < 200, "all producers stay under vanilla's command-spam limit");
+		}
+		check(sends == 600, "shared budget allows one command per forty ticks without bursts");
+		OfficeRoster.Preferences malformed = new OfficeRoster.Preferences();
+		malformed.desks.put("broken", 0); malformed.desks.put(null, 1); malformed.desks.put("owner\n", 2);
+		malformed.desks.put("owner\nthread", null);
+		OfficeRoster.sync(List.of(), List.of("owner"), malformed);
+		check(malformed.desks.isEmpty(), "malformed saved desks are sanitized before pruning");
 		String a = "http://127.0.0.1:25680", b = "http://127.0.0.1:25681";
 		List<T3State.ThreadRow> rows = new ArrayList<>();
 		for (String owner : List.of(a, b)) for (int i = 0; i < 12; i++) rows.add(row(owner, i, i == 10 ? T3State.Status.NEEDS_YOU : i == 9 ? T3State.Status.WORKING : T3State.Status.DONE));
@@ -32,16 +46,55 @@ public final class OfficeChecks {
 		check(brain.agents().get(pin.id()).desk == before.get(OfficeRoster.key(pin)), "brain consumes the saved desk");
 		check(!OfficeRoster.projectKey(rows.get(0)).equals(OfficeRoster.projectKey(rows.get(12))), "same project title on two machines remains distinct");
 
+		// A transient unavailable snapshot must retain unpinned desks, including owners not in the roster.
+		OfficeRoster.sync(List.of(), List.of(a, b), prefs, java.util.Set.of());
+		check(before.equals(prefs.desks), "unknown snapshots retain every desk, not just pins");
+		OfficeRoster.sync(reordered.stream().filter(r -> r.ownerKey().equals(a)).toList(), List.of(a, b), prefs, java.util.Set.of(a));
+		check(before.equals(prefs.desks), "one unavailable peer cannot lose its assignments");
+		OfficeRoster.sync(List.of(), List.of(a, b), prefs, java.util.Set.of(b));
+		check(prefs.desks.keySet().stream().noneMatch(key -> key.startsWith(b + "\n")), "authoritative empty snapshot prunes an available owner");
+		check(prefs.desks.entrySet().containsAll(before.entrySet().stream().filter(e -> e.getKey().startsWith(a + "\n")).toList()), "pruning one owner preserves the unavailable peer");
+		prefs.desks.clear(); prefs.desks.putAll(before);
+
+		WorldBoundQueue<String> queue = new WorldBoundQueue<>();
+		Object level = new Object(), connection = new Object();
+		queue.add(level, connection, List.of("fill", "setblock"));
+		queue.validate(level, connection);
+		check("fill".equals(queue.poll()), "same session sends queued work in order");
+		check(!queue.targetLoaded(false) && queue.isEmpty(), "unloaded target cancels placement instead of resuming over new work");
+		queue.targetLoaded(true);
+		check(queue.isEmpty(), "chunk reload cannot resurrect destructive commands");
+		queue.add(level, connection, List.of("old"));
+		queue.validate(new Object(), connection);
+		check(queue.isEmpty(), "dimension or world change discards remaining work");
+		queue.add(level, connection, List.of("old"));
+		queue.validate(level, new Object());
+		check(queue.isEmpty(), "reconnect to the same level discards work");
+		queue.add(level, connection, List.of("old"));
+		queue.validate(null, null);
+		check(queue.isEmpty(), "disconnect discards work even before another world joins");
+		queue.add(level, connection, List.of("old"));
+		Object otherLevel = new Object();
+		queue.add(otherLevel, connection, List.of("new"));
+		check("new".equals(queue.poll()) && queue.isEmpty(), "enqueue after world change cannot carry old commands");
+
 		var directory = Files.createTempDirectory("t3craft-office-check-");
 		var file = directory.resolve("config.json");
 		try {
 			T3Config config = new T3Config();
 			config.environments.add(new T3Config.Environment("Same name", a, "fixture-only"));
 			config.environments.add(new T3Config.Environment("Same name", b, "fixture-only"));
+			prefs.floorOwners = List.of(a, b);
 			config.officePreferences.put("world-a", prefs);
 			config.officePreferences.put("world-b", new OfficeRoster.Preferences());
 			config.save(file);
 			T3Config restored = T3Config.load(file);
+			check(restored.officePreferences.get("world-a").floorOwners.equals(List.of(a, b)), "built floor owners survive save/load");
+			var builtPrefs = restored.officePreferences.get("world-a");
+			restored.environments.removeFirst();
+			brain.sync(reordered.stream().filter(r -> r.ownerKey().equals(b)).toList(), builtPrefs.floorOwners, builtPrefs, java.util.Set.of(b));
+			check(brain.agents().values().stream().allMatch(agent -> agent.floor == 1), "removing a pairing does not shift the built second floor");
+			restored.environments.addFirst(new T3Config.Environment("Same name", a, "fixture-only"));
 			check(restored.officePreferences.get("world-a").pinned(pin), "pin survives actual JSON save/load");
 			OfficeRoster.sync(reordered, List.of(a, b), restored.officePreferences.get("world-a"));
 			check(before.equals(restored.officePreferences.get("world-a").desks), "all desks survive process-style reload");
@@ -69,8 +122,37 @@ public final class OfficeChecks {
 		for (int i = 0; i < 8; i++) waiting.add(row(a, i, T3State.Status.NEEDS_YOU));
 		brain.clear(); brain.sync(waiting, List.of(a), new OfficeRoster.Preferences());
 		check(brain.agents().values().stream().map(r -> r.goal).distinct().count() == 8, "eight waiting residents do not share a physical spot");
-		System.out.println("PASS stable desks, pinned/waiting/working priority, restart and reconnect persistence, distinct owners/projects, pin removal and shared/client isolation");
+		System.out.println("PASS plain-field/build occupancy, daytime lamps/signs, shared command budget, malformed desks, unloaded-target cancellation, queue world/session binding, unavailable-owner retention, built floor persistence, stable desks, pinned/waiting/working priority, restart and reconnect persistence, distinct owners/projects, pin removal and shared/client isolation");
 	}
+	private static void checkPlacement() {
+		net.minecraft.SharedConstants.tryDetectVersion();
+		net.minecraft.server.Bootstrap.bootStrap();
+		var origin = new net.minecraft.core.BlockPos(0, 64, 0);
+		var blueprint = T3Office.blueprint(List.of("Machine"));
+		var bounds = OfficeSite.bounds(origin, blueprint);
+		var blocks = new java.util.HashMap<net.minecraft.core.BlockPos, net.minecraft.world.level.block.state.BlockState>();
+		java.util.function.Function<net.minecraft.core.BlockPos, net.minecraft.world.level.block.state.BlockState> read = pos -> blocks.getOrDefault(pos,
+			pos.getY() == bounds.min().getY() ? net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState() : net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+		var spot = origin.offset(3, 0, 3);
+		for (var block : List.of(net.minecraft.world.level.block.Blocks.AIR, net.minecraft.world.level.block.Blocks.SHORT_GRASS,
+			net.minecraft.world.level.block.Blocks.DANDELION, net.minecraft.world.level.block.Blocks.SNOW, net.minecraft.world.level.block.Blocks.WATER)) {
+			blocks.put(spot, block.defaultBlockState());
+			check(!OfficeSite.occupied(bounds, null, List.of(), read, pos -> null), "plain terrain builds in one step: " + block);
+		}
+		blocks.put(spot, net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
+		check(OfficeSite.occupied(bounds, null, List.of(), read, pos -> null), "player blocks above ground require confirmation");
+		blocks.clear();
+		var chest = new net.minecraft.world.level.block.entity.ChestBlockEntity(bounds.min(), net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
+		check(OfficeSite.occupied(bounds, null, List.of(), read, pos -> pos.equals(bounds.min()) ? chest : null), "buried containers remain protected");
+		// Recognize both lamp states and the office's own sign block entities on rebuild.
+		var lamp = origin.offset(6, T3Office.HEIGHT - 3, 9);
+		var sign = origin.offset(2, 3, 27);
+		blocks.put(lamp, net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace("white_concrete")).defaultBlockState());
+		blocks.put(sign, net.minecraft.world.level.block.Blocks.BIRCH_WALL_SIGN.defaultBlockState());
+		var signEntity = new net.minecraft.world.level.block.entity.SignBlockEntity(sign, blocks.get(sign));
+		check(!OfficeSite.occupied(bounds, origin, blueprint, read, pos -> pos.equals(sign) ? signEntity : null), "daytime lamps and office whiteboards are rebuildable");
+	}
+
 	private static T3State.ThreadRow row(String owner, int index, T3State.Status status) {
 		JsonObject raw = new JsonObject(); raw.addProperty("projectId", "project");
 		return new T3State.ThreadRow(owner.endsWith("0") ? "A-" + index : "B-" + index, "Thread " + index, "Same project", "Same machine", owner, status, Instant.now(), null, raw);
