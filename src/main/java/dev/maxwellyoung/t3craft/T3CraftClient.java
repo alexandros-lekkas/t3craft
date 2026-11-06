@@ -269,6 +269,7 @@ public final class T3CraftClient implements ClientModInitializer {
 			openConnections();
 			return;
 		}
+		lastPingThread = null;
 		minecraft.gui.setScreen(new T3Screen(this));
 	}
 
@@ -289,6 +290,8 @@ public final class T3CraftClient implements ClientModInitializer {
 
 	/** Remembers the focused thread across sessions. */
 	public void focus(String threadId) {
+		// Choosing a thread yourself outranks an earlier ping, so ` won't jump back to it.
+		lastPingThread = null;
 		state.focus(threadId);
 		config.threadId = threadId;
 		config.save(configPath);
