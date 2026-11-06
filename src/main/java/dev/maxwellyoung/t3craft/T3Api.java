@@ -20,11 +20,11 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Minimal HTTP client for a T3 Code environment. Uses the same public routes as the
+ * Legacy HTTP client for a T3 Code environment. Uses the undocumented routes used by the
  * mobile app: pairing-token exchange, shell/thread snapshots, and command dispatch.
  * Everything here is blocking; callers keep it off the render thread.
  */
-public final class T3Api {
+public final class T3Api implements T3Backend {
 	// Only what the panel needs. Pairing can narrow scopes but never widen them.
 	private static final String SCOPES = "orchestration:read orchestration:operate";
 
@@ -43,7 +43,7 @@ public final class T3Api {
 		this.accessToken = accessToken;
 	}
 
-	String ownerKey() { return baseUrl; }
+	public String ownerKey() { return baseUrl; }
 
 	public record Pairing(String baseUrl, String accessToken, long expiresInSeconds) {}
 
@@ -64,7 +64,7 @@ public final class T3Api {
 		return version;
 	}
 
-	void forgetProtocol() { wireProtocol = 0; }
+	public void forgetProtocol() { wireProtocol = 0; }
 
 	public static final class UnsupportedVersionException extends IOException {
 		UnsupportedVersionException(String message) { super(message); }
@@ -93,7 +93,7 @@ public final class T3Api {
 		HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
 		if (response.statusCode() / 100 != 2) {
 			throw new IOException(response.statusCode() == 400 || response.statusCode() == 401 || response.statusCode() == 403
-				? "Link expired, used or revoked. In T3 Settings > Connections, create a fresh link."
+				? "Link expired, used or revoked. In T3 Settings → Environments, create a fresh link."
 				: "Pairing failed (" + response.statusCode() + "). Check this machine and try a fresh link.");
 		}
 		try {
@@ -113,7 +113,7 @@ public final class T3Api {
 			URI uri = URI.create(link.trim());
 			String token = param(uri.getRawFragment(), "token");
 			if (token == null) token = param(uri.getRawQuery(), "token");
-			if (token == null) throw new IOException("Copy the full pairing link, including #token=, from T3 Settings > Connections.");
+			if (token == null) throw new IOException("Copy the full pairing link, including #token=, from T3 Settings → Environments.");
 			String host = param(uri.getRawQuery(), "host");
 			String base = host != null ? (host.contains("://") ? host : "https://" + host)
 				: uri.getScheme() + "://" + uri.getRawAuthority();
@@ -123,12 +123,12 @@ public final class T3Api {
 				|| address.getUserInfo() != null || address.getRawQuery() != null || address.getRawFragment() != null
 				|| !address.getPath().isEmpty() || address.getPort() > 65535 || address.getPort() == 0) throw new IllegalArgumentException();
 			return new PairingTarget(base, token);
-		} catch (RuntimeException e) { throw new IOException("That pairing link is invalid. Copy the complete link from T3 Settings > Connections."); }
+		} catch (RuntimeException e) { throw new IOException("That pairing link is invalid. Copy the complete link from T3 Settings → Environments."); }
 	}
 
 	static String pairingAddress(String link) throws IOException { return pairingTarget(link).baseUrl(); }
-	boolean sameCredentials(T3Api other) { return baseUrl.equals(other.baseUrl) && accessToken.equals(other.accessToken); }
-	int negotiatedProtocol() { return wireProtocol; }
+	public boolean sameCredentials(T3Backend other) { return other instanceof T3Api api && baseUrl.equals(api.baseUrl) && java.util.Objects.equals(accessToken, api.accessToken); }
+	public int negotiatedProtocol() { return wireProtocol; }
 
 	public record Model(String slug, String name) {}
 
@@ -139,7 +139,7 @@ public final class T3Api {
 	 * so this opens a short-lived WebSocket with a one-time ticket, makes one call, and closes.
 	 */
 	/** Opens the RPC socket with a one-time ticket, so the long-lived token stays out of the URL. */
-	T3Socket openSocket(java.util.function.Consumer<String> onClose) throws IOException, InterruptedException {
+	public T3Socket openSocket(java.util.function.Consumer<String> onClose) throws IOException, InterruptedException {
 		JsonObject ticket = JsonParser.parseString(send(authorized("/api/auth/websocket-ticket")
 			.POST(HttpRequest.BodyPublishers.noBody()).build())).getAsJsonObject();
 		URI uri = URI.create(baseUrl.replaceFirst("^http", "ws") + "/ws?wsTicket=" + enc(ticket.get("ticket").getAsString())
@@ -224,14 +224,14 @@ public final class T3Api {
 	}
 
 
-	JsonObject adaptShell(JsonObject source) {
+	public JsonObject adaptShell(JsonObject source) {
 		if (source.has("schemaVersion") && source.get("schemaVersion").getAsInt() >= 2) protocol2 = true;
 		JsonObject copy = source.deepCopy();
 		var threads = new com.google.gson.JsonArray();
 		for (var value : source.getAsJsonArray("threads")) threads.add(adaptShellThread(value.getAsJsonObject()));
 		copy.add("threads", threads); return copy;
 	}
-	JsonObject adaptShellThread(JsonObject source) {
+	public JsonObject adaptShellThread(JsonObject source) {
 		if (T3Protocol.v2(source)) protocol2 = true;
 		return T3Protocol.shell(source);
 	}
@@ -404,7 +404,7 @@ public final class T3Api {
 		HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
 		if (response.statusCode() == 401 || response.statusCode() == 403) {
 			throw new AuthException("Pairing expired, was revoked, or lacks access (" + response.statusCode()
-				+ "). Create a new pairing link in T3 Settings > Connections, then use /t3 pair <link>.");
+				+ "). Create a new pairing link in T3 Settings → Environments, then use /t3 pair <link>.");
 		}
 		if (response.statusCode() / 100 != 2) {
 			throw new IOException("T3 " + request.method() + " " + request.uri().getPath() + " → " + response.statusCode() + ": " + errorText(response.body()));

@@ -97,6 +97,7 @@ public final class T3CraftClient implements ClientModInitializer {
 			(message, overlay) -> overlay || !(T3Books.isOwnFeedback(message.getString()) || office.hideFeedback(message)));
 		SelfTest selfTest = SelfTest.fromSystemProperty(this);
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
+			state.setPins(List.copyOf(officePreferences().pins));
 			if (selfTest != null) selfTest.tick(client);
 			while (decisionsKey.consumeClick()) if (client.gui.screen() == null) openDecisions();
 			while (openKey.consumeClick()) {
@@ -288,7 +289,7 @@ public final class T3CraftClient implements ClientModInitializer {
 	private List<T3State.Connection> connections() {
 		List<T3State.Connection> connections = new java.util.ArrayList<>();
 		for (T3Config.Environment env : config.environments) {
-			connections.add(new T3State.Connection(new T3Api(env.baseUrl, env.accessToken), env.label));
+			connections.add(new T3State.Connection(T3Backend.forEnvironment(env), env.label));
 		}
 		return connections;
 	}
@@ -308,33 +309,45 @@ public final class T3CraftClient implements ClientModInitializer {
 	}
 
 	/** Both entry points share the exchange; callback messages never contain the link or token. */
-	void pairEnvironment(String link, String label, String expectedOwner, java.util.function.Consumer<String> result) {
-		if (pairingInProgress) { result.accept("A pairing is already in progress. Wait for it to finish."); return; }
+	record PairOutcome(String error, String note) {}
+ private volatile T3McpAuth.Pending mcpPairing;
+ void cancelPairing() { var pending = mcpPairing; if (pending != null) pending.cancel(); }
+ void reopenPairingBrowser() { var pending = mcpPairing; if (pending != null && pending.consent != null) com.mojang.blaze3d.Blaze3D.openUri(pending.consent); }
+ java.net.URI pairingUri() { var pending = mcpPairing; return pending == null ? null : pending.consent; }
+ void pairEnvironment(String link, String label, String expectedOwner, java.util.function.Consumer<PairOutcome> result) {
+		if (pairingInProgress) { result.accept(new PairOutcome("A pairing is already in progress. Wait for it to finish.", null)); return; }
 		pairingInProgress = true;
 		int revision = connectionRevision;
 		Thread thread = new Thread(() -> {
 			String error = null;
 			try {
-				if (expectedOwner != null && !expectedOwner.equals(T3Api.pairingAddress(link)))
-					throw new java.io.IOException("This link belongs to another machine. Use Add machine, or copy a link from the selected machine.");
-				T3Api.Pairing pairing = T3Api.pair(link, "Minecraft");
-				String name = label == null || label.isBlank() ? T3Api.environmentLabel(pairing.baseUrl()) : label.trim();
+				boolean mcp = T3McpAuth.isMcp(link);
+				String actual = mcp ? T3McpAuth.address(link) : T3Api.pairingAddress(link);
+                if (expectedOwner != null && !expectedOwner.equals(actual))
+					throw new java.io.IOException("This URL is for " + actual + ", but this machine is saved as " + expectedOwner + ". Use Add machine for a different address.");
+				T3Config.Environment environment;
+				if (mcp) { mcpPairing = new T3McpAuth.Pending(); environment = T3McpAuth.authorize(link, uri -> Minecraft.getInstance().execute(() -> com.mojang.blaze3d.Blaze3D.openUri(uri)), mcpPairing); }
+				else { T3Api.Pairing pairing = T3Api.pair(link, "Minecraft"); environment = new T3Config.Environment(T3Api.environmentLabel(pairing.baseUrl()), pairing.baseUrl(), pairing.accessToken()); }
+				if (label != null && !label.isBlank()) environment.label = label.trim();
 				Minecraft.getInstance().execute(() -> {
-					pairingInProgress = false;
-					if (revision != connectionRevision) { result.accept("Connections changed during pairing. Try a fresh link."); return; }
+					pairingInProgress = false; mcpPairing = null;
+					if (revision != connectionRevision) { result.accept(new PairOutcome("Connections changed during pairing. Try a fresh link.", null)); return; }
 					connectionRevision++;
 					var previous = new java.util.ArrayList<>(config.environments);
-					config.upsert(new T3Config.Environment(name, pairing.baseUrl(), pairing.accessToken()));
-					if (!config.save(configPath)) { config.environments = previous; result.accept("Could not save this pairing. Check Minecraft's config folder permissions, then try a fresh link."); return; }
-					state.reconfigure(connections(), config.threadId); result.accept(null);
+					config.upsert(environment);
+					if (!config.save(configPath)) { config.environments = previous; result.accept(new PairOutcome("Could not save this pairing. Check Minecraft's config folder permissions, then try a fresh link.", null)); return; }
+					state.reconfigure(connections(), config.threadId); String note = environment.mcpScope != null && !java.util.Arrays.asList(environment.mcpScope.split(" ")).contains("settings:write")
+                        ? "Paired with limited MCP access. Threads running in Full access will refuse prompts from T3 Craft. Re-pair and choose Full access." : null;
+                    if (!(Minecraft.getInstance().gui.screen() instanceof T3ConnectionsScreen)) chat(Component.literal("Paired " + environment.label + "." + (note == null ? "" : " " + note)).withStyle(ChatFormatting.GREEN));
+                    result.accept(new PairOutcome(null, note));
 				});
 				return;
 			} catch (T3Api.UnsupportedVersionException e) { error = e.getMessage(); }
 			catch (java.io.IOException e) {
-				error = e.getClass() == java.io.IOException.class ? e.getMessage() : "Could not reach this machine. Check T3 Code, the address and network, then try again.";
+				error = (e.getClass() == java.io.IOException.class || e instanceof T3McpException) ? e.getMessage() : "Could not reach this machine. Check T3 Code, the address and network, then try again.";
 			} catch (Exception e) { error = "Pairing could not finish. Check T3 Code and try a fresh link."; }
 			String message = error;
-			Minecraft.getInstance().execute(() -> { pairingInProgress = false; result.accept(message); });
+			Minecraft.getInstance().execute(() -> { pairingInProgress = false; mcpPairing = null; if (!(Minecraft.getInstance().gui.screen() instanceof T3ConnectionsScreen)) chat(Component.literal(message).withStyle(ChatFormatting.RED)); result.accept(new PairOutcome(message, null)); });
 		}, "t3craft-pair");
 		thread.setDaemon(true); thread.start();
 	}
@@ -393,7 +406,7 @@ public final class T3CraftClient implements ClientModInitializer {
 		}
 		T3State.ThreadRow target = row;
 		// The target's own environment: a thread from the home server goes to the home server.
-		T3Api api = state.apiFor(target.id());
+		T3Backend api = state.apiFor(target.id());
 		state.run(() -> {
 			if (newThread) {
 				String id = api.startThread(target.raw(), text, model);
@@ -446,7 +459,7 @@ public final class T3CraftClient implements ClientModInitializer {
 
 	public void interrupt() {
 		String threadId = state.focusedThreadId();
-		T3Api api = state.api();
+		T3Backend api = state.api();
 		if (threadId != null) state.run(() -> api.interrupt(threadId), this::reportError);
 	}
 
@@ -596,9 +609,9 @@ public final class T3CraftClient implements ClientModInitializer {
 
 	private int pair(CommandContext<FabricClientCommandSource> ctx) {
 		chat(Component.literal("Pairing…"));
-		pairEnvironment(StringArgumentType.getString(ctx, "link"), null, null, error -> chat(Component.literal(error == null
-			? "Paired. Press " + openKeyName() + " to open the panel; /t3 connections to manage machines." : error)
-			.withStyle(error == null ? ChatFormatting.GREEN : ChatFormatting.RED)));
+		pairEnvironment(StringArgumentType.getString(ctx, "link"), null, null, outcome -> chat(Component.literal(outcome.error() == null
+			? "Paired. Press " + openKeyName() + " to open the panel; /t3 connections to manage machines." + (outcome.note() == null ? "" : " " + outcome.note()) : outcome.error())
+			.withStyle(outcome.error() == null ? ChatFormatting.GREEN : ChatFormatting.RED)));
 		return 1;
 	}
 

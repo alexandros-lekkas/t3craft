@@ -97,6 +97,7 @@ public final class T3CraftServer implements DedicatedServerModInitializer {
 				.then(Commands.literal("pair").then(Commands.argument("link", StringArgumentType.greedyString()).executes(ctx -> {
 					String link = StringArgumentType.getString(ctx, "link");
 					var source = ctx.getSource();
+                    if (T3McpAuth.isMcp(link)) { source.sendFailure(Component.literal("The shared server needs a legacy pairing link from T3 Settings → Environments. MCP URLs authorize in a browser, so pair them from your client.")); return 0; }
 					Thread thread = new Thread(() -> {
 						try {
 							T3Api.Pairing pairing = T3Api.pair(link, "Minecraft server");
@@ -120,8 +121,9 @@ public final class T3CraftServer implements DedicatedServerModInitializer {
 	private void connect() {
 		List<T3State.Connection> connections = new ArrayList<>();
 		for (T3Config.Environment env : config.environments) {
-			connections.add(new T3State.Connection(new T3Api(env.baseUrl, env.accessToken), env.label));
+			connections.add(new T3State.Connection(T3Backend.forEnvironment(env), env.label));
 		}
+		state.setPins(List.copyOf(config.sharedOfficePreferences.pins));
 		state.connect(connections, null);
 	}
 }

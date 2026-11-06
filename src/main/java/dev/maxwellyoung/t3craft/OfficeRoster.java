@@ -49,7 +49,7 @@ final class OfficeRoster {
 		List<Resident> result = new ArrayList<>();
 		Set<String> retain = new HashSet<>();
 		for (String owner : owners) {
-			List<T3State.ThreadRow> candidates = new ArrayList<>(rows.stream().filter(r -> owner.equals(r.ownerKey())).toList());
+			List<T3State.ThreadRow> candidates = new ArrayList<>(rows.stream().filter(r -> owner.equals(r.ownerKey()) && T3Visibility.visible(r, prefs.pinned(r)) && !T3Visibility.snoozedGroup(r)).toList());
 			Map<String, Integer> pinOrder = new HashMap<>();
 			for (int i = 0; i < prefs.pins.size(); i++) pinOrder.put(prefs.pins.get(i).key(), i);
 			candidates.sort(Comparator.comparingInt((T3State.ThreadRow r) -> pinOrder.containsKey(key(r)) ? 0 : r.status() == T3State.Status.NEEDS_YOU ? 1 : r.status() == T3State.Status.WORKING ? 2 : 3)

@@ -225,7 +225,7 @@ final class T3Village {
 	}
 
 	private void sync(T3State.Snapshot snapshot, BlockPos anchor) {
-		List<T3State.ThreadRow> rows = snapshot.threads().subList(0, Math.min(VillageLayout.MAX_VILLAGERS, snapshot.threads().size()));
+		List<T3State.ThreadRow> rows = snapshot.threads().stream().filter(r -> !T3Visibility.snoozedGroup(r)).limit(VillageLayout.MAX_VILLAGERS).toList();
 		Set<String> keep = new HashSet<>();
 		for (int slot = 0; slot < rows.size(); slot++) {
 			T3State.ThreadRow row = rows.get(slot);

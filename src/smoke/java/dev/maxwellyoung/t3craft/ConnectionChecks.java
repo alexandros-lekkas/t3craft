@@ -50,8 +50,8 @@ public final class ConnectionChecks {
 		state.reconfigure(List.of(new T3State.Connection(apiA, "Studio"), new T3State.Connection(new T3Api(b, "fixture-only"), "Renamed")), "B-done-0");
 		waitFor(() -> state.machines().size() == 2 && state.online("A-done-0"));
 		check(state.apiFor("B-done-0") == apiB, "adding A preserves B API");
-		get(a + "/_qa/auth-failed"); waitFor(() -> state.machines().stream().anyMatch(m -> m.owner().equals(a) && m.error() != null && m.error().contains("Settings > Connections")));
-		check(state.machines().stream().anyMatch(m -> m.owner().equals(a) && m.error() != null && m.error().contains("Settings > Connections")), "health belongs to failed machine");
+		get(a + "/_qa/auth-failed"); waitFor(() -> state.machines().stream().anyMatch(m -> m.owner().equals(a) && m.error() != null && m.error().contains("Settings → Environments")));
+		check(state.machines().stream().anyMatch(m -> m.owner().equals(a) && m.error() != null && m.error().contains("Settings → Environments")), "health belongs to failed machine");
 		get(a + "/_qa/reset"); state.retry(a); waitFor(() -> state.online("A-done-0"));
 		check(state.apiFor("B-done-0") == apiB && state.online("B-done-0"), "retry A leaves B untouched");
 		state.reconfigure(List.of(new T3State.Connection(new T3Api(a, "rotated-fixture"), "Studio"), new T3State.Connection(new T3Api(b, "fixture-only"), "Renamed")), "B-done-0");

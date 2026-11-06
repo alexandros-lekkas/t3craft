@@ -28,7 +28,7 @@ final class T3Books {
 		var level = minecraft.level;
 		var connection = minecraft.getConnection();
 		if (player == null || !player.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER)) return;
-		T3Api api = state.apiFor(thread.id());
+		T3Backend api = state.apiFor(thread.id());
 		if (api == null) return;
 		state.run(() -> {
 			JsonObject detail = api.thread(thread.id(), 2);
