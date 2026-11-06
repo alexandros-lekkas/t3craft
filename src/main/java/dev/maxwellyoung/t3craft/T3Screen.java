@@ -43,6 +43,7 @@ final class T3Screen extends Screen {
 	private String selectedRequest;
 	private T3State.Focus shownFocus;
 	private boolean newThread;
+	private final ComposerDraft composerDraft = new ComposerDraft();
 	private int scroll;
 	/** Machine shown in the sidebar; null means all of them. */
 	private String envFilter;
@@ -92,7 +93,7 @@ final class T3Screen extends Screen {
 		boolean first = composer == null;
 		composer = new EditBox(font, mainX, composerY, mainWidth, COMPOSER, composer, Component.literal("Prompt"));
 		composer.setMaxLength(8000);
-		if (first) composer.setValue(mod.draft(draftKey()));
+		if (first) loadDraft();
 		updateHint();
 		addRenderableWidget(composer);
 		setInitialFocus(composer);
@@ -138,7 +139,7 @@ final class T3Screen extends Screen {
 
 	@Override
 	public void removed() {
-		mod.saveDraft(draftKey(), composer.getValue());
+		parkDraft();
 		mod.state().setPanelOpen(false);
 	}
 
@@ -226,10 +227,19 @@ final class T3Screen extends Screen {
 
 	/** Every change of what the composer is for: park the text as the old target's draft, switch, load the new one's. */
 	private void switchDraft(Runnable change) {
-		mod.saveDraft(draftKey(), composer.getValue());
+		parkDraft();
 		change.run();
-		composer.setValue(mod.draft(draftKey()));
+		loadDraft();
 		updateHint();
+	}
+
+	private void loadDraft() {
+		composer.setValue(mod.draft(draftKey()));
+		composerDraft.load(draftKey());
+	}
+
+	private void parkDraft() {
+		composerDraft.park(draftKey(), composer.getValue(), mod::draft, mod::saveDraft);
 	}
 
 	/** A send failed after the composer was cleared: the text goes back in front of whatever is there now. */
@@ -406,7 +416,7 @@ final class T3Screen extends Screen {
 		String key = draftKey();
 		// Nothing was sent (no thread to send to): keep the text and the panel.
 		if (!mod.send(text, newThread, pickedModel, () -> restoreFailedSend(mod, key, text))) return;
-		mod.saveDraft(key, "");
+		composerDraft.sent(mod::saveDraft);
 		composer.setValue("");
 		newThread = false;
 		pickedModel = null;
@@ -645,6 +655,10 @@ final class T3Screen extends Screen {
 	}
 
 	private void extractConversation(GuiGraphicsExtractor graphics, T3State.Snapshot snapshot) {
+		// Early returns below draw no cards, so last frame's hit boxes must not survive them.
+		optionRows.clear();
+		questionBox = null;
+		approvalBox = null;
 		int x0 = MARGIN + SIDEBAR + 8;
 		int x1 = width - MARGIN;
 		graphics.fill(x0, MARGIN, x1, height - MARGIN, 0xB0101014);

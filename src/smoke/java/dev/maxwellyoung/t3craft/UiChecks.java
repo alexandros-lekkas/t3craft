@@ -10,7 +10,8 @@ public final class UiChecks {
 		diffHeaders();
 		tableCells();
 		ellipsize();
-		System.out.println("PASS diff headers inside hunks, table cells with empties/escapes, code-point-safe ellipsize");
+		composerDrafts();
+		System.out.println("PASS diff headers inside hunks, table cells with empties/escapes, code-point-safe ellipsize, composer drafts survive a send");
 	}
 
 	private static void diffHeaders() {
@@ -73,6 +74,31 @@ public final class UiChecks {
 		String longText = "x".repeat(100_000);
 		T3Hud.ellipsize(longText, 50, s -> { calls.incrementAndGet(); return s.length(); });
 		check(calls.get() < 40, "binary search, not a linear scan: " + calls.get() + " width calls");
+	}
+
+	/** Mirrors T3Screen: a draft parked on thread t1, then a prompt typed and sent from + New. */
+	private static void composerDrafts() {
+		java.util.Map<String, String> drafts = new java.util.HashMap<>();
+		java.util.function.Function<String, String> get = k -> drafts.getOrDefault(k, "");
+		java.util.function.BiConsumer<String, String> put = (k, v) -> { if (v.isBlank()) drafts.remove(k); else drafts.put(k, v); };
+		ComposerDraft composer = new ComposerDraft();
+
+		composer.load("t1");
+		composer.park("t1", "half-written", get, put);
+		composer.load("new");
+		composer.sent(put); // submit: newThread flips false, the panel now targets t1
+		composer.park("t1", "", get, put); // closing the panel parks the empty composer
+		check(get.apply("t1").equals("half-written"), "send from + New kept t1's parked draft, got '" + get.apply("t1") + "'");
+		check(!drafts.containsKey("new"), "sent new-thread draft is cleared");
+
+		composer.park("t1", "follow-up", get, put); // typed after the send, then closed
+		check(get.apply("t1").equals("half-written follow-up"), "text typed after a send joins the target's draft, got '" + get.apply("t1") + "'");
+
+		composer.load("t2");
+		composer.park("t1", "for t2", get, put); // focus moved under the open panel
+		check(get.apply("t2").equals("for t2"), "text parks under the key it was loaded for");
+		composer.sent(put);
+		check(!drafts.containsKey("t2"), "sending clears the draft the text came from");
 	}
 
 	private static void check(boolean ok, String message) { if (!ok) throw new AssertionError(message); }
