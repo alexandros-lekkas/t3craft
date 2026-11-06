@@ -43,6 +43,12 @@ final class T3Office {
 	 * may be a seat. Falls back to a straight line if there's no path.
 	 */
 	static List<double[]> path(int fromX, int fromZ, int toX, int toZ) {
+		List<double[]> route = find(fromX, fromZ, toX, toZ);
+		return route != null ? route : new ArrayList<>(List.of(new double[] {toX + 0.5, toZ + 0.5}));
+	}
+
+	/** The same walk as {@link #path}, or null when no open route joins the two cells. */
+	static List<double[]> find(int fromX, int fromZ, int toX, int toZ) {
 		boolean[][] b = blocked();
 		fromX = clamp(fromX, WIDTH); fromZ = clamp(fromZ, LENGTH);
 		int[][] previous = new int[WIDTH * LENGTH][];
@@ -70,11 +76,8 @@ final class T3Office {
 				open.add(new int[] {x, z});
 			}
 		}
+		if (!found) return null;
 		List<double[]> route = new ArrayList<>();
-		if (!found) {
-			route.add(new double[] {toX + 0.5, toZ + 0.5});
-			return route;
-		}
 		for (int[] cell = {toX, toZ}; cell != null && !(cell[0] == fromX && cell[1] == fromZ); cell = previous[cell[0] * LENGTH + cell[1]]) {
 			route.addFirst(new double[] {cell[0] + 0.5, cell[1] + 0.5});
 		}

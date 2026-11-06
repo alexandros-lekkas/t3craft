@@ -53,9 +53,17 @@ public final class T3State {
 		}
 	}
 
-	/** Focus metadata is independent of the sidebar/office visibility filter. */
+	/**
+	 * Focus metadata is independent of the sidebar/office visibility filter. {@code children} are the hidden
+	 * subagent threads that name a parent; the office uses them to show delegation (see {@link AgentTalk}).
+	 */
 	public record Snapshot(boolean connected, String error, List<ThreadRow> threads, String focusedId,
-		Focus focus, List<MachineHealth> machines, ThreadRow focusedRow, String detailError) {}
+		Focus focus, List<MachineHealth> machines, ThreadRow focusedRow, String detailError, List<ThreadRow> children) {
+		public Snapshot(boolean connected, String error, List<ThreadRow> threads, String focusedId,
+			Focus focus, List<MachineHealth> machines, ThreadRow focusedRow, String detailError) {
+			this(connected, error, threads, focusedId, focus, machines, focusedRow, detailError, List.of());
+		}
+	}
 
 	public record Event(ThreadRow thread, Status status) {}
 
@@ -667,7 +675,8 @@ public final class T3State {
 		decisions = T3Decisions.collect(rows, waitingThreads);
 		snapshot = new Snapshot(connected, error, List.copyOf(visible.values()), focusedId, focus, machines,
 			rows.stream().filter(r -> r.id().equals(focusedId)).findFirst().orElse(null),
-			java.util.Objects.equals(focusedId, focusErrorThreadId) ? focusError : null);
+			java.util.Objects.equals(focusedId, focusErrorThreadId) ? focusError : null,
+			rows.stream().filter(r -> AgentTalk.subagentParent(r.raw()) != null && !visible.containsKey(r.id())).toList());
 		events.forEach(onEvent);
 	}
 

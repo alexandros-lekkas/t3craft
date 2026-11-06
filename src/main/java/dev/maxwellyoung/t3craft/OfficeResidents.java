@@ -38,6 +38,8 @@ final class OfficeResidents {
 	private final Map<Integer, String> boards = new HashMap<>();
 	private Boolean night;
 	private final DeskLaptops laptops = new DeskLaptops();
+	/** Parents meeting their subagents in person. */
+	private final OfficeTalks talks = new OfficeTalks();
 	private final UsageBoardWall usageBoard;
 
 	OfficeResidents(T3CraftClient mod) {
@@ -59,6 +61,8 @@ final class OfficeResidents {
 			String threadId = threadByEntity.get(hit.getEntity().getId());
 			// A shared office's agents are real entities whose UUID encodes the thread.
 			if (threadId == null) threadId = threadForUuid(hit.getEntity().getUUID());
+			// A visiting helper opens the subagent it stands for.
+			if (threadId == null) threadId = talks.threadFor(hit.getEntity().getId());
 			if (threadId != null && minecraft.options.keyUse.consumeClick()) {
 				while (minecraft.options.keyUse.consumeClick()) {
 					// Drain queued clicks so vanilla never sends an interact for an entity the server doesn't have.
@@ -105,13 +109,20 @@ final class OfficeResidents {
 		if (frame == null) return;
 		brain.settleStragglers();
 		brain.tick();
+		talks.tick(level, frame, brain, agents::get, mod.state()::driverFor);
 		for (OfficeBrain.Agent agent : brain.agents().values()) {
 			Mannequin mannequin = agents.get(agent.threadId);
 			if (mannequin == null) continue;
 			// Walk there: interpolated position, a body that turns into the heading, and legs that swing.
 			AgentWalk.step(mannequin, frame.point(agent.x, agent.y(), agent.z), frame.yaw(agent.yaw), agent.settled() && agent.goal.seat());
-			if (minecraft.player.distanceToSqr(mannequin) < 9) agent.faceHold = Math.max(agent.faceHold, 8);
-			if (agent.faceHold > 0) AgentPose.face(mannequin, minecraft.player); else AgentPose.rest(mannequin);
+			float talking = talks.faceYaw(frame, agent.threadId);
+			if (!Float.isNaN(talking)) AgentPose.toward(mannequin, talking);
+			else {
+				// Seated or standing at its spot, an agent looks up at you; one on its way somewhere keeps walking (holding it
+				// here froze it mid-route for as long as you stood near, so it never sat down or met a helper).
+				if (minecraft.player.distanceToSqr(mannequin) < 9 && agent.settled()) agent.faceHold = Math.max(agent.faceHold, 8);
+				if (agent.faceHold > 0 && !agent.errand) AgentPose.face(mannequin, minecraft.player); else AgentPose.rest(mannequin);
+			}
 			AgentPose.set(mannequin, agent.settled() && agent.goal.seat());
 			// A drink from the fridge, carried to the sofa.
 			boolean holds = !mannequin.getMainHandItem().isEmpty();
@@ -136,7 +147,10 @@ final class OfficeResidents {
 	 */
 	private void sync(T3State.Snapshot snapshot, OfficeFrame frame, boolean paired, net.minecraft.world.entity.player.Player player) {
 		List<String> floors = mod.floors();
-		if (paired) syncResidents(snapshot, frame);
+		if (paired) {
+			syncResidents(snapshot, frame);
+			talks.observe(snapshot, brain);
+		}
 		else if (!agents.isEmpty() || !brain.agents().isEmpty()) clearResidents();
 		laptops.sync(level, frame, paired ? brain.agents().values() : List.of(), Math.max(2, floors.size() * 2));
 		usageBoard.sync(level, frame, paired, player);
@@ -230,6 +244,9 @@ final class OfficeResidents {
 
 	void faceThread(String thread) { brain.face(thread); }
 
+	/** Conversations between agents, for the self-test and dev showcase. */
+	OfficeTalks talks() { return talks; }
+
 	void clear() {
 		clearResidents();
 		laptops.clear();
@@ -243,6 +260,7 @@ final class OfficeResidents {
 		if (level != null) {
 			for (Mannequin mannequin : agents.values()) level.removeEntity(mannequin.getId(), Entity.RemovalReason.DISCARDED);
 		}
+		talks.clear(level);
 		agents.clear();
 		threadByEntity.clear();
 		skins.clear();

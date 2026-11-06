@@ -5,7 +5,9 @@
   "mixins": [
     "MannequinAccess",
     "ItemFrameAccess",
-    "AgentCollisionMixin"
+    "AgentCollisionMixin",
+    "DisplayAccess",
+    "TextDisplayAccess"
   ],
   "client": [
     "AgentRendererMixin",

@@ -51,6 +51,8 @@ loom {
 			// ./gradlew runClient -Pworldtest=<place> [-Pconfig=<pairing file>] walks title screen → New T3 World → Create and screenshots the arrival and desks.
 			if (project.hasProperty('worldtest')) {
 				vmArg "-Dt3craft.worldtest=${project.property('worldtest')}"
+				// -Pworldtalk=<seconds> then waits for a real conversation (a thread spawning a subagent); -Pworldtalk=stage starts one.
+				if (project.hasProperty('worldtalk')) vmArg "-Dt3craft.worldtalk=${project.property('worldtalk')}"
 				if (project.hasProperty('config')) vmArg "-Dt3craft.config=${project.property('config')}"
 			}
 			// -PmcpPort=<port> keeps a dev client's Minecraft MCP server off the port your real game uses (25590).
@@ -163,8 +165,14 @@ tasks.register('uiCheck', JavaExec) {
 	mainClass = 'dev.maxwellyoung.t3craft.UiChecks'
 }
 
+tasks.register('talkCheck', JavaExec) {
+	description = 'Agents talking in person: conversations from synthetic snapshots, walks on open cells in all four office turns, rate limits.'
+	classpath = sourceSets.smoke.runtimeClasspath
+	mainClass = 'dev.maxwellyoung.t3craft.TalkChecks'
+}
+
 // No fixture needed, so `build` runs it everywhere.
-tasks.named('check') { dependsOn 'uiCheck', 'worldCheck' }
+tasks.named('check') { dependsOn 'uiCheck', 'worldCheck', 'talkCheck' }
 
 tasks.register('firstRunCheck', JavaExec) {
 	description = 'Zero setup: default thread choice, the one-line chat budget and auto-pairing with the local T3 against the fixture.'
@@ -175,7 +183,7 @@ tasks.register('firstRunCheck', JavaExec) {
 
 // Fixture-backed checks share one entry point in PR and tag builds.
 tasks.register('verifyAll') {
-	dependsOn 'build', 'officeCheck', 'connectionCheck', 'featureCheck', 'reliabilityCheck', 'firstRunCheck'
+	dependsOn 'build', 'officeCheck', 'talkCheck', 'connectionCheck', 'featureCheck', 'reliabilityCheck', 'firstRunCheck'
 }
 
 dependencyLocking {

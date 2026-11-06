@@ -186,9 +186,10 @@ final class T3McpBackend implements T3Backend {
 		JsonObject out = new JsonObject(), args = new JsonObject(); args.addProperty("allProjects", true); args.addProperty("includeSubagents", false);
 		JsonArray threads = new JsonArray(); Set<String> listed = new HashSet<>();
         for (var value : pages("t3_thread_list", "threads", args)) { JsonObject row = normalize(value.getAsJsonObject()); threads.add(row); listed.add(T3Protocol.string(row, "id")); }
-        // Main rows exclude children. Fetch only waiting children separately so Decisions can route to their own IDs.
+        // Main rows exclude children. Fetch active children separately: waiting ones so Decisions can route to their own
+        // IDs, running ones so the office can show a parent handing work to a subagent (and the result coming back).
         JsonObject waiting = new JsonObject(); waiting.addProperty("allProjects", true); waiting.addProperty("includeSubagents", true);
-        JsonArray statuses = new JsonArray(); statuses.add("waiting"); waiting.add("statuses", statuses);
+        JsonArray statuses = new JsonArray(); for (String status : List.of("waiting", "preparing", "queued", "starting", "running")) statuses.add(status); waiting.add("statuses", statuses);
         for (var value : pages("t3_thread_list", "threads", waiting)) {
             JsonObject row = normalize(value.getAsJsonObject());
             if (listed.add(T3Protocol.string(row, "id"))) { row.addProperty("childRequestsOnly", true); threads.add(row); }

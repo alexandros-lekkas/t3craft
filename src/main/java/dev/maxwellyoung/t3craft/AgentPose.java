@@ -20,6 +20,8 @@ public final class AgentPose {
  public static boolean ours(Mannequin m) { return m.getProfile().skinPatch().body().map(t->t.texturePath().getNamespace().equals("t3craft")).orElse(false); }
  static void set(Mannequin avatar,boolean sitting){avatar.setPose(sitting?Pose.CROUCHING:Pose.STANDING);}
  static void rest(Mannequin avatar){turn(avatar,avatar.getYRot(),0);}
+ /** Head (and a little of the body) toward a world yaw, e.g. at someone it is talking to; the body stays on its heading. */
+ static void toward(Mannequin avatar,float target){turn(avatar,target,0);}
  static void face(Mannequin avatar,Player player) {
   float target=(float)(Math.toDegrees(Math.atan2(player.getZ()-avatar.getZ(),player.getX()-avatar.getX()))-90);
   // The whole agent turns to you, seated too, not just its head; at rest it turns back to its laptop or sofa.

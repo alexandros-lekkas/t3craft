@@ -79,6 +79,16 @@ Each world and dimension remembers its own office in `config/t3craft.json` under
 
 ![Two-floor office exterior, captured in the game](design/office/exterior.png)
 
+### Agents talk in person
+
+When a thread hands work to a subagent, sends it more, or gets its result back, you see it happen: the parent gets up, walks a few steps toward the entry, and a grey-tagged **Helper** (the subagent, normally hidden from the office) walks in from the door or the stair landing to meet it. They face each other, trade two short lines in speech bubbles (about three seconds each) — *Can you take “Write the tests”?* / *On it!*, or *Done — “Write the tests”!* / *Thanks!* — and both go back: the parent to its seat (or to its new spot if the thread changed status meanwhile), the helper out the way it came. Right-clicking a Helper opens the subagent.
+
+- **Triggers**, from consecutive thread snapshots: a new subagent of a thread in the office (hand-off), a finished or failed subagent (report back), an idle subagent starting a new turn (follow-up). Forks and side chats don't count. Joining a world never replays old ones.
+- **Calm by design:** at most two conversations at once, one per parent, a 20-second cooldown per parent–helper pair, and a short queue where the newest talk for a pair wins and anything older than 90 seconds is dropped.
+- **Walks stay on open floor**, the same 8-way route the agents use (no corner cutting), so nobody passes through desks; everything turns with the office. Client office only; the shared server office doesn't show talks yet.
+
+![A parent asks its subagent to take the tests](images/shots/office-talk-ask.jpg)
+
 ### Shared office (dedicated server)
 
 Put the same jar (and Fabric API) in a dedicated server's `mods/` folder. A server has no local T3 to find, so an operator pairs it once with a legacy pairing link from T3's **Settings → Environments**, then builds:
@@ -160,6 +170,7 @@ Dev-client options, all through `-P` properties:
 ./gradlew runClient -PwebShowcase=<threadId> [-PwebPing=<threadId>] [-PwebPair=<link>]   # read-only capture of the streamed UI; never binds the MCP port
 ./gradlew runClient -Pselftest=<prompt> [-Pworld=<save>] [-Pconfig=<path>] [-Pfocus=<title>] [-PfixturePort=<n>] [-Pwidth=1000 -Pheight=625]
 ./gradlew runClient -Pworldtest=<place> [-Pconfig=<path>]       # title screen → New T3 World → Create, screenshots the arrival and desks
+./gradlew runClient -Pworldtest=<place> -Pworldtalk=<seconds>[:<parent title>]   # … then waits for a real agent conversation and photographs it (-Pworldtalk=stage starts one)
 ./gradlew runClient -PmcpPort=<n> …                             # keep a dev client off the port your real game uses
 ```
 
@@ -210,6 +221,7 @@ python3 scripts/feature-fixture.py --protocol2 --port 0 --port-file build/fixtur
 | --- | --- |
 | `uiCheck` (part of `build`) | Diff headers, table cells, ellipsize, composer drafts, viewport math, CDP messages including modifier keys |
 | `worldCheck` (part of `build`) | The T3 World seed list, save-marker round-trip and office placement math for all four facings |
+| `talkCheck` (part of `build`) | Agents talking in person: hand-off, follow-up and report detection from synthetic snapshots, every walk on open cells for all four office turns, the rate limits, and whole conversations played through the brain |
 | `officeCheck` | Stable desks, pin priority, config save/load and the pre-0.6 village → office migration, leftover village agents discarded, owner isolation, placement protection, lighting |
 | `connectionCheck` | Pairing link parsing without leaks, token exchange, per-machine health changes |
 | `firstRunCheck` | Default thread, one connect line per game, player-only help, agent-build migration, auto-connect with the local T3 through the fixture (probe before mint, least-privilege scopes, no credential in errors) |

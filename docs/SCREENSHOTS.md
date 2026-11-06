@@ -28,6 +28,7 @@ The real in-game shots the docs need. When a feature lands, the implementing PR 
 | ☑ | `world-lakeside-hub` | A T3 world exists. Title → *T3 World* | Full screen | **5** |
 | ☑ | `world-lakeside-plaza`, `world-lakeside-lake`, `world-lakeside-desks` | Lakeside, office fixture paired | Plaza side, lake side, ground-floor desks with agents seated | HUD hidden, **5** |
 | ☑ | `world-river-bend-plaza`, `world-river-bend-desks` | River Bend (office turned 180°) | Same | HUD hidden, **5** |
+| ☑ | `office-talk-ask`, `office-talk-report`, `office-talk-thanks` | Lakeside, office fixture paired, `curl /_qa/delegate?parent=office-0&title=Take%20the%20tests` then `/_qa/finish?id=…` | `-Pworldtalk=300:Build the studio` frames the pair side-on | HUD shown, **5** |
 
 ### Characters and laptop
 

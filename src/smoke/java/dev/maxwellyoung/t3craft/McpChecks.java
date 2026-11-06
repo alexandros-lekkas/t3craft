@@ -234,6 +234,9 @@ public final class McpChecks {
    check(rows.stream().anyMatch(r -> r.id().equals("vis-snoozed-needs") && !T3Visibility.snoozedGroup(r)), "needs-you raised from snoozed group");
    check(rows.stream().anyMatch(r -> r.id().equals("vis-settled-needs")), "needs-you raised from settled");
    check(rows.getFirst().status() == T3State.Status.NEEDS_YOU, "needs-you sorted first");
+   var children = state.snapshot().children();
+   check(children.stream().anyMatch(r -> r.id().equals("vis-subagent") && "vis-active-override".equals(AgentTalk.subagentParent(r.raw())))
+     && children.stream().noneMatch(r -> r.id().equals("vis-sidechat")) && rows.stream().anyMatch(r -> r.id().equals("vis-active-override")), "hidden subagents reach the office with their visible parent");
    await(() -> state.decisions().stream().filter(d -> List.of("vis-subagent", "vis-sidechat").contains(d.thread().id()) && d.requestId() != null).count() == 2, "hidden child decisions retained");
    var error = new AtomicReference<Exception>();
    for (String child : List.of("vis-subagent", "vis-sidechat")) {

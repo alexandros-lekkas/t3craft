@@ -152,7 +152,8 @@ class Handler(BaseHTTPRequestHandler):
                 for name in ('settled', 'snoozed', 'subagent', 'sidechat', 'settled-needs', 'snoozed-needs', 'active-override', 'archived'):
                     ident = 'vis-' + name
                     value = thread(ident, name in ('subagent', 'sidechat', 'settled-needs', 'snoozed-needs'), True)
-                    value['lineage'] = {'relationshipToParent': 'subagent' if name == 'subagent' else None, 'sideChat': name == 'sidechat'}
+                    value['lineage'] = {'relationshipToParent': 'subagent' if name == 'subagent' else None, 'sideChat': name == 'sidechat',
+                                        'parentThreadId': 'vis-active-override' if name in ('subagent', 'sidechat') else None}
                     if name.startswith('settled'): value.update(settledOverride='settled', settledAt='2026-01-01T00:00:00Z')
                     if name.startswith('snoozed'): value.update(snoozedUntil='2099-01-01T00:00:00Z')
                     if name == 'active-override': value.update(settledOverride='active', settledAt='2026-01-01T00:00:00Z')

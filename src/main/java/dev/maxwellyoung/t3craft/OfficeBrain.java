@@ -16,7 +16,7 @@ import java.util.function.Function;
  */
 final class OfficeBrain {
 	static final int PER_FLOOR = 8;
-	private static final double WALK_SPEED = AgentWalk.SPEED;
+	static final double WALK_SPEED = AgentWalk.SPEED;
 	private static final int FRIDGE_PAUSE = 50;
 
 	enum Zone { WORK, NEEDS_YOU, LOUNGE }
@@ -37,7 +37,16 @@ final class OfficeBrain {
 		Zone zone;
 		final ArrayDeque<double[]> path = new ArrayDeque<>();
 		int pause;
+		/** Which way to face while paused; NaN keeps the current yaw. The fridge pause hands out a drink. */
+		float pauseYaw = Float.NaN;
+		boolean fridgePause;
 		int faceHold;
+		/**
+		 * Away from its spot on a short errand (a conversation, see {@link AgentTalk}): stands where its path ends,
+		 * facing {@link #errandYaw}, instead of settling into the spot. A new spot from the thread list waits for the errand.
+		 */
+		boolean errand;
+		float errandYaw = Float.NaN;
 
 		Agent(String threadId) {
 			this.threadId = threadId;
@@ -45,7 +54,12 @@ final class OfficeBrain {
 
 		/** Standing (or sitting) at its spot, not walking or pausing. */
 		boolean settled() {
-			return path.isEmpty() && pause == 0 && goal != null;
+			return path.isEmpty() && pause == 0 && goal != null && !errand;
+		}
+
+		/** At the end of its path and not pausing: arrived, whether at its spot or on an errand. */
+		boolean arrived() {
+			return path.isEmpty() && pause == 0;
 		}
 
 		double y() {
@@ -103,7 +117,12 @@ final class OfficeBrain {
 			agent.status = row.status();
 			agent.desk = resident.desk() % PER_FLOOR;
 			agent.floor = floor;
-			if (!spot.equals(agent.goal)) {
+			if (!spot.equals(agent.goal) && agent.errand) {
+				// Mid-conversation: finish it first; the talk walks the agent to its new spot afterwards.
+				agent.goal = spot;
+				agent.zone = zone;
+				if (zone != Zone.LOUNGE) agent.holding = false;
+			} else if (!spot.equals(agent.goal)) {
 				Zone previous = agent.zone;
 				agent.goal = spot;
 				agent.zone = zone;
@@ -115,7 +134,7 @@ final class OfficeBrain {
 					// Finished: grab a drink from the fridge on the way to the sofa.
 					T3Office.Spot fridge = T3Office.FRIDGE;
 					agent.path.addAll(T3Office.path(fromX, fromZ, fridge.x(), fridge.z()));
-					agent.path.add(new double[] {fridge.x() + 0.5, fridge.z() + 0.5, FRIDGE_PAUSE});
+					agent.path.add(new double[] {fridge.x() + 0.5, fridge.z() + 0.5, FRIDGE_PAUSE, fridge.yaw(), 1});
 					agent.path.addAll(T3Office.path(fridge.x(), fridge.z(), spot.x(), spot.z()));
 				} else {
 					agent.path.addAll(T3Office.path(fromX, fromZ, spot.x(), spot.z()));
@@ -136,36 +155,51 @@ final class OfficeBrain {
 	/** One game tick: walk, pause at the fridge, or settle into the spot. */
 	void tick() {
 		for (Agent agent : agents.values()) {
-			if(agent.faceHold>0){agent.faceHold--;agent.walking=false;continue;}
-			if (agent.pause > 0) {
-				agent.pause--;
-				agent.walking = false;
-				agent.yaw = T3Office.FRIDGE.yaw();
-				if (agent.pause == 0) agent.holding = true;
-				continue;
-			}
-			double[] next = agent.path.peek();
-			if (next != null) {
-				double dx = next[0] - agent.x, dz = next[1] - agent.z;
-				double distance = Math.sqrt(dx * dx + dz * dz);
-				if (distance <= WALK_SPEED) {
-					agent.x = next[0];
-					agent.z = next[1];
-					agent.path.poll();
-					if (next.length > 2) agent.pause = (int) next[2];
-				} else {
-					agent.x += dx / distance * WALK_SPEED;
-					agent.z += dz / distance * WALK_SPEED;
-				}
-				agent.yaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90);
-				agent.walking = true;
-				continue;
-			}
+			if (agent.faceHold > 0 && !agent.errand) { agent.faceHold--; agent.walking = false; continue; }
+			step(agent);
+		}
+	}
+
+	/**
+	 * One tick for one agent. A path point is {x, z}, or {x, z, ticks, yaw, fridge} to stop there for a while
+	 * (yaw NaN keeps the current heading; fridge 1 hands out a drink when the pause ends).
+	 */
+	static void step(Agent agent) {
+		if (agent.pause > 0) {
+			agent.pause--;
 			agent.walking = false;
-			if (agent.goal != null) {
-				agent.sink = agent.goal.sink();
-				if (!Float.isNaN(agent.goal.yaw())) agent.yaw = agent.goal.yaw();
+			if (!Float.isNaN(agent.pauseYaw)) agent.yaw = agent.pauseYaw;
+			if (agent.pause == 0 && agent.fridgePause) agent.holding = true;
+			return;
+		}
+		double[] next = agent.path.peek();
+		if (next != null) {
+			double dx = next[0] - agent.x, dz = next[1] - agent.z;
+			double distance = Math.sqrt(dx * dx + dz * dz);
+			if (distance <= WALK_SPEED) {
+				agent.x = next[0];
+				agent.z = next[1];
+				agent.path.poll();
+				if (next.length > 2) {
+					agent.pause = (int) next[2];
+					agent.pauseYaw = next.length > 3 ? (float) next[3] : Float.NaN;
+					agent.fridgePause = next.length > 4 && next[4] > 0;
+				}
+			} else {
+				agent.x += dx / distance * WALK_SPEED;
+				agent.z += dz / distance * WALK_SPEED;
 			}
+			if (distance > 1e-6) agent.yaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90);
+			agent.walking = distance > 1e-6;
+			return;
+		}
+		agent.walking = false;
+		if (agent.errand) {
+			agent.sink = 0;
+			if (!Float.isNaN(agent.errandYaw)) agent.yaw = agent.errandYaw;
+		} else if (agent.goal != null) {
+			agent.sink = agent.goal.sink();
+			if (!Float.isNaN(agent.goal.yaw())) agent.yaw = agent.goal.yaw();
 		}
 	}
 

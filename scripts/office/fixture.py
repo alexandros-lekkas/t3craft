@@ -27,6 +27,29 @@ def dispatch(self,command):
   try: handler.frame({'_tag':'Chunk','requestId':ident,'values':[{'kind':'thread-upserted','thread':t}]})
   except OSError: pass
 f.Handler.dispatch=dispatch
+def broadcast(server,t):
+ for handler,ident in list(server.subscribers.items()):
+  try: handler.frame({'_tag':'Chunk','requestId':ident,'values':[{'kind':'thread-upserted','thread':t}]})
+  except OSError: pass
+stock_get=f.Handler.do_GET
+def do_GET(self):
+ """/_qa/delegate?parent=office-0&title=… spawns a subagent of that thread; /_qa/finish?id=… completes it (agents talking, see AgentTalk)."""
+ q=f.parse_qs(f.urlparse(self.path).query)
+ if self.path.startswith('/_qa/delegate?'):
+  with self.server.lock:
+   parent=q['parent'][0];ident=parent+'-helper-'+str(len(self.server.threads))
+   t=f.thread(ident);t['title']=q.get('title',['Take the tests'])[0];t['messages']=[];t['activities']=[]
+   t['lineage']={'parentThreadId':parent,'relationshipToParent':'subagent','sideChat':False}
+   t['latestTurn']={'turnId':ident+'-turn','state':'running','requestedAt':f.datetime.now(f.timezone.utc).isoformat()}
+   self.server.threads[ident]=t;broadcast(self.server,t)
+   return self.reply({'id':ident})
+ if self.path.startswith('/_qa/finish?'):
+  with self.server.lock:
+   t=self.server.threads[q['id'][0]];t['latestTurn']['state']='completed';t['updatedAt']=f.datetime.now(f.timezone.utc).isoformat()
+   broadcast(self.server,t)
+   return self.reply({'ok':True})
+ return stock_get(self)
+f.Handler.do_GET=do_GET
 p=Path('run/config/office-fixture.json');p.parent.mkdir(parents=True,exist_ok=True)
 p.write_text(json.dumps({'environments':[{'label':'Studio Mac','baseUrl':'http://127.0.0.1:25720','accessToken':'fixture-only'}],'threadId':'office-0','books':False}));p.chmod(0o600)
 s.serve_forever()
