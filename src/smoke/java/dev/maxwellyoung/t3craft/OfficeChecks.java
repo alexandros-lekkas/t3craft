@@ -32,16 +32,51 @@ public final class OfficeChecks {
 		check(brain.agents().get(pin.id()).desk == before.get(OfficeRoster.key(pin)), "brain consumes the saved desk");
 		check(!OfficeRoster.projectKey(rows.get(0)).equals(OfficeRoster.projectKey(rows.get(12))), "same project title on two machines remains distinct");
 
+		// A transient unavailable snapshot must retain unpinned desks, including owners not in the roster.
+		OfficeRoster.sync(List.of(), List.of(a, b), prefs, java.util.Set.of());
+		check(before.equals(prefs.desks), "unknown snapshots retain every desk, not just pins");
+		OfficeRoster.sync(reordered.stream().filter(r -> r.ownerKey().equals(a)).toList(), List.of(a, b), prefs, java.util.Set.of(a));
+		check(before.equals(prefs.desks), "one unavailable peer cannot lose its assignments");
+		OfficeRoster.sync(List.of(), List.of(a, b), prefs, java.util.Set.of(b));
+		check(prefs.desks.keySet().stream().noneMatch(key -> key.startsWith(b + "\n")), "authoritative empty snapshot prunes an available owner");
+		check(prefs.desks.entrySet().containsAll(before.entrySet().stream().filter(e -> e.getKey().startsWith(a + "\n")).toList()), "pruning one owner preserves the unavailable peer");
+		prefs.desks.clear(); prefs.desks.putAll(before);
+
+		WorldBoundQueue<String> queue = new WorldBoundQueue<>();
+		Object level = new Object(), connection = new Object();
+		queue.add(level, connection, List.of("fill", "setblock"));
+		queue.validate(level, connection);
+		check("fill".equals(queue.poll()), "same session sends queued work in order");
+		queue.validate(new Object(), connection);
+		check(queue.isEmpty(), "dimension or world change discards remaining work");
+		queue.add(level, connection, List.of("old"));
+		queue.validate(level, new Object());
+		check(queue.isEmpty(), "reconnect to the same level discards work");
+		queue.add(level, connection, List.of("old"));
+		queue.validate(null, null);
+		check(queue.isEmpty(), "disconnect discards work even before another world joins");
+		queue.add(level, connection, List.of("old"));
+		Object otherLevel = new Object();
+		queue.add(otherLevel, connection, List.of("new"));
+		check("new".equals(queue.poll()) && queue.isEmpty(), "enqueue after world change cannot carry old commands");
+
 		var directory = Files.createTempDirectory("t3craft-office-check-");
 		var file = directory.resolve("config.json");
 		try {
 			T3Config config = new T3Config();
 			config.environments.add(new T3Config.Environment("Same name", a, "fixture-only"));
 			config.environments.add(new T3Config.Environment("Same name", b, "fixture-only"));
+			prefs.floorOwners = List.of(a, b);
 			config.officePreferences.put("world-a", prefs);
 			config.officePreferences.put("world-b", new OfficeRoster.Preferences());
 			config.save(file);
 			T3Config restored = T3Config.load(file);
+			check(restored.officePreferences.get("world-a").floorOwners.equals(List.of(a, b)), "built floor owners survive save/load");
+			var builtPrefs = restored.officePreferences.get("world-a");
+			restored.environments.removeFirst();
+			brain.sync(reordered.stream().filter(r -> r.ownerKey().equals(b)).toList(), builtPrefs.floorOwners, builtPrefs, java.util.Set.of(b));
+			check(brain.agents().values().stream().allMatch(agent -> agent.floor == 1), "removing a pairing does not shift the built second floor");
+			restored.environments.addFirst(new T3Config.Environment("Same name", a, "fixture-only"));
 			check(restored.officePreferences.get("world-a").pinned(pin), "pin survives actual JSON save/load");
 			OfficeRoster.sync(reordered, List.of(a, b), restored.officePreferences.get("world-a"));
 			check(before.equals(restored.officePreferences.get("world-a").desks), "all desks survive process-style reload");
@@ -69,7 +104,7 @@ public final class OfficeChecks {
 		for (int i = 0; i < 8; i++) waiting.add(row(a, i, T3State.Status.NEEDS_YOU));
 		brain.clear(); brain.sync(waiting, List.of(a), new OfficeRoster.Preferences());
 		check(brain.agents().values().stream().map(r -> r.goal).distinct().count() == 8, "eight waiting residents do not share a physical spot");
-		System.out.println("PASS stable desks, pinned/waiting/working priority, restart and reconnect persistence, distinct owners/projects, pin removal and shared/client isolation");
+		System.out.println("PASS queue world/session binding, unavailable-owner retention, built floor persistence, stable desks, pinned/waiting/working priority, restart and reconnect persistence, distinct owners/projects, pin removal and shared/client isolation");
 	}
 	private static T3State.ThreadRow row(String owner, int index, T3State.Status status) {
 		JsonObject raw = new JsonObject(); raw.addProperty("projectId", "project");

@@ -3,13 +3,11 @@ package dev.maxwellyoung.t3craft;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.List;
 
 /** Client side of the office: sends its build and update commands a few per tick, quietly. */
 final class OfficeQueue {
-	private final Deque<String> queue = new ArrayDeque<>();
+	private final WorldBoundQueue<String> queue = new WorldBoundQueue<>();
 	private long quietUntil;
 
 	boolean building() {
@@ -22,8 +20,12 @@ final class OfficeQueue {
 		send(origin, T3Office.blueprint(floors));
 	}
 
+	void clear() { queue.clear(); quietUntil = 0; }
+
 	void send(BlockPos origin, List<String> commands) {
-		for (String command : commands) queue.add(T3Office.absolute(command, origin.getX(), origin.getY(), origin.getZ()));
+		Minecraft minecraft = Minecraft.getInstance();
+		queue.add(minecraft.level, minecraft.getConnection(), commands.stream()
+			.map(command -> T3Office.absolute(command, origin.getX(), origin.getY(), origin.getZ())).toList());
 	}
 
 	/**
@@ -38,8 +40,12 @@ final class OfficeQueue {
 	}
 
 	void tick(Minecraft minecraft) {
+		if (!queue.validate(minecraft.level, minecraft.getConnection())) quietUntil = 0;
 		if (queue.isEmpty() || minecraft.player == null) return;
 		quietUntil = System.currentTimeMillis() + 3000;
-		for (int i = 0; i < 6 && !queue.isEmpty(); i++) minecraft.player.connection.sendCommand(queue.poll());
+		for (int i = 0; i < 6 && !queue.isEmpty(); i++) {
+			if (!OfficeSite.loaded(minecraft.level, BlockPos.ZERO, List.of(queue.peek()))) return;
+			minecraft.player.connection.sendCommand(queue.poll());
+		}
 	}
 }

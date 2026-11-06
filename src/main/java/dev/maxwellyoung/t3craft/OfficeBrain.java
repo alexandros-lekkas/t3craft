@@ -60,8 +60,12 @@ final class OfficeBrain {
 
 	/** Spatial slots survive activity reorder; each owner gets its own floor. */
 	List<Agent> sync(List<T3State.ThreadRow> rows, List<String> owners, OfficeRoster.Preferences prefs) {
+		return sync(rows, owners, prefs, Set.copyOf(owners));
+	}
+
+	List<Agent> sync(List<T3State.ThreadRow> rows, List<String> owners, OfficeRoster.Preferences prefs, Set<String> knownOwners) {
 		Set<String> keep = new HashSet<>();
-		for (OfficeRoster.Resident resident : OfficeRoster.sync(rows, owners, prefs)) {
+		for (OfficeRoster.Resident resident : OfficeRoster.sync(rows, owners, prefs, knownOwners)) {
 			T3State.ThreadRow row = resident.row();
 			int floor = owners.indexOf(row.ownerKey());
 			keep.add(row.id());

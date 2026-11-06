@@ -42,10 +42,16 @@ final class ServerOffice {
 	}
 
 	List<String> floors() {
-		return config.environments.stream().map(e -> config.labelFor(T3Config.ownerKey(e.baseUrl))).toList();
+		return owners().stream().map(config::labelFor).toList();
 	}
 
-	List<String> owners() { return config.environments.stream().map(e -> T3Config.ownerKey(e.baseUrl)).toList(); }
+	List<String> owners() {
+		if (config.sharedOfficePreferences.floorOwners == null) {
+			config.sharedOfficePreferences.floorOwners = config.environments.stream().map(e -> T3Config.ownerKey(e.baseUrl)).toList();
+			save.run();
+		}
+		return config.sharedOfficePreferences.floorOwners;
+	}
 
 	boolean pin(String threadId, boolean remove) {
 		if (remove) {
@@ -65,6 +71,7 @@ final class ServerOffice {
 	/** Builds the office with its door a few blocks south of {@code feet} (same placement as the client). */
 	void build(MinecraftServer server, BlockPos feet) {
 		clear(server);
+		config.sharedOfficePreferences.floorOwners = config.environments.stream().map(e -> T3Config.ownerKey(e.baseUrl)).toList();
 		BlockPos origin = new BlockPos(feet.getX() - 10, feet.getY(), feet.getZ() + 5);
 		config.serverOffice = new int[] {origin.getX(), origin.getY(), origin.getZ()};
 		save.run();
@@ -123,7 +130,7 @@ final class ServerOffice {
 	private void sync(MinecraftServer server, ServerLevel level, BlockPos o) {
 		List<String> floors = floors();
 		Map<String, Integer> previousDesks = Map.copyOf(config.sharedOfficePreferences.desks);
-		for (OfficeBrain.Agent gone : brain.sync(state.snapshot().threads(), owners(), config.sharedOfficePreferences)) {
+		for (OfficeBrain.Agent gone : brain.sync(state.snapshot().threads(), owners(), config.sharedOfficePreferences, state.machines().stream().filter(T3State.MachineHealth::online).map(T3State.MachineHealth::owner).collect(java.util.stream.Collectors.toSet()))) {
 			Villager villager = villagers.remove(gone.threadId);
 			if (villager != null) villager.discard();
 		}
@@ -156,21 +163,22 @@ final class ServerOffice {
 				villager.setCustomName(VillageLayout.label(row, state.waitingDetail(row.id()), state.online(row.id())));
 			}
 		}
+		// Retry periodically as well: command dispatch alone does not prove the world changed.
 		for (int floor = 0; floor < Math.max(1, floors.size()); floor++) {
 			String machine = floor < owners().size() ? owners().get(floor) : null;
 			List<T3Office.Note> notes = state.snapshot().threads().stream().filter(row -> row.status() == T3State.Status.NEEDS_YOU)
 				.filter(row -> row.ownerKey().equals(machine))
 				.map(row -> new T3Office.Note(row.title(), state.waitingDetail(row.id()))).toList();
 			String key = notes.toString();
-			if (!key.equals(boards.get(floor))) {
-				boards.put(floor, key);
+			if ((!key.equals(boards.get(floor)) || ticks % 200 == 0) && OfficeSite.loaded(level, o, T3Office.whiteboard(floor, notes))) {
 				run(server, o, T3Office.whiteboard(floor, notes));
+				boards.put(floor, key);
 			}
 		}
 		boolean dark = NycSun.isNight(Instant.now());
-		if (night == null || night != dark) {
-			night = dark;
+		if ((night == null || night != dark || ticks % 200 == 0) && OfficeSite.loaded(level, o, T3Office.lamps(floors.size(), dark))) {
 			run(server, o, T3Office.lamps(floors.size(), dark));
+			night = dark;
 		}
 	}
 

@@ -140,7 +140,7 @@ final class T3Village {
 		List<String> floors = mod.floors();
 		OfficeRoster.Preferences prefs = mod.officePreferences();
 		Map<String, Integer> previousDesks = Map.copyOf(prefs.desks);
-		for (OfficeBrain.Agent gone : brain.sync(snapshot.threads(), mod.floorOwners(), prefs)) {
+		for (OfficeBrain.Agent gone : brain.sync(snapshot.threads(), mod.floorOwners(), prefs, mod.state().machines().stream().filter(T3State.MachineHealth::online).map(T3State.MachineHealth::owner).collect(java.util.stream.Collectors.toSet()))) {
 			Villager villager = villagers.remove(gone.threadId);
 			if (villager != null) {
 				threadByEntity.remove(villager.getId());
@@ -149,8 +149,10 @@ final class T3Village {
 		}
 		if (!previousDesks.equals(prefs.desks)) mod.saveOfficePreferences();
 		for (OfficeBrain.Agent agent : brain.agents().values()) {
+			if (!level.isLoaded(o.offset((int) agent.x, (int) agent.y(), (int) agent.z))) continue;
 			Villager villager = villagers.get(agent.threadId);
-			if (villager == null) {
+			if (villager == null || villager.isRemoved() || level.getEntity(villager.getId()) != villager) {
+				if (villager != null) threadByEntity.remove(villager.getId());
 				villager = new Villager(EntityTypes.VILLAGER, level);
 				villager.setId(nextId--);
 				villager.setNoAi(true);
@@ -167,21 +169,22 @@ final class T3Village {
 				villager.setCustomName(VillageLayout.label(row, mod.state().waitingDetail(row.id()), mod.state().online(row.id())));
 			}
 		}
-		// Each floor's whiteboard: who needs you and what for (only when it changes).
+		// Client commands have no success acknowledgement: retry every ten seconds, even with the same cached value.
+		// Each floor's whiteboard: who needs you and what for.
 		for (int floor = 0; floor < Math.max(1, floors.size()); floor++) {
 			String machine = floor < mod.floorOwners().size() ? mod.floorOwners().get(floor) : null;
 			List<T3Office.Note> notes = snapshot.threads().stream().filter(row -> row.status() == T3State.Status.NEEDS_YOU)
 				.filter(row -> row.ownerKey().equals(machine))
 				.map(row -> new T3Office.Note(row.title(), mod.state().waitingDetail(row.id()))).toList();
 			String key = notes.toString();
-			if (!key.equals(boards.get(floor))) {
+			if ((!key.equals(boards.get(floor)) || ticks % 200 == 0) && OfficeSite.loaded(level, o, T3Office.whiteboard(floor, notes))) {
 				boards.put(floor, key);
 				mod.office().send(o, T3Office.whiteboard(floor, notes));
 			}
 		}
 		// Lamps on after New York sunset, off in the morning.
 		boolean dark = NycSun.isNight(Instant.now());
-		if (night == null || night != dark) {
+		if ((night == null || night != dark || ticks % 200 == 0) && OfficeSite.loaded(level, o, T3Office.lamps(floors.size(), dark))) {
 			night = dark;
 			mod.office().send(o, T3Office.lamps(floors.size(), dark));
 		}
@@ -227,7 +230,8 @@ final class T3Village {
 			int y = VillageLayout.standY(level, column);
 
 			Villager villager = villagers.get(row.id());
-			if (villager == null) {
+			if (villager == null || villager.isRemoved() || level.getEntity(villager.getId()) != villager) {
+				if (villager != null) threadByEntity.remove(villager.getId());
 				villager = new Villager(EntityTypes.VILLAGER, level);
 				villager.setId(nextId--);
 				villager.setNoAi(true);
