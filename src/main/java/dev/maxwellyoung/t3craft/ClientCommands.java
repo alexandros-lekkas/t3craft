@@ -5,18 +5,31 @@ import java.util.List;
 
 /** One budget for every mod-originated command, including books and MCP actions. */
 final class ClientCommands {
-	private static final WorldBoundQueue<String> pending = new WorldBoundQueue<>();
+	private record Command(String text, Runnable dispatched, Runnable dropped) {}
+	private static final WorldBoundQueue<Command> pending = new WorldBoundQueue<>(command -> command.dropped().run());
 	private static final CommandBudget budget = new CommandBudget();
 
 	static void send(String command) {
+		send(command, () -> {}, () -> {});
+	}
+
+	static void send(String command, Runnable dispatched, Runnable dropped) {
 		Minecraft mc = Minecraft.getInstance();
-		pending.add(mc.level, mc.getConnection(), List.of(command));
+		enqueue(mc.level, mc.getConnection(), command, dispatched, dropped);
+	}
+
+	static void enqueue(Object level, Object connection, String command, Runnable dispatched, Runnable dropped) {
+		pending.add(level, connection, List.of(new Command(command, dispatched, dropped)));
 	}
 
 	static void tick(Minecraft mc) {
-		pending.validate(mc.level, mc.getConnection());
 		budget.tick();
-		if (!pending.isEmpty() && trySend(mc, pending.peek())) pending.poll();
+		dispatch(mc.level, mc.getConnection(), command -> trySend(mc, command));
+	}
+
+	static void dispatch(Object level, Object connection, java.util.function.Predicate<String> sender) {
+		pending.validate(level, connection);
+		if (!pending.isEmpty() && sender.test(pending.peek().text())) pending.poll().dispatched().run();
 	}
 
 	static boolean trySend(Minecraft mc, String command) {

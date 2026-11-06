@@ -8,10 +8,14 @@ import java.util.List;
 final class WorldBoundQueue<T> {
 	private final Deque<T> items = new ArrayDeque<>();
 	private Object level, connection;
+	private final java.util.function.Consumer<T> discarded;
+
+	WorldBoundQueue() { this(item -> {}); }
+	WorldBoundQueue(java.util.function.Consumer<T> discarded) { this.discarded = discarded; }
 
 	void add(Object level, Object connection, List<T> additions) {
 		validate(level, connection);
-		if (level == null || connection == null) return;
+		if (level == null || connection == null) { additions.forEach(discarded); return; }
 		this.level = level;
 		this.connection = connection;
 		items.addAll(additions);
@@ -29,7 +33,7 @@ final class WorldBoundQueue<T> {
 		return loaded;
 	}
 
-	void clear() { items.clear(); level = null; connection = null; }
+	void clear() { while (!items.isEmpty()) discarded.accept(items.poll()); level = null; connection = null; }
 	boolean isEmpty() { return items.isEmpty(); }
 	T peek() { return items.peek(); }
 	T poll() { return items.poll(); }

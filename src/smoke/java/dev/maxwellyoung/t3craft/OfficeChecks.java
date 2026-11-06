@@ -12,6 +12,7 @@ import java.util.Map;
 public final class OfficeChecks {
 	public static void main(String[] args) throws Exception {
 		checkPlacement();
+		checkCommandDispatch();
 		CommandBudget budget = new CommandBudget();
 		int spam = 0, sends = 0;
 		for (int tick = 0; tick < 24000; tick++) {
@@ -163,6 +164,25 @@ public final class OfficeChecks {
 		check(OfficeSite.occupied(bounds, origin, blueprint, read, pos -> pos.equals(shulkerPos) ? shulker : null), "non-empty office shulker requires confirmation");
 		shulker.clearContent();
 		check(OfficeSite.occupied(bounds, null, List.of(), read, pos -> pos.equals(shulkerPos) ? shulker : null), "unowned empty shulker remains protected");
+	}
+
+	private static void checkCommandDispatch() {
+		Object level = new Object(), connection = new Object();
+		var dispatched = new java.util.concurrent.CompletableFuture<Long>();
+		ClientCommands.enqueue(level, connection, "test", () -> dispatched.complete(2_000L), () -> dispatched.completeExceptionally(new IllegalStateException("dropped")));
+		ClientCommands.dispatch(level, connection, command -> false);
+		check(!dispatched.isDone(), "budget-delayed MCP command does not start its feedback window");
+		ClientCommands.dispatch(level, connection, command -> true);
+		check(dispatched.join() == 2_000L, "MCP feedback window begins at actual dispatch");
+		for (boolean enqueue : List.of(false, true)) {
+			var dropped = new java.util.concurrent.CompletableFuture<Void>();
+			ClientCommands.enqueue(level, connection, "old", () -> { throw new AssertionError("stale command sent"); },
+				() -> dropped.completeExceptionally(new IllegalStateException("session changed")));
+			if (enqueue) ClientCommands.enqueue(new Object(), connection, "new", () -> {}, () -> {});
+			else ClientCommands.dispatch(null, null, command -> { throw new AssertionError("disconnected command sent"); });
+			check(dropped.isCompletedExceptionally(), "session change reports queued MCP command failure");
+		}
+		ClientCommands.dispatch(null, null, command -> false);
 	}
 
 	private static T3State.ThreadRow row(String owner, int index, T3State.Status status) {
