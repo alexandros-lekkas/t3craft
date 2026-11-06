@@ -129,7 +129,11 @@ tasks.register('verifyAll') {
 	dependsOn 'build', 'officeCheck', 'connectionCheck', 'featureCheck', 'reliabilityCheck'
 }
 
-dependencyLocking { lockAllConfigurations() }
+dependencyLocking {
+	lockAllConfigurations()
+	// macOS-only Minecraft library; resolving it on Linux CI would violate the lock state.
+	ignoredDependencies.add("ca.weblite:java-objc-bridge")
+}
 
 // Exercise smoke checks on the invoking JDK while compiling the mod with Java 25.
 tasks.withType(JavaExec).configureEach {
