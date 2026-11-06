@@ -128,10 +128,13 @@ if ! lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
       owned_server_pid=""
     done
     [ -n "$owned_server_pid" ] && break
-    owns_job || break
+    # This is our direct child, but nohup may not have exec'd Gradle yet. Its
+    # command line is not an ownership/readiness signal during that transition.
+    kill -0 "$server_job_pid" 2>/dev/null || break
     sleep 2
   done
   if ! owns_server; then
+    echo "The world did not start. See $LOGS/server.log" >&2
     notify "The world did not start. See $LOGS/server.log"
     exit 1
   fi
