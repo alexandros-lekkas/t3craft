@@ -381,7 +381,8 @@
         "src/main/resources/data/t3craft/function/office/**",
         "src/main/resources/data/t3craft/office/**",
         "scripts/office/scandi.cjs",
-        "scripts/office/generate.cjs"
+        "scripts/office/generate.cjs",
+        "scripts/office/lighting.cjs"
       ],
       "where_used": "The two-floor shared office your agents work in.",
       "inspired_by": "Scandinavian interiors: birch, white walls, lots of light.",

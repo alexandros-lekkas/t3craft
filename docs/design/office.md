@@ -12,6 +12,19 @@ The brain owns movement and stable desk identity. Workers sit and type at their 
 
 Each desk has a paper-backed ItemDisplay using FIXED transform and a separate Interaction hitbox. UUIDs encode thread identity and entity role, so display and hitbox identities are distinct and stable. States map to `idle`, `working`, or `needs_you`; the laptop faces the same direction as its user. Clicks retain the existing use-key drain and focus/open-panel route. The complete original props pack places 59 displays on each floor: every desk has its own chair and mug plus a distinct mix of monitor, succulent, lamp, headphones, nameplate and notebook. The kitchenette has an espresso machine and mugs; shared areas add a water cooler, wall clock, printer, pinboard, filing cabinets and monsteras. The generated manifest removes the old block monitors/chairs and replaced plants/appliance. Chair seats are 0.508 blocks above the floor. Working mugs steam, monitors follow status, desk lamps illuminate at night, and waiting agents' chairs swivel toward the player. Small props use the pack's shorter tracking visibility ranges.
 
+## Lighting
+
+The office is lit in two layers, so it reads as a working studio by day and a warm one by night without a cluttered ceiling.
+
+- **Always on, cool white.** A hidden `light[level=15]` grid sits one block above head height, every third block, on every floor. It is invisible, has no hitbox, and keeps every walkable cell at block light 11 or more at foot level, day and night, so there is no dark corner and nothing can spawn inside. White end-rod downlights hang from the ceiling over the circulation routes: a row across the open floor between the bench and the lounge, a pair inside the entry, a pair over the kitchen aisle and one over the whiteboard where waiting agents stand. A sconce at the foot of each stair and a hidden light in the well keep the run soft but clear.
+- **Warm at dusk.** The design's own lamps still switch with the Minecraft clock: the linear bars over the desks, the island and canopy lanterns, the candles and the picture light. The three fabric shades (lounge pendant, floor lamp, lectern pendant) now glow as `ochre_froglight` instead of shroomlight, a cream light that matches the white wool they are by day.
+- **Outside.** Lanterns sit on the four corner posts and the two south mullions of the roof parapet, on the stair-head guard, and on a birch bollard at each far corner of the entry path, so the garden and the way to the door are lit all night. A few hidden lights over the terrace walks fill in between them.
+
+![Block light at foot level, before and after, at night](office/light-map-before-after.png)
+![Block light at foot level by day and by night, after](office/light-map.png)
+
+The maps are computed from the template (`scripts/office/lighting.cjs` adds the layer after `generate.cjs` expands the plan). Before: night light averaged 6 on each floor with cells at 0, and 68 roof cells were dark enough to spawn mobs. After: every interior cell is at 11 or more, the roof is never below 4, and the entry path never below 10. `officeCheck` proves the same numbers headlessly on every build with the real block emission and dampening values (`OfficeLighting`), and `/t3 office build` rebuilds an existing office with the new layer, clearing the old hidden lights first. In-game screenshots of the lit office are still to be captured.
+
 ## Going to the office
 
 Use `/t3 office build` to place or explicitly rebuild the office. Once this world has an office, `/t3 office` and `/t3 office go` return you to its entrance plaza, facing the door, even from an unloaded area or another dimension. Singleplayer teleports run directly on the integrated server; remote servers use the existing throttled `/tp` command path and require server permission. With no saved office, bare `/t3 office` builds one.

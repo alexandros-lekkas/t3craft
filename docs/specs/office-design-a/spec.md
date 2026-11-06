@@ -65,8 +65,8 @@ All local coordinates below are **floor-relative** (add `6·n` to y). Exterior i
 | Balustrade / guards | `glass_pane` |
 | Lectern | `lectern[facing=west,has_book=false,powered=false]` |
 | Pendant hangers | `iron_chain[axis=y]` (renamed from `chain` in 1.21.9) |
-| Lamps (day ↔ night) | see §6: `iron_chain[axis=x]` ↔ `end_rod[facing=east]`; `white_wool` ↔ `shroomlight`; `iron_chain[axis=y]`/`air` ↔ `lantern[hanging=…]`; `*_candle[lit=false]` ↔ `[lit=true]` |
-| Hidden fill light | `light[level=10]` at y4 (always on, stops mob spawning) |
+| Lamps (day ↔ night) | see §6: `iron_chain[axis=x]` ↔ `end_rod[facing=east]`; `white_wool` ↔ `ochre_froglight`; `iron_chain[axis=y]`/`air` ↔ `lantern[hanging=…]`; `*_candle[lit=false]` ↔ `[lit=true]` |
+| Always-on light | `light[level=15]` grid at y2, `end_rod` downlights and sconces, parapet and bollard `lantern`s (see §6) |
 | Plants | `decorated_pot` + `azalea_leaves[persistent=true]` (+ `flowering_azalea_leaves[persistent=true]`); `potted_fern`, `potted_azalea_bush`, `potted_flowering_azalea_bush`, `potted_cactus` |
 | Roof planting | `moss_block` + `azalea`, `flowering_azalea`, `fern`, `short_grass`, `firefly_bush`; tree `birch_log[axis=y]` + `birch_leaves[persistent=true]` |
 
@@ -291,17 +291,21 @@ Mark every y=0 cell holding something other than carpet, sign or light as blocke
 |---|---|---|---|
 | Desk linear pendants | x3–6, y3, z3 and z4 (two bars); hangers `iron_chain[axis=y]` at (3,4,3) (6,4,3) (3,4,4) (6,4,4) | `iron_chain[axis=x]` | `end_rod[facing=east]` |
 | Island lanterns | (13,3,3) (14,3,3), chains at y4 | `iron_chain[axis=y]` | `lantern[hanging=true]` |
-| Lounge pendant | (10,3,14), chain (10,4,14) | `white_wool` | `shroomlight` |
-| Floor lamp | shade (14,2,14) on `birch_fence` (14,0–1,14) | `white_wool` | `shroomlight` |
-| Lectern pendant | (18,3,12), chain (18,4,12) | `white_wool` | `shroomlight` |
+| Lounge pendant | (10,3,14), chain (10,4,14) | `white_wool` | `ochre_froglight` |
+| Floor lamp | shade (14,2,14) on `birch_fence` (14,0–1,14) | `white_wool` | `ochre_froglight` |
+| Lectern pendant | (18,3,12), chain (18,4,12) | `white_wool` | `ochre_froglight` |
 | Whiteboard picture light | (1,3,11) | `air` | `end_rod[facing=east]` |
 | Coffee-table candles | (9,1,14) `white_candle[candles=3]`, (11,1,14) `yellow_candle[candles=2]` | `lit=false` | `lit=true` |
 | Entry lanterns (floor 0) | (17,3,-2) (18,3,-2), hanging under the canopy | `air` | `lantern[hanging=true]` |
 | Pergola lanterns (roof) | (5|7|9, 6F+2, 12), hanging from the slats | `air` | `lantern[hanging=true]` |
 | Dining-table lantern (roof) | (14, 6F+1, 5) | `air` | `lantern[hanging=false]` |
-| Hidden fill light | (1,4,4) (9,4,8) (16,4,6) (3,4,14) (16,4,14) (10,4,10) | `light[level=10]` | same |
+| Hidden fill light | superseded: see the always-on layer below | | |
 
-Survival notes: wool, shroomlight, end rods and chains have no support rules. Hanging lanterns are under a chain, a full canopy block or a log slat (all sturdy). Candles stand on top slabs (a sturdy top face). Leaves need `persistent=true`. Every pendant leaves y2 clear above the furniture.
+### Always-on layer (added 2026-11-06, over the expanded 30 × 24 plan)
+
+`scripts/office/lighting.cjs` runs after the plan is expanded, so its coordinates are the built ones, not the ones in this table. Per floor: a hidden `light[level=15]` grid at y2 every third block from (1,1) (shifted one cell when something stands there), `end_rod[facing=down]` downlights at y4 over (4|10|16|22|28, 10), (25|26, 1), (16|22, 1) and (4, 15), an `end_rod[facing=west]` sconce at (29,3,1) at the foot of the stair, and hidden lights at (28,7,5) in the well and (29,2,6) under the run. Roof: `lantern[hanging=false]` on the corner posts, the south mullion posts (11|20, 6F+1, 24) and the stair-head guard (27, 6F+1, 3), with hidden lights at 6F+2 over the walks. Entry: a `birch_fence` bollard with a lantern at (22|27, 0–1, -6). Target: every walkable interior cell at block light ≥ 11 day and night, no roof or path cell at 0. `officeCheck` verifies it.
+
+Survival notes: wool, froglight, end rods and chains have no support rules. Hanging lanterns are under a chain, a full canopy block or a log slat (all sturdy). Candles stand on top slabs (a sturdy top face). Leaves need `persistent=true`. Every pendant leaves y2 clear above the furniture.
 
 ---
 

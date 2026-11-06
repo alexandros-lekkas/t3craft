@@ -9,6 +9,7 @@
       "source": "https://github.com/alexandros-lekkas/t3craft",
       "files": [
         "scripts/office/scandi.cjs",
+        "scripts/office/lighting.cjs",
         "src/main/resources/data/t3craft/office/scandi-*.json"
       ],
       "modifications": "Expanded to a 30 by 24 interior, minimum two floors, generated floor modules and anchors.",

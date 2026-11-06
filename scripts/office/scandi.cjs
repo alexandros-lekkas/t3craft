@@ -19,7 +19,7 @@
     chairS: 'pale_oak_stairs[facing=south,half=bottom,shape=straight]',
     monN: 'dark_oak_trapdoor[facing=north,half=bottom,open=true]', monS: 'dark_oak_trapdoor[facing=south,half=bottom,open=true]',
     chainY: 'iron_chain[axis=y]', chainX: 'iron_chain[axis=x]', rod: 'end_rod[facing=east]',
-    shadeDay: 'white_wool', shadeNight: 'shroomlight',
+    shadeDay: 'white_wool', shadeNight: 'ochre_froglight',
     sofa: f => `polished_andesite_stairs[facing=${f},half=bottom,shape=straight]`,
     arm: f => `waxed_oxidized_cut_copper_stairs[facing=${f},half=bottom,shape=straight]`,
     table: 'birch_slab[type=top]', bench: 'birch_slab[type=bottom]',
@@ -188,8 +188,7 @@
       if (n === 0) F(17, 0, 0, 18, 0, 0, T.rugEdge);
       P(17, 0, 8, false, false);
 
-      // ---- hidden fill light (always on, stops mob spawns) ----
-      for (const [x, z] of [[1, 4], [9, 8], [16, 6], [3, 14], [16, 14], [10, 10]]) S(x, 4, z, 'light[level=10]');
+      // Fill light, downlights and terrace lanterns are added over the expanded plan by lighting.cjs.
 
       // ---- anchors ----
       const seat = 0.3, sofa = 0.3;

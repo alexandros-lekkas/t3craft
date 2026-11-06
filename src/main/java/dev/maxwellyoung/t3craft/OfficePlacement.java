@@ -107,7 +107,9 @@ final class OfficePlacement {
 			for (int z = e[2]; z <= e[3]; z++)
 				for (int y = OfficeDesign.top(floors); y >= 0; y--) {
 					var pos = frame.block(x, y, z);
-					if (!level.getBlockState(pos).isAir()) level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
+					// Hidden light blocks count as air, so name them: an older lighting layout must not linger under the new one.
+					var state = level.getBlockState(pos);
+					if (!state.isAir() || state.is(Blocks.LIGHT)) level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
 				}
 		var registry = level.registryAccess().lookupOrThrow(Registries.BLOCK);
 		try {

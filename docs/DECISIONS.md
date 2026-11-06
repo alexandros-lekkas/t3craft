@@ -6,6 +6,7 @@ The product calls behind T3 Craft, newest first. Each one has the date, the deci
 
 | Date | Decision | Why |
 |:--|:--|:--|
+| 2026-11-06 | [A lit office, day and night](#2026-11-06--a-lit-office-day-and-night) | No dark corners, no spawns, nothing modded-looking |
 | 2026-11-05 | Office only; real T3 UI streamed in-game | Keep one workplace and the full T3 experience |
 | 2026-11-05 | [Simple features, no settings or machine UI](#2026-11-05--simple-features-no-settings-or-machine-ui) | Each screen has one obvious purpose |
 | 2026-11-05 | [Zero setup: auto-connect to the local T3](#2026-11-05--zero-setup-auto-connect-to-the-local-t3) | Players shouldn't have to type commands or paste links |
@@ -23,6 +24,11 @@ The product calls behind T3 Craft, newest first. Each one has the date, the deci
 | 2026-11-05 | [Office design A: Scandi Studio](#2026-11-05--office-design-a-scandi-studio) | Warm, readable and modular |
 
 ---
+
+### 2026-11-06 · A lit office, day and night
+
+**Decision:** Light the office in two layers. An always-on layer (a hidden light grid, white end-rod downlights, a stair sconce, lanterns on the parapet posts and the path bollards) keeps every walkable cell at block light 11 or more and the roof and path never dark. The design's own lamps keep switching with the clock as the warm evening layer, and the fabric shades glow cream (`ochre_froglight`) rather than orange shroomlight. ([design](design/office.md#lighting))
+**Why:** The office was too dim, inside by day and everywhere by night, and an open roof at light 0 spawns mobs. Hidden light blocks and end rods are vanilla and invisible or discreet, so the ceiling stays clean.
 
 ### 2026-11-05 · Office only and streamed T3 UI
 

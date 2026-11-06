@@ -26,8 +26,33 @@ public final class OfficeChecks {
   check(OfficeProps.state("desk_lamp","off",null,true).equals("on")&&OfficeProps.state("desk_lamp","off",T3State.Status.IDLE,false).equals("off"),"night desk lamps");
   check(DeskLaptops.state(T3State.Status.NEEDS_YOU).equals("needs_you")&&DeskLaptops.state(T3State.Status.WORKING).equals("working")&&DeskLaptops.state(T3State.Status.DONE).equals("idle"),"laptop status mapping");
   check(DeskLaptops.uuid("a",true).equals(DeskLaptops.uuid("a",true))&&!DeskLaptops.uuid("a",true).equals(DeskLaptops.uuid("a",false))&&!DeskLaptops.uuid("a",true).equals(DeskLaptops.uuid("b",true)),"laptop pair identity stable and distinct");
+  checkLighting();
   var brain=new OfficeBrain();var row=row("owner",0,T3State.Status.WORKING);brain.sync(List.of(row),List.of("owner"),new OfficeRoster.Preferences());brain.face(row.id());var a=brain.agents().get(row.id());double x=a.x,z=a.z;brain.tick();check(a.x==x&&a.z==z&&!a.walking,"head turn hold pauses the brain");
  }
+
+	/** The office is lit everywhere an agent can stand, day and night, and nothing can spawn on the terrace or the path. */
+	private static void checkLighting() {
+		for (int floors : new int[] {2, 3}) for (boolean night : new boolean[] {false, true}) {
+			var blocks = OfficeLighting.blocks(floors, night);
+			var light = OfficeLighting.blockLight(blocks);
+			String when = floors + " floors " + (night ? "night" : "day");
+			var inside = OfficeLighting.report(light, OfficeLighting.walkable(blocks, floors));
+			check(inside.cells() > 550 * floors, "walkable interior found: " + when + ": " + inside);
+			check(inside.min() >= 11, "every walkable interior cell at block light 11 or more, " + when + ": " + inside);
+			var terrace = OfficeLighting.report(light, OfficeLighting.terrace(blocks, floors));
+			check(terrace.cells() > 500 && terrace.min() >= 3, "roof terrace lit so nothing spawns, " + when + ": " + terrace);
+			List<net.minecraft.core.BlockPos> path = new ArrayList<>();
+			for (int x = 22; x <= 27; x++) for (int z = -6; z <= -2; z++) if (!blocks.containsKey(new net.minecraft.core.BlockPos(x, 0, z))) path.add(new net.minecraft.core.BlockPos(x, 0, z));
+			var entry = OfficeLighting.report(light, path);
+			check(entry.min() >= 6, "entry path lit to the door, " + when + ": " + entry);
+			long hidden = blocks.values().stream().filter(s -> s.is(net.minecraft.world.level.block.Blocks.LIGHT)).count();
+			check(hidden < 120 * floors, "hidden fill stays a sparse grid, " + when + ": " + hidden);
+			if (floors == 2 && night) System.out.println("Office light: inside " + inside + "; terrace " + terrace + "; entry " + entry);
+		}
+		var blueprint = T3Office.blueprint(List.of("one machine"));
+		check(blueprint.stream().anyMatch(c -> c.contains("end_rod[facing=down]")) && blueprint.stream().anyMatch(c -> c.contains("lantern[hanging=false]")), "rebuilt offices place the downlights and lanterns");
+		check(OfficeDesign.lamps(2, true).stream().anyMatch(c -> c.contains("ochre_froglight")) && OfficeDesign.lamps(2, false).stream().noneMatch(c -> c.contains("froglight")), "pendant shades glow warm at night only");
+	}
 
 	public static void main(String[] args) throws Exception {
 		checkPlacement();
@@ -146,7 +171,7 @@ public final class OfficeChecks {
 		for (int i = 0; i < 8; i++) waiting.add(row(a, i, T3State.Status.NEEDS_YOU));
 		brain.clear(); brain.sync(waiting, List.of(a), new OfficeRoster.Preferences());
 		check(brain.agents().values().stream().map(r -> r.goal).distinct().count() == 8, "eight waiting residents do not share a physical spot");
-		System.out.println("PASS plain-field/build occupancy, daytime lamps/signs, shared command budget, malformed desks, unloaded-target cancellation, queue world/session binding, unavailable-owner retention, built floor persistence, stable desks, pinned/waiting/working priority, restart and reconnect persistence, distinct owners/projects, pin removal and shared/client isolation");
+		System.out.println("PASS plain-field/build occupancy, daytime lamps/signs, lit interior and terrace, shared command budget, malformed desks, unloaded-target cancellation, queue world/session binding, unavailable-owner retention, built floor persistence, stable desks, pinned/waiting/working priority, restart and reconnect persistence, distinct owners/projects, pin removal and shared/client isolation");
 	}
 	private static void checkPlacement() {
 		net.minecraft.SharedConstants.tryDetectVersion();

@@ -1,5 +1,5 @@
 // Design A expanded to a 30 x 24 interior. Insert usable space rather than scaling avatars.
-const fs=require('fs'),g=require('./scandi.cjs');
+const fs=require('fs'),g=require('./scandi.cjs'),lighting=require('./lighting.cjs');
 const out='src/main/resources/data/t3craft/office';fs.mkdirSync(out,{recursive:true});
 const X=x=>x+Math.max(0,Math.min(4,Math.floor(x)-3))+(x>=10?2:0)+(x>=17?2:0);
 const Z=z=>z+(z>=8?4:0)+(z>=14?2:0);
@@ -16,6 +16,7 @@ for(let n=1;n<=2;n++){
  const stretch=/(planks|concrete|glass_pane|smooth_quartz|carpet|bookshelf|stripped_birch|iron_block|pale_oak_planks|polished_andesite_stairs|birch_slab|moss_block)/.test(state);
  for(let xx=X(x);xx<(stretch?X(x+1):X(x)+1);xx++)for(let zz=Z(z);zz<(stretch?Z(z+1):Z(z)+1);zz++)blocks.set([xx,y,zz].join(','),state);
  }
+ lighting.apply(blocks,n);
  fs.writeFileSync(`${out}/scandi-${n}.json`,JSON.stringify({blocks:[...blocks].map(([p,state])=>({pos:p.split(',').map(Number),state})),anchors:anchor(d.anchors),lamps:anchor(d.lamps)}));
 }
 // Same mapping for the original prop placement sheet.
