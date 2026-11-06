@@ -41,6 +41,9 @@ final class T3Mcp {
 	// Server feedback lines ("Successfully filled 49 block(s)") collected while a command is in flight.
 	private final java.util.List<String> feedback = new java.util.concurrent.CopyOnWriteArrayList<>();
 	private volatile boolean collecting;
+	// Dispatch runs on the game thread, including after the caller has timed out.
+	private final Object collectionLock = new Object();
+	private Object activeCall;
 
 	T3Mcp(BooleanSupplier commandsAllowed) {
 		this.commandsAllowed = commandsAllowed;
@@ -191,36 +194,47 @@ final class T3Mcp {
 			};
 			return text.startsWith("error: ") ? result(text.substring(7), true) : result(text, false);
 		} catch (Exception e) {
-			return result("Minecraft did not respond: " + e.getMessage(), true);
+			Throwable cause = e;
+			while (cause instanceof java.util.concurrent.ExecutionException && cause.getCause() != null) cause = cause.getCause();
+			return result("Minecraft did not respond: " + cause.getMessage(), true);
 		}
 	}
 
 	/** Sends the command, then waits briefly for the server's reply so the agent can check its work. */
 	private synchronized String runCommand(String command) throws Exception {
 		var dispatched = new java.util.concurrent.CompletableFuture<Long>();
+		Object token = new Object();
+		synchronized (collectionLock) { activeCall = token; }
 		try {
 			String sent = onGameThread(() -> {
 				Minecraft minecraft = Minecraft.getInstance();
 				if (minecraft.player == null) return "error: the player is not in a world.";
 				agentChat(Component.literal("/" + command).withStyle(ChatFormatting.GRAY));
 				ClientCommands.send(command, () -> {
-					feedback.clear();
-					collecting = true;
-					dispatched.complete(System.nanoTime());
+					synchronized (collectionLock) {
+						if (activeCall != token) return;
+						feedback.clear();
+						collecting = true;
+						dispatched.complete(System.nanoTime());
+					}
 				}, () -> dispatched.completeExceptionally(new IllegalStateException("Command dropped because the world session changed.")));
 				return "sent";
 			});
 			if (!"sent".equals(sent)) return sent;
 			// Feedback usually lands within a tick or two; stop early once it has settled.
-			long deadline = dispatched.get() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(1500);
+			long deadline = dispatched.get(30, TimeUnit.SECONDS) + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(1500);
 			int seen = -1;
 			while (System.nanoTime() < deadline) {
 				Thread.sleep(150);
 				if (!feedback.isEmpty() && feedback.size() == seen) break;
 				seen = feedback.size();
 			}
+		} catch (java.util.concurrent.TimeoutException e) {
+			throw new IOException("Timed out waiting for Minecraft command dispatch.", e);
 		} finally {
-			collecting = false;
+			synchronized (collectionLock) {
+				if (activeCall == token) { activeCall = null; collecting = false; }
+			}
 		}
 		if (feedback.isEmpty()) return "Sent /" + command + ". The server gave no reply (it may lack permission to show feedback); verify with minecraft_nearby_blocks.";
 		return "Ran /" + command + ". Server replied:\n" + String.join("\n", feedback);

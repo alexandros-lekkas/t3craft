@@ -53,13 +53,9 @@ public final class T3State {
 		}
 	}
 
-	public record Snapshot(boolean connected, String error, List<ThreadRow> threads, String focusedId, Focus focus, List<MachineHealth> machines) {
-		public ThreadRow focusedRow() {
-			if (focusedId == null) return null;
-			for (ThreadRow row : threads) if (row.id().equals(focusedId)) return row;
-			return null;
-		}
-	}
+	/** Focus metadata is independent of the sidebar/office visibility filter. */
+	public record Snapshot(boolean connected, String error, List<ThreadRow> threads, String focusedId,
+		Focus focus, List<MachineHealth> machines, ThreadRow focusedRow, String detailError) {}
 
 	public record Event(ThreadRow thread, Status status) {}
 
@@ -126,9 +122,11 @@ public final class T3State {
 
 	private volatile List<Env> envs = List.of();
 	private Focus focusDetail;
+	private String focusError;
+	private String focusErrorThreadId;
 
 	private volatile String focusedThreadId;
-	private volatile Snapshot snapshot = new Snapshot(false, null, List.of(), null, null, List.of());
+	private volatile Snapshot snapshot = new Snapshot(false, null, List.of(), null, null, List.of(), null, null);
 	private volatile boolean panelOpen;
 	private volatile boolean refreshSoon;
 	private long tick;
@@ -210,11 +208,11 @@ public final class T3State {
 			decisions = List.of();
 			onlineThreads = Map.of();
 			connectionErrors = Map.of(); offlineMachines = List.of();
-			focusDetail = null;
+			focusDetail = null; focusError = null;
 			List<Env> next = new ArrayList<>();
 			for (Connection connection : connections) next.add(new Env(connection.api(), connection.label()));
 			envs = List.copyOf(next);
-			snapshot = new Snapshot(false, null, List.of(), focusedThreadId, null, List.of());
+			snapshot = new Snapshot(false, null, List.of(), focusedThreadId, null, List.of(), null, null);
 			maintainSafely();
 		});
 	}
@@ -238,7 +236,9 @@ public final class T3State {
 			}
 			for (Env previous : envs) if (!next.contains(previous)) closeSocket(previous);
 			Env previousOwner = envFor(focusedId);
-			if (previousOwner == null || next.stream().noneMatch(e -> e.api.ownerKey().equals(previousOwner.api.ownerKey()))) focusDetail = null;
+			if (previousOwner == null || next.stream().noneMatch(e -> e.api.ownerKey().equals(previousOwner.api.ownerKey()))) {
+				focusDetail = null; focusError = null;
+			}
 			envs = List.copyOf(next);
 			Set<String> retainedIds = new HashSet<>();
 			for (Env env : next) retainedIds.addAll(env.threads.keySet());
@@ -264,7 +264,7 @@ public final class T3State {
 		if (threadId != null) watched.add(threadId);
 		refreshSoon = true;
 		executor.execute(() -> {
-			focusDetail = null;
+			focusDetail = null; focusError = null;
 			for (Env env : envs) syncThreadSubscription(env);
 			fetchFocus();
 			publish(List.of());
@@ -534,15 +534,17 @@ public final class T3State {
 		String threadId = focusedThreadId;
 		Env env = envFor(threadId);
 		if (env == null || threadId == null || !env.threads.containsKey(threadId)) {
-			focusDetail = null;
+			focusDetail = null; focusError = null;
 			return;
 		}
 		try {
 			JsonObject raw = env.api.thread(threadId, 4);
 			focusDetail = focus(raw);
+			focusError = null;
 			waitingThreads.put(threadId, raw);
 		} catch (Exception e) {
-			env.error = e.getMessage();
+			focusErrorThreadId = threadId;
+			focusError = "Could not load this thread: " + e.getMessage();
 		}
 	}
 
@@ -613,13 +615,14 @@ public final class T3State {
 
 	/** Rebuilds the published snapshot from the mirrors, then fires events against it. */
 	private void publish(List<Event> events) {
+		String focusedId = focusedThreadId;
 		List<ThreadRow> rows = allRows();
 		rows.sort(Comparator.comparingInt((ThreadRow row) -> row.status() == Status.NEEDS_YOU ? 0 : 1)
             .thenComparing(Comparator.comparing((ThreadRow row) -> activityAt(row.raw())).reversed()));
 		// Every active thread from every machine; the panel scrolls and filters.
 		Map<String, ThreadRow> visible = new LinkedHashMap<>();
 		for (ThreadRow row : rows) if (T3Visibility.visible(row, pinnedKeys.contains(OfficeRoster.key(row)))) visible.put(row.id(), row);
-		Focus focus = focusDetail != null && focusDetail.threadId().equals(focusedThreadId) ? focusDetail : null;
+		Focus focus = focusDetail != null && focusDetail.threadId().equals(focusedId) ? focusDetail : null;
 		if (focus != null) events = withNewApprovals(focus, rows, events);
 		List<Env> current = envs;
 		boolean connected = current.stream().anyMatch(env -> env.error == null && (env.shellLive || env.shellLoaded));
@@ -643,7 +646,9 @@ public final class T3State {
 		offlineMachines = current.stream().filter(env -> env.error != null || !env.shellLoaded && !env.shellLive)
 			.map(env -> env.label).toList();
 		decisions = T3Decisions.collect(rows, waitingThreads);
-		snapshot = new Snapshot(connected, error, List.copyOf(visible.values()), focusedThreadId, focus, machines);
+		snapshot = new Snapshot(connected, error, List.copyOf(visible.values()), focusedId, focus, machines,
+			rows.stream().filter(r -> r.id().equals(focusedId)).findFirst().orElse(null),
+			java.util.Objects.equals(focusedId, focusErrorThreadId) ? focusError : null);
 		events.forEach(onEvent);
 	}
 
