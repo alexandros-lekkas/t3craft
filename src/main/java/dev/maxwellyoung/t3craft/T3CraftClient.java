@@ -266,8 +266,11 @@ public final class T3CraftClient implements ClientModInitializer {
 
 	List<String> floorOwners() {
 		OfficeRoster.Preferences prefs = officePreferences();
-		if (prefs.floorOwners == null) {
-			prefs.floorOwners = pairedOwners();
+		// An office first seen before T3 paired must not stay ownerless: keep asking until a machine is paired.
+		if (prefs.floorOwners == null || prefs.floorOwners.isEmpty()) {
+			List<String> owners = pairedOwners();
+			if (owners.isEmpty()) return owners;
+			prefs.floorOwners = owners;
 			if (officeOrigin() != null) saveOfficePreferences();
 		}
 		return prefs.floorOwners;
