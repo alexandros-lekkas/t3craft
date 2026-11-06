@@ -122,3 +122,10 @@ tasks.register('connectionCheck', JavaExec) {
 	mainClass = 'dev.maxwellyoung.t3craft.ConnectionChecks'
 	args = [project.findProperty('fixturePort') ?: '25680']
 }
+
+tasks.register('mcpCheck', JavaExec) {
+ description = 'Public MCP transport, OAuth PKCE, polling and legacy gap checks against loopback fixtures.'
+ classpath = sourceSets.smoke.runtimeClasspath
+ mainClass = 'dev.maxwellyoung.t3craft.McpChecks'
+ args = [project.findProperty('fixturePort') ?: '25680']
+}

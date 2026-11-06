@@ -14,7 +14,7 @@ import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 
 PATCH = '''diff --git a/src/greeting.ts b/src/greeting.ts
 index 1111111..2222222 100644
@@ -93,6 +93,11 @@ class Fixture(ThreadingHTTPServer):
         self.threads[f'{self.machine}-waiting'] = thread(f'{self.machine}-waiting', True, self.machine == 'B', True)
         self.threads[f'{self.machine}-done-11']['projectId'] = 'fixture-alt'
         self.dispatches.clear()
+        self.mcp_calls = []
+        self.mcp_answered = False
+        self.mcp_sent = False
+        self.oauth_redirect = None
+        self.oauth_challenge = None
         self.offline = False
         self.auth_failed = False
         self.protocol_version = 2 if self.protocol2 else 1
@@ -105,16 +110,32 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
     def log_message(self, *_): pass
 
-    def reply(self, value, code=200):
+    def reply(self, value, code=200, headers=None):
         body = json.dumps(value).encode()
         self.send_response(code)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Content-Length', str(len(body)))
+        for key, value in (headers or {}).items(): self.send_header(key, value)
         self.end_headers()
         self.wfile.write(body)
 
     def do_GET(self):
         with self.server.lock:
+            base = f'http://127.0.0.1:{self.server.server_port}'
+            if self.path == '/.well-known/oauth-protected-resource/mcp': return self.reply({'resource': base + '/mcp', 'authorization_servers': [base]})
+            if self.path == '/.well-known/oauth-authorization-server': return self.reply({'issuer': base, 'registration_endpoint': base + '/oauth/mcp/register', 'authorization_endpoint': base + '/oauth/mcp/authorize', 'token_endpoint': base + '/oauth/mcp/token'})
+            if self.path == '/_qa/mcp-hybrid':
+                self.server.threads['mcp-approval'] = thread('mcp-approval', True)
+                self.server.threads['mcp-question'] = thread('mcp-question', True, True)
+                return self.reply({'ok': True})
+            if self.path == '/_qa/mcp-calls': return self.reply(self.server.mcp_calls)
+            if self.path.startswith('/oauth/mcp/authorize?'):
+                q = parse_qs(urlparse(self.path).query)
+                assert q['code_challenge_method'] == ['S256']
+                assert q['redirect_uri'] == [self.server.oauth_redirect]
+                assert q['resource'] == [base + '/mcp']
+                self.server.oauth_challenge = q['code_challenge'][0]
+                return self.reply({'redirect': self.server.oauth_redirect, 'state': q['state'][0], 'code': 'fixture-code', 'iss': base})
             if self.path == '/.well-known/t3/environment': return self.reply({'label': 'Fixture ' + self.server.machine, 'orchestrationProtocolVersion': self.server.protocol_version})
             if self.path in ('/_qa/protocol3', '/_qa/auth-failed'):
                 if self.path == '/_qa/protocol3': self.server.protocol_version = 3
@@ -169,6 +190,17 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get('Content-Length', '0')))
+        if self.path == '/mcp': return self.mcp(json.loads(body))
+        if self.path == '/oauth/mcp/register':
+            self.server.oauth_redirect = json.loads(body)['redirect_uris'][0]
+            assert self.server.oauth_redirect.startswith('http://127.0.0.1:')
+            return self.reply({'client_id': 'fixture-client'})
+        if self.path == '/oauth/mcp/token':
+            q = parse_qs(body.decode())
+            challenge = base64.urlsafe_b64encode(hashlib.sha256(q['code_verifier'][0].encode()).digest()).decode().rstrip('=')
+            assert challenge == self.server.oauth_challenge
+            assert q['code'] == ['fixture-code'] and q['redirect_uri'] == [self.server.oauth_redirect]
+            return self.reply({'access_token': 'mcp-fixture', 'expires_in': 3600, 'token_type': 'Bearer'})
         if self.path == '/oauth/token' and parse_qs(body.decode()).get('subject_token', [''])[0] == 'delayed-fixture': time.sleep(3)
         with self.server.lock:
             if self.server.offline: return self.reply({'message': 'Fixture offline'}, 503)
@@ -185,6 +217,74 @@ class Handler(BaseHTTPRequestHandler):
                 self.dispatch(command)
                 return self.reply({'sequence': len(self.server.dispatches)})
         self.reply({'message': 'Unknown route'}, 404)
+
+    def mcp(self, request):
+        auth = self.headers.get('Authorization')
+        if auth not in ('Bearer mcp-fixture', 'Bearer mcp-readonly'):
+            return self.reply({'error': 'Credential must never be echoed: ' + str(auth)}, 401)
+        assert self.headers.get('MCP-Protocol-Version') == '2025-06-18'
+        method = request['method']
+        if method == 'initialize':
+            return self.reply({'jsonrpc': '2.0', 'id': request['id'], 'result': {'protocolVersion': '2025-06-18', 'capabilities': {'tools': {}}, 'serverInfo': {'name': 'fixture', 'version': '1'}}}, headers={'Mcp-Session-Id': 'mcp-session'})
+        assert self.headers.get('Mcp-Session-Id') == 'mcp-session'
+        if method == 'notifications/initialized': return self.reply({}, 202)
+        assert method == 'tools/call'
+        name, args = request['params']['name'], request['params']['arguments']
+        self.server.mcp_calls.append({'name': name, 'arguments': args})
+        if auth == 'Bearer mcp-readonly' and (name in ('t3_thread_send', 't3_thread_launch', 't3_thread_interrupt') or 'answers' in args or 'modelSelection' in args):
+            return self.reply({'error': 'Read-only'}, 403)
+        ident = args.get('threadId', 'mcp-question')
+        now = '2026-11-01T00:00:00Z'
+        row = {'threadId': ident, 'projectId': 'mcp-project', 'title': 'MCP fixture', 'status': 'completed' if self.server.mcp_answered else 'waiting', 'latestRunId': 'mcp-run', 'providerInstanceId': 'fixture-provider', 'model': 'fixture-model', 'runtimeMode': 'full-access', 'interactionMode': 'default', 'updatedAt': now}
+        questions = [{'id': 'format', 'header': 'Format', 'question': 'Which format?', 'options': [{'label': 'JSON', 'description': 'Structured', 'value': 'json'}], 'allowCustomAnswer': True}]
+        if name == 't3_thread_list':
+            assert args['allProjects'] is True
+            cursor = args.get('cursor', 0)
+            row['threadId'] = 'mcp-question' if cursor == 0 else 'mcp-approval'
+            row['status'] = 'waiting' if cursor else row['status']
+            result = {'threads': [row], 'nextCursor': 1 if cursor == 0 else None, 'total': 2}
+        elif name == 't3_project_list': result = {'projects': [{'id': 'mcp-project', 'title': 'MCP project'}], 'nextCursor': None}
+        elif name == 't3_thread_read':
+            row['worktreePath'] = '/fixture/worktree'
+            row['branch'] = 'fixture-branch'
+            if args.get('view') == 'activity':
+                if 'afterPosition' not in args:
+                    items = [{'position': 1, 'itemId': 'message-1', 'type': 'assistant_message', 'text': 'Sent' if self.server.mcp_sent else 'MCP reply', 'status': 'completed', 'updatedAt': now, 'textTruncated': False}]
+                    more = True
+                else:
+                    assert args['afterPosition'] == 1
+                    items = [{'position': 2, 'itemId': 'tool-1', 'type': 'command_execution', 'title': 'Fixture command', 'text': 'echo fixture', 'status': 'completed', 'updatedAt': now, 'textTruncated': False}]
+                    more = False
+            else: items, more = [], False
+            result = {'thread': row, 'recentRuns': [], 'items': items, 'hasMore': more, 'nextPosition': 1 if more else 2}
+        elif name == 't3_pending_request':
+            action = args['action']
+            if action == 'list': result = {'requestIds': ['mcp-request'] if ident == 'mcp-question' and not self.server.mcp_answered else []}
+            elif action == 'read': result = {'requestId': 'mcp-request', 'questions': questions}
+            else:
+                assert args['requestId'] == 'mcp-request' and args['answers'] == {'format': 'json'}
+                self.server.mcp_answered = True
+                result = {'sequence': 1}
+        elif name == 'orchestrator_capabilities': result = {'providers': [{'providerInstanceId': 'fixture-provider', 'driverKind': 'codex', 'displayName': 'Fixture', 'models': [{'id': 'fixture-model', 'label': 'Model'}], 'constraints': []}]}
+        elif name == 't3_thread_configure': result = {'sequence': 2}
+        elif name == 't3_thread_send':
+            assert args['mode'] == 'queue' and args['message'] == 'Fixture prompt' and args['clientRequestId']
+            self.server.mcp_sent = True
+            result = {'threadId': ident, 'delivery': 'queued'}
+        elif name == 't3_thread_launch':
+            assert args['workspaceStrategy'] == {'type': 'existing_worktree', 'worktreePath': '/fixture/worktree'}
+            assert args['projectId'] == 'mcp-project' and args['clientRequestId']
+            result = {'threadId': 'mcp-new'}
+        elif name == 't3_thread_interrupt': result = {'threadId': ident}
+        else: raise AssertionError('Unknown MCP tool: ' + name)
+        reply = {'jsonrpc': '2.0', 'id': request['id'], 'result': {'content': [{'type': 'text', 'text': json.dumps(result)}]}}
+        # Exercise both Streamable HTTP response formats and both tool-result encodings.
+        if name == 't3_thread_read':
+            payload = ('event: message\ndata: ' + json.dumps(reply) + '\n\n').encode()
+            self.send_response(200); self.send_header('Content-Type', 'text/event-stream'); self.send_header('Content-Length', str(len(payload))); self.end_headers(); self.wfile.write(payload)
+        else:
+            reply['result']['structuredContent'] = result
+            self.reply(reply)
 
     def broadcast_snapshot(self):
         for handler, ident in list(self.server.subscribers.items()):
