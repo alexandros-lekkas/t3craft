@@ -19,6 +19,7 @@ final class T3ActivityScreen extends Screen {
 	private record Line(net.minecraft.util.FormattedCharSequence text, int color) {}
 	private List<Line> lines = List.of();
 	private int scroll;
+	private final T3Scroll wheel = new T3Scroll();
 	T3ActivityScreen(T3CraftClient mod, String threadId) {
 		super(Component.literal("Activity")); this.mod = mod; this.threadId = threadId;
 		var row = mod.state().snapshot().focusedRow();
@@ -32,7 +33,7 @@ final class T3ActivityScreen extends Screen {
 	@Override public boolean isPauseScreen() { return false; }
 	@Override public boolean isInGameUi() { return true; }
 	@Override public void removed() { mod.state().setPanelOpen(false); }
-	@Override public boolean mouseScrolled(double x, double y, double h, double v) { scroll = Math.max(0, scroll - (int)(v * 3)); return true; }
+	@Override public boolean mouseScrolled(double x, double y, double h, double v) { scroll = Math.max(0, scroll - wheel.rows(v * 3)); return true; }
 	@Override public boolean keyPressed(KeyEvent event) {
 		if (event.key() == InputConstants.KEY_DOWN) { scroll += 3; return true; }
 		if (event.key() == InputConstants.KEY_UP) { scroll = Math.max(0, scroll - 3); return true; }

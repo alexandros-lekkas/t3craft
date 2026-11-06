@@ -76,11 +76,11 @@ final class T3Markdown {
 			}
 			if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
 				if (TABLE_DIVIDER.matcher(trimmed).matches()) continue;
-				String[] cells = trimmed.substring(1, trimmed.length() - 1).split("\\|");
+				List<String> cells = cells(trimmed);
 				MutableComponent row = Component.empty();
-				for (int i = 0; i < cells.length; i++) {
+				for (int i = 0; i < cells.size(); i++) {
 					if (i > 0) row.append(Component.literal("  │  ").withColor(0xFF4B5563));
-					row.append(inline(cells[i].strip(), baseColor));
+					row.append(inline(cells.get(i), baseColor));
 				}
 				wrap(font, row, width, 0, null, Kind.TEXT, out);
 				continue;
@@ -116,6 +116,8 @@ final class T3Markdown {
 				result.append(inline(m.group(2) != null ? m.group(2) : m.group(3), color).withStyle(Style.EMPTY.withBold(true)));
 			} else if (m.group(4) != null) {
 				result.append(Component.literal(m.group(4)).withStyle(Style.EMPTY.withColor(LINK).withUnderlined(true)));
+				// Minecraft text isn't clickable here, so the destination has to be readable.
+				if (!m.group(4).equals(m.group(5))) result.append(Component.literal(" (" + m.group(5) + ")").withColor(MUTED));
 			} else if (m.group(6) != null) {
 				result.append(inline(m.group(6), MUTED).withStyle(Style.EMPTY.withStrikethrough(true)));
 			} else {
@@ -126,6 +128,23 @@ final class T3Markdown {
 		}
 		if (last < text.length()) result.append(Component.literal(text.substring(last)).withColor(color));
 		return result;
+	}
+
+	/** Cells of a "| a | b |" row: empty cells are kept, and {@code \|} is a literal pipe, not a divider. */
+	static List<String> cells(String row) {
+		String body = row.strip();
+		if (body.startsWith("|")) body = body.substring(1);
+		if (body.endsWith("|") && !body.endsWith("\\|")) body = body.substring(0, body.length() - 1);
+		List<String> cells = new java.util.ArrayList<>();
+		StringBuilder cell = new StringBuilder();
+		for (int i = 0; i < body.length(); i++) {
+			char c = body.charAt(i);
+			if (c == '\\' && i + 1 < body.length() && body.charAt(i + 1) == '|') { cell.append('|'); i++; }
+			else if (c == '|') { cells.add(cell.toString().strip()); cell.setLength(0); }
+			else cell.append(c);
+		}
+		cells.add(cell.toString().strip());
+		return cells;
 	}
 
 	static void wrap(Font font, Component text, int width, int indent, String marker, Kind kind, List<Line> out) {

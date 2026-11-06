@@ -23,6 +23,7 @@ final class T3ReviewScreen extends Screen {
 	private Button previous, next;
 	private List<T3Diff.Line> numbered = List.of();
 	private List<Integer> hunks = List.of();
+	private final T3Scroll fileWheel = new T3Scroll(), patchWheel = new T3Scroll();
 
 	T3ReviewScreen(T3CraftClient mod, String threadId) { super(Component.literal("Checkpoint review")); this.mod = mod; this.threadId = threadId; }
 	@Override protected void init() {
@@ -58,12 +59,27 @@ final class T3ReviewScreen extends Screen {
 			T3Api.Review result = owner.review(threadId);
 			Minecraft.getInstance().execute(() -> {
 				if (closed || request != serial || owner != mod.state().apiFor(threadId)) return;
-				review = result; files = T3Diff.files(result.diff()); choose(-1); fileScroll = 0; loading = false;
+				show(result); loading = false;
 			});
 		}, e -> Minecraft.getInstance().execute(() -> {
 			if (closed || request != serial) return;
 			loading = false; error = e.getMessage();
 		}));
+	}
+	/** First load starts at the agent reply; Refresh/F5 keeps the open file (by path) and its position. */
+	private void show(T3Api.Review result) {
+		boolean refreshing = review != null;
+		String path = selected >= 0 && selected < files.size() ? files.get(selected).path() : null;
+		int keepScroll = scroll, keepHorizontal = horizontal, keepFileScroll = fileScroll;
+		review = result; files = T3Diff.files(result.diff());
+		int index = -1;
+		for (int i = 0; path != null && i < files.size(); i++) if (files.get(i).path().equals(path)) { index = i; break; }
+		choose(index);
+		if (!refreshing || path != null && index < 0) { fileScroll = 0; return; }
+		// Render clamps these if the file got shorter.
+		scroll = keepScroll; horizontal = keepHorizontal;
+		fileScroll = Math.min(keepFileScroll, Math.max(0, files.size() + 1 - visible()));
+		tick();
 	}
 	T3Api.Review reviewForTest() { return review; }
 	List<T3Diff.File> filesForTest() { return files; }
@@ -95,8 +111,8 @@ final class T3ReviewScreen extends Screen {
 		return super.mouseClicked(event, doubleClick);
 	}
 	@Override public boolean mouseScrolled(double x, double y, double h, double v) {
-		if (x < side()) fileScroll = Math.max(0, Math.min(fileScroll - (int) v, Math.max(0, files.size() + 1 - visible())));
-		else scroll = Math.max(0, scroll - (int) (v * 3));
+		if (x < side()) fileScroll = Math.max(0, Math.min(fileScroll - fileWheel.rows(v), Math.max(0, files.size() + 1 - visible())));
+		else scroll = Math.max(0, scroll - patchWheel.rows(v * 3));
 		return true;
 	}
 	@Override public boolean keyPressed(KeyEvent event) {

@@ -46,12 +46,15 @@ final class T3Hud implements HudElement {
 		T3State.ThreadRow shown = row != null && (row.status() == T3State.Status.WORKING || row.status() == T3State.Status.NEEDS_YOU) ? row
 			// Only threads you're following; a stale approval elsewhere shouldn't own the corner.
 			: snapshot.threads().stream().filter(t -> t.status() == T3State.Status.NEEDS_YOU && mod.state().isWatched(t.id()))
-				.findFirst().orElse(null);
+				.findFirst()
+				// Then a followed thread that's still working, so a prompt you sent before switching stays visible.
+				.or(() -> snapshot.threads().stream().filter(t -> t.status() == T3State.Status.WORKING && mod.state().isWatched(t.id())).findFirst())
+				.orElse(null);
 		long waitingAnywhere = snapshot.threads().stream().filter(t -> t.status() == T3State.Status.NEEDS_YOU).count();
 		if (shown == null && waitingAnywhere > 0) {
 			// Nothing followed is active, but threads elsewhere are waiting: just the count.
 			Font font = minecraft.font;
-			String text = waitingAnywhere + " waiting  [`]";
+			String text = waitingAnywhere + " waiting  [" + mod.openKeyName() + "]";
 			graphics.fill(4, 4, 4 + 12 + font.width(text) + 6, 18, 0xA0101014);
 			graphics.fill(8, 9, 12, 13, color(T3State.Status.NEEDS_YOU));
 			graphics.text(font, text, 16, 7, 0xFF9CA3AF, false);
@@ -69,7 +72,7 @@ final class T3Hud implements HudElement {
 			if (shown.step() != null) step = " · " + shown.step();
 		}
 		String suffix = (othersWaiting > 0 ? "  +" + othersWaiting + " waiting" : "")
-			+ (shown.status() == T3State.Status.NEEDS_YOU ? "  [`]" : "");
+			+ (shown.status() == T3State.Status.NEEDS_YOU ? "  [" + mod.openKeyName() + "]" : "");
 
 		// Stay clear of the toast column on the right; shorten the title first, then drop the step.
 		int maxWidth = graphics.guiWidth() - TOAST_COLUMN - 12;
@@ -99,11 +102,24 @@ final class T3Hud implements HudElement {
 	}
 
 	static String ellipsize(Font font, String text, int maxWidth) {
+		return ellipsize(text, maxWidth, font::width);
+	}
+
+	/**
+	 * Longest prefix that fits with "…" appended, found by binary search over code points so a
+	 * surrogate pair is never split and a long string costs O(log n) width calls, not O(n).
+	 */
+	static String ellipsize(String text, int maxWidth, java.util.function.ToIntFunction<String> width) {
 		if (text == null) return "";
-		if (font.width(text) <= maxWidth) return text;
+		if (width.applyAsInt(text) <= maxWidth) return text;
 		String ellipsis = "…";
-		int end = text.length();
-		while (end > 0 && font.width(text.substring(0, end)) + font.width(ellipsis) > maxWidth) end--;
-		return text.substring(0, end) + ellipsis;
+		int room = maxWidth - width.applyAsInt(ellipsis);
+		int low = 0, high = text.codePointCount(0, text.length());
+		while (low < high) {
+			int mid = (low + high + 1) >>> 1;
+			if (width.applyAsInt(text.substring(0, text.offsetByCodePoints(0, mid))) <= room) low = mid;
+			else high = mid - 1;
+		}
+		return text.substring(0, text.offsetByCodePoints(0, low)) + ellipsis;
 	}
 }

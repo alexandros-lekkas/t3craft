@@ -18,6 +18,7 @@ final class T3DeskScreen extends Screen {
 	private int scroll, detailScroll;
 	private Button open;
 	private List<T3Decisions.Entry> rows = List.of();
+	private final T3Scroll listWheel = new T3Scroll(), detailWheel = new T3Scroll();
 
 	T3DeskScreen(T3CraftClient mod) { super(Component.literal("Decision desk")); this.mod = mod; }
 	@Override protected void init() {
@@ -42,7 +43,8 @@ final class T3DeskScreen extends Screen {
 	private T3Decisions.Entry selection() { return rows.stream().filter(e -> e.key().equals(selected)).findFirst().orElse(null); }
 	void openSelected() { var e = selection(); if (e != null && open.active) mod.openRequest(e); }
 	@Override public boolean keyPressed(KeyEvent event) {
-		if (event.key() == InputConstants.KEY_J || event.key() == InputConstants.KEY_ESCAPE) { onClose(); return true; }
+		// The decisions key closes the desk it opened, whatever it is bound to.
+		if (mod.decisionsKey().matches(event) || event.key() == InputConstants.KEY_ESCAPE) { onClose(); return true; }
 		if (event.isConfirmation()) { openSelected(); return true; }
 		return super.keyPressed(event);
 	}
@@ -55,8 +57,8 @@ final class T3DeskScreen extends Screen {
 		return super.mouseClicked(event, doubleClick);
 	}
 	@Override public boolean mouseScrolled(double x, double y, double horizontal, double vertical) {
-		if (x < side()) scroll = Math.max(0, Math.min(scroll - (int) vertical, Math.max(0, rows.size() - visible())));
-		else detailScroll = Math.max(0, detailScroll - (int) (vertical * 3));
+		if (x < side()) scroll = Math.max(0, Math.min(scroll - listWheel.rows(vertical), Math.max(0, rows.size() - visible())));
+		else detailScroll = Math.max(0, detailScroll - detailWheel.rows(vertical * 3));
 		return true;
 	}
 	@Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
@@ -79,7 +81,8 @@ final class T3DeskScreen extends Screen {
 			: e.kind() + " · " + e.thread().projectTitle() + "\n\n" + e.detail()
 				+ (!mod.state().online(e.thread().id()) ? "\n\nLast-known request. This machine is offline; answering is disabled." : "");
 		var lines = font.split(Component.literal(detail), Math.max(20, width - side() - 32));
-		detailScroll = Math.min(detailScroll, Math.max(0, lines.size() - Math.max(1, (height - 94) / font.lineHeight)));
+		// Rows below are lineHeight + 2 apart from y = 60; count only rows that fit whole above height - 36.
+		detailScroll = Math.min(detailScroll, Math.max(0, lines.size() - Math.max(1, (height - 94) / (font.lineHeight + 2))));
 		int y = 60;
 		for (int i = detailScroll; i < lines.size() && y < height - 36; i++, y += font.lineHeight + 2) g.text(font, lines.get(i), side() + 16, y, 0xFFE5E7EB, false);
 		g.disableScissor();
