@@ -212,7 +212,7 @@ public final class T3CraftClient implements ClientModInitializer {
 	private List<T3State.Connection> connections() {
 		List<T3State.Connection> connections = new java.util.ArrayList<>();
 		for (T3Config.Environment env : config.environments) {
-			connections.add(new T3State.Connection(new T3Api(env.baseUrl, env.accessToken), env.label));
+			connections.add(new T3State.Connection(T3Backend.forEnvironment(env), env.label));
 		}
 		return connections;
 	}
@@ -239,16 +239,19 @@ public final class T3CraftClient implements ClientModInitializer {
 		Thread thread = new Thread(() -> {
 			String error = null;
 			try {
-				if (expectedOwner != null && !expectedOwner.equals(T3Api.pairingAddress(link)))
+				boolean mcp = T3McpAuth.isMcp(link);
+				if (expectedOwner != null && !expectedOwner.equals(mcp ? T3McpAuth.address(link) : T3Api.pairingAddress(link)))
 					throw new java.io.IOException("This link belongs to another machine. Use Add machine, or copy a link from the selected machine.");
-				T3Api.Pairing pairing = T3Api.pair(link, "Minecraft");
-				String name = label == null || label.isBlank() ? T3Api.environmentLabel(pairing.baseUrl()) : label.trim();
+				T3Config.Environment environment;
+				if (mcp) environment = T3McpAuth.authorize(link, uri -> Minecraft.getInstance().execute(() -> com.mojang.blaze3d.Blaze3D.openUri(uri)));
+				else { T3Api.Pairing pairing = T3Api.pair(link, "Minecraft"); environment = new T3Config.Environment(T3Api.environmentLabel(pairing.baseUrl()), pairing.baseUrl(), pairing.accessToken()); }
+				if (label != null && !label.isBlank()) environment.label = label.trim();
 				Minecraft.getInstance().execute(() -> {
 					pairingInProgress = false;
 					if (revision != connectionRevision) { result.accept("Connections changed during pairing. Try a fresh link."); return; }
 					connectionRevision++;
 					var previous = new java.util.ArrayList<>(config.environments);
-					config.upsert(new T3Config.Environment(name, pairing.baseUrl(), pairing.accessToken()));
+					config.upsert(environment);
 					if (!config.save(configPath)) { config.environments = previous; result.accept("Could not save this pairing. Check Minecraft's config folder permissions, then try a fresh link."); return; }
 					state.reconfigure(connections(), config.threadId); result.accept(null);
 				});
@@ -311,7 +314,7 @@ public final class T3CraftClient implements ClientModInitializer {
 		}
 		T3State.ThreadRow target = row;
 		// The target's own environment: a thread from the home server goes to the home server.
-		T3Api api = state.apiFor(target.id());
+		T3Backend api = state.apiFor(target.id());
 		state.run(() -> {
 			if (newThread) {
 				String id = api.startThread(target.raw(), text, model);
@@ -357,7 +360,7 @@ public final class T3CraftClient implements ClientModInitializer {
 
 	public void interrupt() {
 		String threadId = state.focusedThreadId();
-		T3Api api = state.api();
+		T3Backend api = state.api();
 		if (threadId != null) state.run(() -> api.interrupt(threadId), this::reportError);
 	}
 

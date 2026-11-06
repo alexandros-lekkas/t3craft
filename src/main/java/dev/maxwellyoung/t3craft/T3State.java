@@ -95,7 +95,7 @@ public final class T3State {
 
 	/** One paired environment: its API, socket, and shell mirror. Owned by the executor thread. */
 	private static final class Env {
-		final T3Api api;
+		final T3Backend api;
 		String label;
 		final Map<String, String> projectTitles = new HashMap<>();
 		final Map<String, JsonObject> threads = new ConcurrentHashMap<>();
@@ -110,13 +110,13 @@ public final class T3State {
 		volatile List<T3Api.Provider> providers = List.of();
 		long providersLoadedAt;
 
-		Env(T3Api api, String label) {
+		Env(T3Backend api, String label) {
 			this.api = api;
 			this.label = label;
 		}
 	}
 
-	public record Connection(T3Api api, String label) {}
+	public record Connection(T3Backend api, String label) {}
 
 	private volatile List<Env> envs = List.of();
 	private Focus focusDetail;
@@ -138,13 +138,13 @@ public final class T3State {
 	}
 
 	/** API of the environment that owns the focused thread (or the first one). */
-	public T3Api api() {
+	public T3Backend api() {
 		Env env = envFor(focusedThreadId);
 		return env == null ? null : env.api;
 	}
 
 	/** API of the environment that owns {@code threadId}; falls back to the first environment. */
-	public T3Api apiFor(String threadId) {
+	public T3Backend apiFor(String threadId) {
 		Env env = envFor(threadId);
 		return env == null ? null : env.api;
 	}
@@ -176,7 +176,7 @@ public final class T3State {
 
 	/** The config payload is large (~700 KB), so reload at most every five minutes. */
 	private void loadProvidersIfStale(Env env) {
-		if (env.socket == null || !env.socket.isOpen() || System.currentTimeMillis() - env.providersLoadedAt < 5 * 60_000) return;
+		if ((!env.api.publicMcp() && (env.socket == null || !env.socket.isOpen())) || System.currentTimeMillis() - env.providersLoadedAt < 5 * 60_000) return;
 		env.providersLoadedAt = System.currentTimeMillis();
 		try {
 			env.providers = env.api.providers(env.socket);
@@ -186,7 +186,7 @@ public final class T3State {
 		}
 	}
 
-	public void connect(T3Api api, String focusedThreadId) {
+	public void connect(T3Backend api, String focusedThreadId) {
 		connect(api == null ? List.of() : List.of(new Connection(api, "T3")), focusedThreadId);
 	}
 
@@ -362,12 +362,13 @@ public final class T3State {
 		for (Env env : current) {
 			try {
 				ensureSocket(env);
+				if (env.api.publicMcp()) loadProvidersIfStale(env);
 				if (env.shellLive && env.error == null) {
 					if (tick % 15 == 0) env.socket.ping();
 					syncThreadSubscription(env);
-					continue;
+					if (!env.api.publicMcp()) continue;
 				}
-				if (!pollNow) continue;
+				if (!pollNow || env.api.publicMcp() && !refreshSoon && tick % 2 != 0) continue;
 				applyShellSnapshot(env, env.api.shell());
 				env.error = null;
 				changed = true;
@@ -394,6 +395,7 @@ public final class T3State {
 	}
 
 	private void ensureSocket(Env env) {
+		if (!env.api.hasLegacy()) return;
 		if (env.socket != null && env.socket.isOpen()) return;
 		if (System.currentTimeMillis() < env.nextSocketAttempt) return;
 		env.shellLive = false;
@@ -441,6 +443,11 @@ public final class T3State {
 	}
 
 	private void onShellItem(Env env, JsonObject item) {
+		if (env.api.publicMcp()) {
+			if ("synchronized".equals(string(item, "kind"))) { env.shellLive = true; syncThreadSubscription(env); }
+			refreshSoon = true;
+			return;
+		}
 		switch (string(item, "kind")) {
 			case "snapshot" -> {
 				JsonObject shell = item.getAsJsonObject("snapshot");

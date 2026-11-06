@@ -70,7 +70,7 @@ final class T3ConnectionsScreen extends Screen {
 	}
 	private void submit() {
 		if (busy || link.getValue().isBlank()) return;
-		String value = link.getValue(); busy = true; message = "Pairing…"; tick();
+		String value = link.getValue(); busy = true; message = T3McpAuth.isMcp(value) ? "Authorize T3 Craft in your browser. Choose write access to send prompts and answer questions. Waiting up to 3 minutes…" : "Pairing…"; tick();
 		mod.pairEnvironment(value, name.getValue(), replacing, error -> {
 			busy = false;
 			if (error != null) { message = error; if (minecraft.gui.screen() == this) tick(); return; }
@@ -124,9 +124,9 @@ final class T3ConnectionsScreen extends Screen {
 			wrapped(g, "Remove " + mod.machineLabel(removing) + " from this Minecraft client? Other machines stay connected. Its saved pins remain available if you pair this address again.", x, 58, w, 0xFFFFCC72);
 			wrapped(g, "This removes local access only. It does not revoke the device in T3 Code or remove the operator's shared pairing.", x, 110, w, 0xFF9CA3AF);
 		} else if (form) {
-			wrapped(g, "1. In T3: Settings > Connections > pairing link.\n2. Copy the full link. Keep T3 running.", x, 40, w, 0xFFE5E7EB);
+			wrapped(g, "1. T3: Settings > Environments > Copy MCP URL.\n2. Paste below and authorize in your browser. Legacy pairing links also work.", x, 40, w, 0xFFE5E7EB);
 			g.text(font, replacing == null ? "Add a machine · name optional" : "Re-pair " + T3Hud.ellipsize(font, mod.machineLabel(replacing), w - 60), x, 82, 0xFF93C5FD, false);
-			g.text(font, "Pairing link · hidden from screen and narration", x, 122, 0xFF9CA3AF, false);
+			g.text(font, "MCP URL or legacy pairing link · value hidden", x, 122, 0xFF9CA3AF, false);
 			g.enableScissor(x, 188, right(), height - 30);
 			int y = 188 - messageScroll;
 			for (var line : font.split(Component.literal(message.isEmpty() ? "Use a reachable address for another machine. No chat command needed." : message), w)) {
@@ -141,7 +141,7 @@ final class T3ConnectionsScreen extends Screen {
 				var env = shown.get(i); String owner = T3Config.ownerKey(env.baseUrl); int y = 58 + (i - page * count) * 52;
 				var health = mod.state().machines().stream().filter(m -> m.owner().equals(owner)).findFirst().orElse(null);
 				String status = health == null ? "Connecting…" : health.error() != null ? recovery(health.error()) : health.online()
-					? (health.live() ? "Live" : "Connected · polling") + " · protocol " + health.protocol() + " · " + health.threads() + " threads" : "Connecting…";
+					? (env.mcpUrl != null ? (health.live() ? "MCP + legacy live" : "MCP · polling") : (health.live() ? "Live" : "Connected · polling") + " · protocol " + health.protocol()) + " · " + health.threads() + " threads" : "Connecting…";
 				g.text(font, T3Hud.ellipsize(font, mod.machineLabel(owner), w - 182), x, y + 2, 0xFFE5E7EB, false);
 				g.text(font, T3Hud.ellipsize(font, owner, w), x, y + 22, 0xFF9CA3AF, false);
 				g.text(font, T3Hud.ellipsize(font, status, w), x, y + 35, health != null && health.online() ? 0xFF86EFAC : 0xFFFFCC72, false);
@@ -172,7 +172,7 @@ final class T3ConnectionsScreen extends Screen {
 		@Override public void extractWidgetRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
 			g.fill(getX() - 1, getY() - 1, getX() + getWidth() + 1, getY() + getHeight() + 1, isFocused() ? 0xFF93C5FD : 0xFF9CA3AF);
 			g.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), 0xFF101114);
-			g.text(font, getValue().isBlank() ? "Paste the complete pairing link" : "Pairing link entered (hidden)", getX() + 4, getY() + 6, 0xFFE5E7EB, false);
+			g.text(font, getValue().isBlank() ? "Paste MCP URL or legacy pairing link" : "Connection URL entered (hidden)", getX() + 4, getY() + 6, 0xFFE5E7EB, false);
 		}
 	}
 }

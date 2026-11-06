@@ -18,6 +18,7 @@ final class T3Activity {
 				String summary = T3Protocol.string(item, "title");
 				String detail = "command_execution".equals(kind) ? T3Protocol.string(item, "input")
 					: "approval_request".equals(kind) ? T3Protocol.string(item, "prompt") : null;
+				if (detail == null) detail = T3Protocol.string(item, "text"); // Public MCP timeline text.
 				if ("command_execution".equals(kind) && T3Protocol.string(item, "exitCode") != null)
 					detail = (detail == null ? "" : detail + "\n") + "Exit code: " + T3Protocol.string(item, "exitCode");
 				entries.add(new Entry(kind, T3Protocol.string(item, "status"), T3Protocol.string(item, "startedAt"),

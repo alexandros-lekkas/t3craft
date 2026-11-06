@@ -51,7 +51,7 @@ final class T3ReviewScreen extends Screen {
 	void load() {
 		int request = ++serial;
 		loading = true; error = null;
-		T3Api owner = mod.state().apiFor(threadId);
+		T3Backend owner = mod.state().apiFor(threadId);
 		mod.state().run(() -> {
 			if (owner == null || owner != mod.state().apiFor(threadId) || !mod.state().online(threadId))
 				throw new java.io.IOException("This thread's machine is offline. Reconnect before loading a review.");

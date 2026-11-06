@@ -129,7 +129,7 @@ public final class T3CraftServer implements DedicatedServerModInitializer {
 	private void connect() {
 		List<T3State.Connection> connections = new ArrayList<>();
 		for (T3Config.Environment env : config.environments) {
-			connections.add(new T3State.Connection(new T3Api(env.baseUrl, env.accessToken), env.label));
+			connections.add(new T3State.Connection(T3Backend.forEnvironment(env), env.label));
 		}
 		state.connect(connections, null);
 	}
