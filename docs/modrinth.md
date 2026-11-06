@@ -15,8 +15,8 @@ Draft copy for the T3 Craft project page on Modrinth. Nothing here is published 
 | Loaders | Fabric |
 | Game versions | 26.3 |
 | License | MIT (`LICENSE` in the repo) |
-| Source | https://github.com/maxwellyoung/t3craft |
-| Issues | https://github.com/maxwellyoung/t3craft/issues |
+| Source | https://github.com/alexandros-lekkas/t3craft |
+| Issues | https://github.com/alexandros-lekkas/t3craft/issues |
 | Primary category | Utility |
 | Additional categories | Management, Social |
 | Icon | `src/main/resources/assets/t3craft/icon.png` (128x128). Modrinth accepts it; a 512x512 export of `scripts/icon-1024.png` looks sharper. |

@@ -4,7 +4,7 @@ This is an early Fabric mod, not a replacement for T3 Code. Use a disposable Min
 
 ## Before you start
 
-- Minecraft Java 26.3, Fabric Loader 0.19.5+, Fabric API for 26.3, and the [0.5.0 release jar](https://github.com/maxwellyoung/t3craft/releases/tag/v0.5.0).
+- Minecraft Java 26.3, Fabric Loader 0.19.5+, Fabric API for 26.3, and the [0.5.0 release jar](https://github.com/alexandros-lekkas/t3craft/releases/tag/v0.5.0).
 - A running T3 Code environment with Settings → Connections. T3's client protocol may change; the README records the tested nightly versions.
 - For Prism, select Java 25 for the 26.3 profile. Keep your existing launcher profiles and worlds intact.
 
