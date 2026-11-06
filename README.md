@@ -18,7 +18,7 @@ It is a Fabric mod for Minecraft Java 26.3. On the client it connects to your T3
 
 ## Public MCP and legacy connections
 
-In **Connections**, paste the URL from **T3 Settings → Environments → Copy MCP URL**, then choose **Pair machine**. T3 Craft opens the browser for consent and listens temporarily on `127.0.0.1`. Choose write access to send prompts, launch/stop threads, change models and answer questions; T3 defaults to read-only access and caps writes by its permission mode. Authorization uses OAuth with PKCE, separate from legacy pairing. Tokens are saved in `config/t3craft.json` using the existing owner-only file handling. Sessions expire after 30 days without refresh tokens; **Re-pair** with the MCP URL authorizes again. Tokens are never shown in the connection form.
+In **Connections**, paste the URL from **T3 Settings → Environments → Copy MCP URL**, then choose **Pair machine**. T3 Craft opens the browser for consent and listens temporarily on `127.0.0.1`. On T3's consent page choose **Full access**, then **Approve**. Read only is refused at pairing. Supervised, Auto-accept edits or Auto still pair, but T3 then refuses prompts to threads that run in Full access. If the page asks for a pairing code, create one in **T3 Settings → Sharing & access** (or `t3 auth pairing create`). Authorization uses OAuth with PKCE, separate from legacy pairing. Tokens are saved in `config/t3craft.json` using the existing owner-only file handling. Sessions expire after 30 days without refresh tokens. Connections shows days left; **Re-pair** prefills the saved MCP URL. You can reopen the consent page or cancel while pairing. Tokens are never shown in the connection form.
 
 | Feature | Connection used |
 | --- | --- |
@@ -27,13 +27,15 @@ In **Connections**, paste the URL from **T3 Settings → Environments → Copy M
 | Permission approvals and checkpoint patches | Legacy pairing required; public MCP does not expose them yet |
 | Live notifications | Legacy subscriptions; MCP polls every 2 seconds while active and 6 seconds while idle |
 
-To enable approvals, review and live updates as well, paste a legacy pairing link from **Settings → Connections** for the same environment address. Adding either connection preserves the other credential. If legacy breaks after a T3 update, MCP operations continue through polling. The decision desk and review show guidance for features requiring legacy. Legacy-only installations retain their existing behavior. Removing a machine removes both credentials locally; revoke access separately in T3.
+To enable approvals, review and live updates as well, paste a legacy pairing link from **Settings → Environments** for the same environment address. Adding either connection preserves the other credential. MCP and legacy are checked separately. If MCP fails or expires, the machine keeps working over legacy (Connections shows `Legacy only · MCP: …`). If legacy fails, MCP keeps sends, questions and polling working, and approvals and review show the legacy error. An ambiguous write failure is never automatically replayed over legacy. Legacy-only installations retain their existing behavior. Removing a machine removes both credentials locally; revoke access separately in T3.
 
-MCP sends explicitly **queue** behind an active turn instead of steering it. New threads retain the selected thread's project and existing worktree. The model picker uses the model shortlist returned by `orchestrator_capabilities`; the public tool may omit additional models. Activity is a recent-run snapshot, with pagination; individual messages beyond the public tool's 50,000-character limit are marked truncated. MCP exposes less checkpoint and timing metadata than the legacy projection.
+MCP sends explicitly **queue** behind an active turn instead of steering it. New threads retain the selected thread's project and existing worktree. The model picker uses the model shortlist returned by `orchestrator_capabilities`; the provider label discloses any additional models omitted by T3. Activity is cached per thread and read incrementally, at most ten pages per refresh; individual messages beyond the public tool's 50,000-character limit are marked truncated. MCP exposes less checkpoint and timing metadata than the legacy projection.
+
+The sidebar shows active, non-archived threads. Settled threads are hidden from the sidebar, office, village and HUD unless locally pinned; threads needing you are raised. Snoozed threads appear in a collapsed **Snoozed** group and do not ping. Subagent and side-chat children stay out of those views, while their pending requests remain in Decisions and answers target the child thread. Public MCP can discover waiting subagents, but T3's public list omits side chats entirely; discovering their pending requests requires the companion legacy connection. Public MCP still needs legacy for permission approvals.
 
 The public adapter targets MCP `2025-06-18` and the tool contracts in T3 nightly `0.1.7-nightly.20261103.4119`. It is separate from T3 Craft's Minecraft-facing MCP server (`T3Mcp.java`), which is unchanged.
 
-For isolated checks, run `python3 scripts/feature-fixture.py --port 25680`, then `./gradlew mcpCheck featureCheck reliabilityCheck connectionCheck officeCheck`. Repeat with `--protocol2` to check legacy protocol 2. `mcpCheck` covers OAuth state/PKCE, private persistence, JSON/SSE, pagination, public operations, polling, and missing/incompatible legacy and expired/read-only access. Gradle 9.5.1's Groovy compiler can require JDK 25 to compile an uncached build script (`JAVA_HOME=/path/to/jdk25 ./gradlew help`); Java compilation and these checks also run on JDK 27.
+For isolated checks, run `JAVA_HOME=/path/to/jdk25 bash scripts/verify-ci.sh`. It builds the mod and runs all fixture smoke checks, with `mcpCheck` in separate invocations on ports 25680 and 25682. `mcpCheck` covers OAuth approve/deny/read-only/limited/cancel, state/PKCE, private persistence and 0.5.0 migration, session recovery, JSON/SSE, incremental pagination, public operations, per-leg health and fallbacks, revoked-token backoff, two-machine routing, schema conformance, and thread visibility. Use JDK 25: JDK 27 breaks Gradle 9.5.1’s build-script compiler.
 
 ## What it does
 
@@ -83,7 +85,7 @@ Open **Activity** beside Connections in the panel. It shows the focused thread's
 
 ## Guided connections (0.4.0)
 
-Version 0.4.0 and later open a private pairing form when you press **`** or run `/t3` while unpaired. In T3 Code, create a pairing link under **Settings > Connections**, then choose **Paste link** and **Pair machine**. The value is hidden from the screen and narration, and never enters Minecraft chat through this form. A machine name is optional.
+Version 0.4.0 and later open a private pairing form when you press **`** or run `/t3` while unpaired. In T3 Code, create a pairing link under **Settings → Environments**, then choose **Paste link** and **Pair machine**. The value is hidden from the screen and narration, and never enters Minecraft chat through this form. A machine name is optional.
 
 Use **Connections** in the panel or `/t3 connections` to add machines, see live/polling health, retry one connection or replace an expired pairing. **Re-pair** accepts only the selected machine's address; use **Add machine** for a different address. Removing one machine asks for confirmation and preserves the others' sockets, focused conversation, draft and pins. Removal is local only: revoke the Minecraft device in that machine's T3 settings separately. Saved pins remain available if the same address is paired again. Shared server pairings remain operator-owned.
 
@@ -114,16 +116,16 @@ Set up T3 Craft (https://github.com/alexandros-lekkas/t3craft) on this machine s
    Remove older t3craft-*.jar and fabric-api-*.jar files there. Leave my other mods alone, and delete anything else you downloaded.
 4. If you support MCP servers, add one named "minecraft" at http://127.0.0.1:25590/mcp (streamable HTTP; it only answers while Minecraft is running). For Claude Code:
    claude mcp add --transport http -s user minecraft http://127.0.0.1:25590/mcp
-5. Then tell me the steps only I can do: in the Minecraft Launcher, play the fabric-loader-…-26.3 profile; in T3 Code, create a pairing link under Settings → Connections; in game, press ` to open setup and paste the full pairing link into the private form. Never ask me to paste the pairing link or any token to you.
+5. Then tell me the steps only I can do: in the Minecraft Launcher, play the fabric-loader-…-26.3 profile; in T3 Code, create a pairing link under Settings → Environments; in game, press ` to open setup and paste the full pairing link into the private form. Never ask me to paste the pairing link or any token to you.
 ```
 
 Or by hand:
 
 1. Install Minecraft Java 26.3 with [Fabric Loader](https://fabricmc.net/use/) 0.19.5+ and [Fabric API](https://modrinth.com/mod/fabric-api). Download `t3craft-0.5.0.jar` from [Releases](https://github.com/alexandros-lekkas/t3craft/releases/latest) (or build it, below) and put it in `mods/`.
-2. In T3 Code, go to **Settings → Connections** and create a pairing link. If Minecraft runs on a different machine from T3, turn on network access first so the link uses an address that machine can reach. For a headless server, run `t3 pair` there.
+2. In T3 Code, go to **Settings → Environments** and create a pairing link. If Minecraft runs on a different machine from T3, turn on network access first so the link uses an address that machine can reach. For a headless server, run `t3 pair` there.
 3. In game, press **`** or run `/t3`, then use **Paste link → Pair machine** in the private form. Repeat through **Connections → Add machine** for another environment. Keep pairing links out of game chat and messages to agents.
 
-Pairing asks only for `orchestration:read orchestration:operate`. The token lasts 30 days and is saved to `config/t3craft.json` with owner-only permissions. To remove the device, revoke "Minecraft" in T3 under **Settings → Connections**.
+Pairing asks only for `orchestration:read orchestration:operate`. The token lasts 30 days and is saved to `config/t3craft.json` with owner-only permissions. To remove the device, revoke "Minecraft" in T3 under **Settings → Environments**.
 
 ## Shared village (server)
 
