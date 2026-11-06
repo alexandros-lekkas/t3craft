@@ -2,6 +2,8 @@ package dev.maxwellyoung.t3craft;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,6 +30,8 @@ public final class T3Config {
 		}
 	}
 
+	/** Bumped when a default changes for existing files; {@link #load} migrates older ones. 2: agent building on. */
+	public int configVersion = 2;
 	public java.util.List<Environment> environments = new java.util.ArrayList<>();
 	// Single-environment fields from 0.1; migrated into environments on load.
 	public String baseUrl;
@@ -52,8 +56,10 @@ public final class T3Config {
 	public OfficeRoster.Preferences sharedOfficePreferences = new OfficeRoster.Preferences();
 	/** Hand the player a written report when a watched thread finishes (needs command permission). */
 	public boolean books = true;
-	/** Lets local agents run commands through the MCP server. Off until the player opts in. */
-	public boolean agentCommands;
+	/** Lets local agents run commands through the MCP server. On by default: no gates ({@code /t3 agent-build off} turns it off). */
+	public boolean agentCommands = true;
+	/** Shows the debug and admin subcommands of {@code /t3} (pairing, threads, village, books…). Off: players see only what they need. */
+	public boolean debug;
 	/**
 	 * Stream T3 Code's web app through a hidden Chrome instead of the native screens. Off by default, and there is
 	 * no in-game switch: edit {@code t3craft.json}. While it is off, Chrome is never started.
@@ -92,8 +98,14 @@ public final class T3Config {
 	public static T3Config load(Path path) {
 		try {
 			if (Files.exists(path)) {
-				T3Config config = GSON.fromJson(Files.readString(path), T3Config.class);
+				String text = Files.readString(path);
+				T3Config config = GSON.fromJson(text, T3Config.class);
 				if (config != null) {
+					// Files from before 0.6 carry "agentCommands": false because Gson wrote the old default, not because the player chose it.
+					JsonObject raw = JsonParser.parseString(text).getAsJsonObject();
+					int version = raw.has("configVersion") && !raw.get("configVersion").isJsonNull() ? raw.get("configVersion").getAsInt() : 1;
+					if (version < 2) config.agentCommands = true;
+					config.configVersion = 2;
 					if (config.environments == null) config.environments = new java.util.ArrayList<>();
 					if (config.environments.isEmpty() && config.baseUrl != null && config.accessToken != null) {
 						config.environments.add(new Environment("This Mac", config.baseUrl, config.accessToken));

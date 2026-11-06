@@ -47,6 +47,9 @@ public final class T3Api implements T3Backend {
 
 	public record Pairing(String baseUrl, String accessToken, long expiresInSeconds) {}
 
+	/** Refuses an incompatible machine before any credential is minted or exchanged for it. */
+	static void probe(String baseUrl) throws IOException, InterruptedException { new T3Api(baseUrl, "").protocol(); }
+
 	/** Public environment metadata determines the protocol before any authenticated request. */
 	private int protocol() throws IOException, InterruptedException {
 		if (wireProtocol != 0) return wireProtocol;
@@ -406,7 +409,7 @@ public final class T3Api implements T3Backend {
 		HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
 		if (response.statusCode() == 401 || response.statusCode() == 403) {
 			throw new AuthException("Pairing expired, was revoked, or lacks access (" + response.statusCode()
-				+ "). Create a new pairing link in T3 Settings → Environments, then use /t3 pair <link>.");
+				+ "). The T3 on this computer is paired again by itself; for another machine, create a new pairing link in T3 Settings → Environments.");
 		}
 		if (response.statusCode() / 100 != 2) {
 			throw new IOException("T3 " + request.method() + " " + request.uri().getPath() + " → " + response.statusCode() + ": " + errorText(response.body()));

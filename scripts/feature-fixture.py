@@ -193,7 +193,7 @@ class Handler(BaseHTTPRequestHandler):
                 result = {'redirect': self.server.oauth_redirect, 'state': q['state'][0], 'iss': base}
                 result.update({'error': 'access_denied'} if self.server.oauth_decision == 'deny' else {'code': 'fixture-code'})
                 return self.reply(result)
-            if self.path == '/.well-known/t3/environment': return self.reply({'label': 'Fixture ' + self.server.machine, 'orchestrationProtocolVersion': self.server.protocol_version})
+            if self.path == '/.well-known/t3/environment': return self.reply({'environmentId': 'fixture-' + self.server.machine, 'label': 'Fixture ' + self.server.machine, 'orchestrationProtocolVersion': self.server.protocol_version})
             if self.path in ('/_qa/protocol3', '/_qa/auth-failed'):
                 if self.path == '/_qa/protocol3': self.server.protocol_version = 3
                 else: self.server.auth_failed = True

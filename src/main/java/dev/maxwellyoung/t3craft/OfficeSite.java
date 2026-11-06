@@ -46,12 +46,62 @@ final class OfficeSite {
 		return true;
 	}
 
-	/** Ignore terrain at the plaza layer and replaceable vegetation; protect player builds and containers. */
+	/** Whether {@link #blocker} finds anything: terrain never counts, only the player's storage and builds. */
 	static boolean occupied(Level level, Bounds bounds, BlockPos oldOrigin, List<String> oldBlueprint) {
-		return occupied(bounds, oldOrigin, oldBlueprint, level::getBlockState, level::getBlockEntity);
+		return blocker(level, bounds, oldOrigin, oldBlueprint) != null;
 	}
 
 	static boolean occupied(Bounds bounds, BlockPos oldOrigin, List<String> oldBlueprint,
+		java.util.function.Function<BlockPos, net.minecraft.world.level.block.state.BlockState> blocks,
+		java.util.function.Function<BlockPos, net.minecraft.world.level.block.entity.BlockEntity> entities) {
+		return blocker(bounds, oldOrigin, oldBlueprint, blocks, entities) != null;
+	}
+
+	/** Block entities world generation leaves in the open: wild bee nests, suspicious sand and gravel, creaking hearts. */
+	private static boolean natural(net.minecraft.world.level.block.state.BlockState state, net.minecraft.world.level.block.entity.BlockEntity entity) {
+		if (entity instanceof net.minecraft.world.level.block.entity.BeehiveBlockEntity) return state.is(net.minecraft.world.level.block.Blocks.BEE_NEST);
+		return entity instanceof net.minecraft.world.level.block.entity.BrushableBlockEntity
+			|| entity instanceof net.minecraft.world.level.block.entity.CreakingHeartBlockEntity;
+	}
+
+	static BlockPos blocker(Level level, Bounds bounds, BlockPos oldOrigin, List<String> oldBlueprint) {
+		return blocker(bounds, oldOrigin, oldBlueprint, level::getBlockState, level::getBlockEntity);
+	}
+
+	/**
+	 * Blocks nature never places: anything crafted. Terrain, stone, ore, wood, leaves, plants, snow and water are
+	 * replaced without a word, so a hill or a forest never stops the office; a wall of planks or a glass window does.
+	 */
+	static boolean playerMade(net.minecraft.world.level.block.state.BlockState state) {
+		if (state.isAir() || state.canBeReplaced()) return false;
+		var block = state.getBlock();
+		if (block instanceof net.minecraft.world.level.block.StairBlock || block instanceof net.minecraft.world.level.block.SlabBlock
+			|| block instanceof net.minecraft.world.level.block.FenceBlock || block instanceof net.minecraft.world.level.block.FenceGateBlock
+			|| block instanceof net.minecraft.world.level.block.WallBlock || block instanceof net.minecraft.world.level.block.DoorBlock
+			|| block instanceof net.minecraft.world.level.block.TrapDoorBlock || block instanceof net.minecraft.world.level.block.LadderBlock
+			|| block instanceof net.minecraft.world.level.block.IronBarsBlock || block instanceof net.minecraft.world.level.block.TransparentBlock
+			|| block instanceof net.minecraft.world.level.block.WoolCarpetBlock || block instanceof net.minecraft.world.level.block.BedBlock
+			|| block instanceof net.minecraft.world.level.block.AnvilBlock || block instanceof net.minecraft.world.level.block.ButtonBlock
+			|| block instanceof net.minecraft.world.level.block.BasePressurePlateBlock || block instanceof net.minecraft.world.level.block.BaseRailBlock
+			|| block instanceof net.minecraft.world.level.block.CraftingTableBlock || block instanceof net.minecraft.world.level.block.BaseTorchBlock
+			|| block instanceof net.minecraft.world.level.block.LanternBlock || block instanceof net.minecraft.world.level.block.CandleBlock) return true;
+		// By name rather than tag: tags are only loaded with a world, and this also runs in the headless office check.
+		String key = BuiltInRegistries.BLOCK.getKey(block).getPath();
+		// Natural look-alikes stay replaceable: badlands terracotta, mossy boulders, geode basalt, quartz ore.
+		if (key.equals("smooth_basalt")) return false;
+		if (key.equals("cobblestone")) return true;
+		for (String crafted : new String[] {"planks", "wool", "glazed_terracotta", "bricks", "banner", "concrete", "polished_", "smooth_", "cut_",
+			"chiseled_", "quartz_block", "quartz_bricks", "quartz_pillar", "bookshelf", "glass"})
+			if (key.contains(crafted)) return true;
+		return false;
+	}
+
+	/**
+	 * The first spot the build must not touch, or null when it can go ahead: a container with items, a lectern with a
+	 * book, any block entity that is not the office's own (chests, furnaces, signs, beds…), or a crafted block that is
+	 * not the office's own. The plaza layer and everything natural are replaceable.
+	 */
+	static BlockPos blocker(Bounds bounds, BlockPos oldOrigin, List<String> oldBlueprint,
 		java.util.function.Function<BlockPos, net.minecraft.world.level.block.state.BlockState> blocks,
 		java.util.function.Function<BlockPos, net.minecraft.world.level.block.entity.BlockEntity> entities) {
 		Map<BlockPos, String> existing = new HashMap<>();
@@ -85,14 +135,12 @@ final class OfficeSite {
 			var state = blocks.apply(pos);
 			var entity = entities.apply(pos);
 			boolean officeBlock = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString().equals(existing.get(pos));
-			if (entity instanceof net.minecraft.world.level.block.entity.LecternBlockEntity lectern && lectern.hasBook()) return true;
-			if (entity instanceof net.minecraft.world.Container container && (!officeBlock || !container.isEmpty())) return true;
-			if (entity != null && !officeBlock) return true;
-			if (pos.getY() == bounds.min().getY() || state.canBeReplaced() || state.isAir()
-				|| state.getBlock() instanceof net.minecraft.world.level.block.FlowerBlock
-				|| state.is(net.minecraft.tags.BlockTags.FLOWERS)) continue;
-			if (!officeBlock) return true;
+			if (entity instanceof net.minecraft.world.level.block.entity.LecternBlockEntity lectern && lectern.hasBook()) return pos.immutable();
+			if (entity instanceof net.minecraft.world.Container container && (!officeBlock || !container.isEmpty())) return pos.immutable();
+			if (entity != null && !officeBlock && !natural(state, entity)) return pos.immutable();
+			if (pos.getY() == bounds.min().getY() || officeBlock) continue;
+			if (playerMade(state)) return pos.immutable();
 		}
-		return false;
+		return null;
 	}
 }

@@ -62,6 +62,8 @@ public final class T3CraftClient implements ClientModInitializer {
 	private static final long PING_JUMP_WINDOW_MS = 60_000;
 	private T3Village village;
 	private final OfficeQueue office = new OfficeQueue();
+	private final FirstRun.ConnectNotice connectNotice = new FirstRun.ConnectNotice();
+	private int ticks;
 	/** The last level checked for a T3 World marker, so each world is adopted once per visit. */
 	private Object t3WorldLevel;
 
@@ -89,6 +91,7 @@ public final class T3CraftClient implements ClientModInitializer {
 		config = T3Config.load(configPath);
 		state = new T3State(event -> Minecraft.getInstance().execute(() -> announce(event)));
 		connectAll();
+		startAutoConnect();
 
 		KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "main"));
 		openKey = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.t3craft.open", InputConstants.KEY_GRAVE, category));
@@ -110,6 +113,10 @@ public final class T3CraftClient implements ClientModInitializer {
 		if (webShowcase != null) ClientTickEvents.END_CLIENT_TICK.register(webShowcase::tick);
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			state.setPins(List.copyOf(officePreferences().pins));
+			// The one line the mod says on its own: once per game, when connected and in a world. Reconnects stay in the log.
+			if (connectNotice.due(state.snapshot().connected(), client.player != null))
+				chat(Component.literal(FirstRun.connectedLine(openKeyName())).withStyle(ChatFormatting.GREEN));
+			if (++ticks % 100 == 0) recoverLocalPairing();
 			if (selfTest != null) selfTest.tick(client);
 			if (worldTest != null) worldTest.tick(client);
 			while (decisionsKey.consumeClick()) if (client.gui.screen() == null) openDecisions();
@@ -273,9 +280,6 @@ public final class T3CraftClient implements ClientModInitializer {
 
 	private List<String> pairedOwners() { return config.environments.stream().map(e -> T3Config.ownerKey(e.baseUrl)).toList(); }
 
-	private record PendingOffice(Object level, Object connection, net.minecraft.core.BlockPos origin, List<String> owners, List<String> labels) {}
-	private PendingOffice pendingOffice;
-
 	OfficeRoster.Preferences officePreferences() {
 		String world = worldKey();
 		return world == null ? new OfficeRoster.Preferences() : config.officePreferences.computeIfAbsent(world, k -> new OfficeRoster.Preferences());
@@ -322,7 +326,7 @@ public final class T3CraftClient implements ClientModInitializer {
         Minecraft mc = Minecraft.getInstance();
         OfficeDestination destination = officeDestination();
         if (mc.player == null || destination == null) {
-            chat(Component.literal("No office in this world yet. Use /t3 office build."));
+            chat(Component.literal("No office in this world yet. /t3 office builds one where you stand."));
             return 0;
         }
         // Just outside the door, looking in, however the office is turned.
@@ -358,39 +362,34 @@ public final class T3CraftClient implements ClientModInitializer {
         buildOffice(); return 1;
     }
 
-	/** Builds the Scandinavian office just south of the player (door facing them) and moves this world's village into it. */
-	void buildOffice() { buildOffice(false); }
-
-	private void buildOffice(boolean confirm) {
+	/**
+	 * Builds the Scandinavian office just south of the player (door facing them) and moves this world's village into it.
+	 * No confirmations: terrain at the site is replaced and the bounds go to the log; the player's own storage and
+	 * builds make it refuse instead, with one line saying what and where.
+	 */
+	void buildOffice() {
 		var minecraft = Minecraft.getInstance();
 		var player = minecraft.player;
 		String world = worldKey();
 		if (player == null || world == null) return;
-		PendingOffice request = pendingOffice;
-		if (confirm) {
-			if (request == null || request.level() != minecraft.level || request.connection() != minecraft.getConnection()) {
-				pendingOffice = null;
-				chat(Component.literal("No office site to confirm in this world. Run /t3 office first.")); return;
-			}
-		} else {
-			var feet = player.blockPosition();
-			var owners = pairedOwners();
-			request = new PendingOffice(minecraft.level, minecraft.getConnection(), feet.offset(-10, 0, 5), owners,
-				owners.stream().map(config::labelFor).toList());
-		}
-		var origin = request.origin();
-		var blueprint = T3Office.blueprint(request.labels());
+		var owners = pairedOwners();
+		var labels = owners.stream().map(config::labelFor).toList();
+		var origin = player.blockPosition().offset(-10, 0, 5);
+		var blueprint = T3Office.blueprint(labels);
 		var bounds = OfficeSite.bounds(origin, blueprint);
-		chat(Component.literal("Office bounds: " + bounds.describe()));
 		if (!OfficeSite.loaded(minecraft.level, origin, blueprint)) {
-			pendingOffice = null;
-			chat(Component.literal("The entire site must be loaded and inside the world's height limits.")); return;
+			chat(Component.literal("The whole office site must be loaded and inside the world's height limits.").withStyle(ChatFormatting.RED)); return;
 		}
-		if (!confirm && OfficeSite.occupied(minecraft.level, bounds, officeMode() ? villageAnchor() : null, T3Office.blueprint(floors()))) {
-			pendingOffice = request;
-			chat(Component.literal("This site contains existing blocks (including any containers). Run /t3 office confirm to replace them at these exact bounds.")); return;
+		// Terrain is replaced without a word; the player's storage and builds are not. This is a refusal, not a confirmation.
+		var blocker = OfficeSite.blocker(minecraft.level, bounds, officeMode() ? villageAnchor() : null, T3Office.blueprint(floors()));
+		if (blocker != null) {
+			String what = minecraft.level.getBlockState(blocker).getBlock().getName().getString();
+			chat(Component.literal("The office would cover your " + what + " at " + blocker.toShortString()
+				+ ". The office goes just south of where you stand: move somewhere clear of your chests and builds, then run /t3 office again. Nothing was changed.")
+				.withStyle(ChatFormatting.RED));
+			return;
 		}
-		pendingOffice = null;
+		LOGGER.info("Building the office at {}", bounds.describe());
 		var oldVillage = config.villages.get(world);
 		boolean oldOffice = config.officeWorlds.contains(world);
 		var oldOwners = officePreferences().floorOwners;
@@ -398,17 +397,17 @@ public final class T3CraftClient implements ClientModInitializer {
 		config.villages.put(world, new int[] {origin.getX(), origin.getY(), origin.getZ()});
 		config.officeWorlds.add(world);
 		config.officeRotations.remove(world); // Built by hand: the design's own orientation.
-		officePreferences().floorOwners = List.copyOf(request.owners());
+		officePreferences().floorOwners = List.copyOf(owners);
 		if (!config.save(configPath)) {
 			if (oldVillage == null) config.villages.remove(world); else config.villages.put(world, oldVillage);
 			if (!oldOffice) config.officeWorlds.remove(world);
 			if (oldRotation != null) config.officeRotations.put(world, oldRotation);
 			officePreferences().floorOwners = oldOwners;
-			chat(Component.literal("Could not save office settings; no blocks were changed.")); return;
+			chat(Component.literal("Could not save office settings; no blocks were changed.").withStyle(ChatFormatting.RED)); return;
 		}
-		office.build(origin, request.labels());
+		office.build(origin, labels);
 		village.clear();
-		chat(Component.literal("Office build accepted. " + (minecraft.getSingleplayerServer() == null ? "Needs command permission (op). " : "") + "Rebuild to add floors for newly paired machines."));
+		LOGGER.info("Office build queued{}", minecraft.getSingleplayerServer() == null ? " (needs command permission on this server)" : "");
 	}
 
 	private int officeOff() {
@@ -423,7 +422,6 @@ public final class T3CraftClient implements ClientModInitializer {
 			if (oldRotation != null) config.officeRotations.put(world, oldRotation);
 			chat(Component.literal("Could not save office settings; office kept.")); return 0;
 		}
-		pendingOffice = null;
 		office.clear();
 		village.clear();
 		chat(Component.literal("Office residents hidden; building blocks kept."));
@@ -463,6 +461,35 @@ public final class T3CraftClient implements ClientModInitializer {
 	}
 
 	private void connectAll() { state.connect(connections(), config.threadId); }
+
+	/** Zero setup: pair with the T3 Code on this computer by itself. Dev runs (self-tests, captures) keep their own pairing. */
+	private void startAutoConnect() {
+		if (config.paired() || System.getProperty("t3craft.selftest") != null || System.getProperty("t3craft.webShowcase") != null) return;
+		T3AutoConnect.ensureStarted(() -> !config.paired(), env -> Minecraft.getInstance().execute(() -> adoptLocal(env)));
+	}
+
+	/**
+	 * A local pairing T3 no longer accepts (revoked in T3's settings, expired, or T3 reinstalled): forget it and pair
+	 * again silently, so the fix is never a hand-edited config file.
+	 */
+	private void recoverLocalPairing() {
+		for (String owner : state.authFailedOwners()) {
+			if (!T3Web.loopback(owner)) continue;
+			if (removeEnvironment(owner)) LOGGER.info("The local T3 no longer accepts its pairing; pairing again");
+			else LOGGER.warn("The local T3 no longer accepts its pairing and the config could not be saved; still trying with it");
+		}
+		startAutoConnect();
+	}
+
+	/** Auto-connect paired the local T3 in the background: keep it, unless the player paired something meanwhile. */
+	private void adoptLocal(T3Config.Environment env) {
+		if (config.paired()) return;
+		connectionRevision++;
+		config.upsert(env);
+		if (!config.save(configPath)) LOGGER.warn("Could not save the local T3 pairing; connected for this session only");
+		state.reconfigure(connections(), config.threadId);
+		LOGGER.info("Connected to {} at {}", env.label, env.baseUrl);
+	}
 	List<T3Config.Environment> environments() { return List.copyOf(config.environments); }
 	void openConnections() { Minecraft.getInstance().gui.setScreen(new T3ConnectionsScreen(this)); }
 	boolean removeEnvironment(String owner) {
@@ -619,15 +646,13 @@ public final class T3CraftClient implements ClientModInitializer {
 	}
 
 	public boolean send(String text, boolean newThread, com.google.gson.JsonObject model, Runnable onFailure) {
-		T3State.Snapshot snapshot = state.snapshot();
-		// A new thread only borrows project and settings, so any recent thread can stand in.
-		T3State.ThreadRow row = snapshot.focusedRow();
-		if (row == null && newThread && !snapshot.threads().isEmpty()) row = snapshot.threads().getFirst();
-		if (row == null) {
-			chat(Component.literal("Pick a thread first (" + openKeyName() + " then click one, or /t3 threads).").withStyle(ChatFormatting.RED));
+		// Nothing to pick first: the chosen thread, else the one that needs you, else the most recent one
+		// (a new thread only borrows its project and settings). With no threads at all, T3 itself is where to start one.
+		T3State.ThreadRow target = targetThread();
+		if (target == null) {
+			openPanelNextTick = true;
 			return false;
 		}
-		T3State.ThreadRow target = row;
 		// The target's own environment: a thread from the home server goes to the home server.
 		T3Backend api = state.apiFor(target.id());
 		state.run(() -> {
@@ -681,9 +706,25 @@ public final class T3CraftClient implements ClientModInitializer {
 	}
 
 	public void interrupt() {
-		String threadId = state.focusedThreadId();
-		T3Backend api = state.api();
-		if (threadId != null) state.run(() -> api.interrupt(threadId), this::reportError);
+		T3State.ThreadRow target = targetThread();
+		if (target == null) return;
+		T3Backend api = state.apiFor(target.id());
+		state.run(() -> api.interrupt(target.id()), this::reportError);
+	}
+
+	/**
+	 * The thread a command talks to (see {@link FirstRun#defaultThread}). An automatic pick is never saved as the
+	 * player's choice: chat commands pick afresh every time, so a thread that needs you is never shadowed by one
+	 * the mod chose earlier. The panel is the exception: it sends to the thread it shows, and follows the thread it
+	 * just sent to for this session, so the reply appears where the player is looking.
+	 */
+	private T3State.ThreadRow targetThread() {
+		T3State.Snapshot snapshot = state.snapshot();
+		boolean onPanel = Minecraft.getInstance().gui.screen() instanceof T3Screen;
+		if (onPanel && snapshot.focusedRow() != null) return snapshot.focusedRow();
+		T3State.ThreadRow row = FirstRun.defaultThread(snapshot.threads(), snapshot.focusedId());
+		if (onPanel && row != null) state.focus(row.id());
+		return row;
 	}
 
 	private void reportError(Exception e) {
@@ -751,14 +792,24 @@ public final class T3CraftClient implements ClientModInitializer {
 	}
 
 	private void registerCommands(CommandDispatcher<FabricClientCommandSource> dispatcher) {
+		// Players get /t3, /t3 open and /t3 office. Everything else is for debugging and admin, and exists only with
+		// "debug": true in config/t3craft.json: Brigadier keeps unmet nodes out of tab-complete and usage.
+		java.util.function.Predicate<FabricClientCommandSource> debug = source -> config.debug;
 		dispatcher.register(literal("t3")
-			.executes(ctx -> {
-				openPanelNextTick = true;
-				return 1;
-			})
-			.then(literal("connections").executes(ctx -> { openConnections(); return 1; }))
-			.then(literal("pair").executes(ctx -> { openConnections(); return 1; }).then(argument("link", StringArgumentType.greedyString()).executes(this::pair)))
-			.then(literal("unpair").executes(ctx -> {
+			.executes(ctx -> help())
+			.then(literal("open").executes(ctx -> { openPanelNextTick = true; return 1; })
+				.then(argument("id", StringArgumentType.word()).requires(debug).executes(ctx -> {
+					focus(StringArgumentType.getString(ctx, "id"));
+					openPanelNextTick = true;
+					return 1;
+				})))
+			.then(literal("office").executes(ctx -> officeAction())
+				.then(literal("go").executes(ctx -> goToOffice()))
+				.then(literal("build").executes(ctx -> { buildOffice(); return 1; }))
+				.then(literal("off").requires(debug).executes(ctx -> officeOff())))
+			.then(literal("connections").requires(debug).executes(ctx -> { openConnections(); return 1; }))
+			.then(literal("pair").requires(debug).executes(ctx -> { openConnections(); return 1; }).then(argument("link", StringArgumentType.greedyString()).executes(this::pair)))
+			.then(literal("unpair").requires(debug).executes(ctx -> {
 				connectionRevision++;
 				var previous = new java.util.ArrayList<>(config.environments);
 				String previousFocus = config.threadId;
@@ -768,27 +819,22 @@ public final class T3CraftClient implements ClientModInitializer {
 					chat(Component.literal("Could not save removal. Your machines remain paired.").withStyle(ChatFormatting.RED)); return 0;
 				}
 				state.connect(List.of(), null);
-				chat(Component.literal("Forgot all environments. Revoke \"Minecraft\" in each T3's Settings → Connections too."));
+				chat(Component.literal("Forgot all environments. Revoke \"Minecraft\" in each T3's Settings → Connections too. The local T3 is paired again by itself."));
+				startAutoConnect();
 				return 1;
 			}))
-			.then(literal("threads").executes(ctx -> listThreads()))
-			.then(literal("decisions").executes(ctx -> { openDecisions(); return 1; }))
-			.then(literal("review").executes(ctx -> { openReview(state.focusedThreadId()); return 1; }))
-			.then(literal("agent-build")
+			.then(literal("threads").requires(debug).executes(ctx -> listThreads()))
+			.then(literal("decisions").requires(debug).executes(ctx -> { openDecisions(); return 1; }))
+			.then(literal("review").requires(debug).executes(ctx -> { var target = targetThread(); openReview(target == null ? null : target.id()); return 1; }))
+			.then(literal("agent-build").requires(debug)
 				.then(literal("on").executes(ctx -> setAgentCommands(true)))
 				.then(literal("off").executes(ctx -> setAgentCommands(false))))
-			.then(literal("books")
+			.then(literal("books").requires(debug)
 				.then(literal("on").executes(ctx -> setBooks(true)))
 				.then(literal("off").executes(ctx -> setBooks(false))))
-			.then(literal("pin").executes(ctx -> { togglePin(state.snapshot().focusedRow()); return 1; }))
-			.then(literal("pins").executes(ctx -> { Minecraft.getInstance().gui.setScreen(new T3PinsScreen(this)); return 1; }))
-			.then(literal("office").executes(ctx -> officeAction())
-                .then(literal("go").executes(ctx -> goToOffice()))
-                .then(literal("build").executes(ctx -> { buildOffice(); return 1; })
-                    .then(literal("confirm").executes(ctx -> { buildOffice(true); return 1; })))
-				.then(literal("confirm").executes(ctx -> { buildOffice(true); return 1; }))
-				.then(literal("off").executes(ctx -> officeOff())))
-			.then(literal("village")
+			.then(literal("pin").requires(debug).executes(ctx -> { togglePin(state.snapshot().focusedRow()); return 1; }))
+			.then(literal("pins").requires(debug).executes(ctx -> { Minecraft.getInstance().gui.setScreen(new T3PinsScreen(this)); return 1; }))
+			.then(literal("village").requires(debug)
 				.executes(ctx -> {
 					placeVillage();
 					chat(Component.literal("Your agents moved in here. Right-click one to open its thread; /t3 village off to hide them."));
@@ -806,7 +852,7 @@ public final class T3CraftClient implements ClientModInitializer {
 					chat(Component.literal("Village hidden."));
 					return 1;
 				})))
-			.then(literal("use").then(argument("n", IntegerArgumentType.integer(1)).executes(ctx -> {
+			.then(literal("use").requires(debug).then(argument("n", IntegerArgumentType.integer(1)).executes(ctx -> {
 				List<T3State.ThreadRow> rows = state.snapshot().threads();
 				int n = IntegerArgumentType.getInteger(ctx, "n");
 				if (n > rows.size()) {
@@ -817,20 +863,22 @@ public final class T3CraftClient implements ClientModInitializer {
 				chat(Component.literal("Now talking to: " + rows.get(n - 1).title()));
 				return 1;
 			})))
-			.then(literal("open").then(argument("id", StringArgumentType.word()).executes(ctx -> {
-				focus(StringArgumentType.getString(ctx, "id"));
-				openPanelNextTick = true;
-				return 1;
-			})))
-			.then(literal("ask").then(argument("prompt", StringArgumentType.greedyString()).executes(ctx -> prompt(ctx, false))))
-			.then(literal("new").then(argument("prompt", StringArgumentType.greedyString()).executes(ctx -> prompt(ctx, true))))
-			.then(literal("approve").executes(ctx -> answer("accept")))
-			.then(literal("deny").executes(ctx -> answer("decline")))
-			.then(literal("stop").executes(ctx -> {
+			.then(literal("ask").requires(debug).then(argument("prompt", StringArgumentType.greedyString()).executes(ctx -> prompt(ctx, false))))
+			.then(literal("new").requires(debug).then(argument("prompt", StringArgumentType.greedyString()).executes(ctx -> prompt(ctx, true))))
+			.then(literal("approve").requires(debug).executes(ctx -> answer("accept")))
+			.then(literal("deny").requires(debug).executes(ctx -> answer("decline")))
+			.then(literal("stop").requires(debug).executes(ctx -> {
 				interrupt();
 				chat(Component.literal("Asked the agent to stop."));
 				return 1;
 			})));
+	}
+
+	/** {@code /t3}: the two things a player needs, each clickable. */
+	private int help() {
+		for (FirstRun.Tip tip : FirstRun.help(openKeyName()))
+			chat(Component.literal(tip.text()).withStyle(style -> style.withClickEvent(new ClickEvent.RunCommand(tip.command()))));
+		return 1;
 	}
 
 	int setAgentCommands(boolean allowed) {
@@ -853,7 +901,7 @@ public final class T3CraftClient implements ClientModInitializer {
 	private int listThreads() {
 		T3State.Snapshot snapshot = state.snapshot();
 		if (!snapshot.connected()) {
-			chat(Component.literal(snapshot.error() == null ? "Connecting…" : snapshot.error()).withStyle(ChatFormatting.RED));
+			chat(Component.literal(snapshot.error() == null ? "Not connected to T3 yet." : snapshot.error()).withStyle(ChatFormatting.RED));
 			return 0;
 		}
 		int shown = Math.min(20, snapshot.threads().size());

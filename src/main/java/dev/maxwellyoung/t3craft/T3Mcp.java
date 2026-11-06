@@ -166,7 +166,7 @@ final class T3Mcp {
 		tools.add(tool("minecraft_say", "Show a message in the player's chat. Only the player sees it.",
 			schema(Map.of("message", prop("string", "Text to show"))), "message"));
 		tools.add(tool("minecraft_run_command", "Run a Minecraft command as the player, e.g. \"fill 10 64 10 14 68 14 minecraft:stone\" or "
-				+ "\"setblock 3 70 -2 minecraft:redstone_lamp\" (no leading slash). Needs the player to allow it (/t3 agent-build on) and "
+				+ "\"setblock 3 70 -2 minecraft:redstone_lamp\" (no leading slash). Allowed unless the player turned it off, and needs "
 				+ "permission on the server. The player sees every command in chat.",
 			schema(Map.of("command", prop("string", "Command without the leading slash"))), "command"));
 		return tools;
@@ -186,7 +186,7 @@ final class T3Mcp {
 				});
 				case "minecraft_run_command" -> {
 					if (!commandsAllowed.getAsBoolean()) {
-						yield error("The player has not allowed agent commands. Ask them to run /t3 agent-build on in Minecraft.");
+						yield error("The player turned agent commands off. Ask them to run /t3 agent-build on in Minecraft.");
 					}
 					String command = args.get("command").getAsString().replaceFirst("^/", "").trim();
 					yield runCommand(command);

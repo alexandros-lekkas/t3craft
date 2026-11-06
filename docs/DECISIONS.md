@@ -8,6 +8,7 @@ The product calls behind T3 Craft, newest first. Each one has the date, the deci
 |:--|:--|:--|
 | 2026-11-06 | [Simple native Minecraft UI](#2026-11-06--simple-native-minecraft-ui) | *"It was better when it was mc, but just very simple"* |
 | 2026-11-05 | Office only; real T3 UI streamed in-game (UI part superseded) | Keep one workplace and the full T3 experience |
+| 2026-11-06 | [Nothing to pick, nothing to confirm, one line in chat](#2026-11-06--nothing-to-pick-nothing-to-confirm-one-line-in-chat) | Every demand in chat is a place to get stuck |
 | 2026-11-06 | [A lit office, day and night](#2026-11-06--a-lit-office-day-and-night) | No dark corners, no spawns, nothing modded-looking |
 | 2026-11-05 | [Simple features, no settings or machine UI](#2026-11-05--simple-features-no-settings-or-machine-ui) | Each screen has one obvious purpose |
 | 2026-11-05 | [Zero setup: auto-connect to the local T3](#2026-11-05--zero-setup-auto-connect-to-the-local-t3) | Players shouldn't have to type commands or paste links |
@@ -38,6 +39,11 @@ The product calls behind T3 Craft, newest first. Each one has the date, the deci
 
 **Decision:** Focus on the office only. An arrival plaza belongs to the office; multi-building expansion is out of scope. Stream the real T3 web UI in-game: the laptop opens the full app, and clicking an agent opens its thread in a floating window. ([how it works](design/real-t3-ui.md), [#7](https://github.com/alexandros-lekkas/t3craft/pull/7)) **The UI part is superseded** by the [simple native UI](#2026-11-06--simple-native-minecraft-ui); the streamed app is opt-in.
 **Why:** Preserve the actual T3 experience without rebuilding it in Minecraft widgets.
+
+### 2026-11-06 · Nothing to pick, nothing to confirm, one line in chat
+
+**Decision:** No command ever asks the player to pick a thread first. With nothing chosen it talks to the thread that needs them, else the most recently active one, and with no threads at all it opens T3. The office builds where you stand without a confirmation step: terrain is replaced, and only your own storage and builds make it refuse (one red line naming the spot). A local pairing T3 stops accepting is dropped and made again by itself. On its own the mod says one line in chat per game, when T3 connects (*T3 connected · press ` to open*); everything else goes to the log, or to chat only on error. `/t3` prints two lines of help (open T3, office). Debug and admin subcommands (pairing, threads, village, books, pins, agent-build…) exist only with `"debug": true` in `config/t3craft.json`, so tab-complete shows players only what they need. Agent building is on by default.
+**Why:** The owner's first session was a wall of chat and a *"Pick a thread first"* refusal. Every demand in chat is a place to get stuck, and a feature that needs instructions in chat isn't done clearly enough.
 
 ### 2026-11-05 · Simple features, no settings or machine UI
 

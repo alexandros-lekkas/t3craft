@@ -156,9 +156,16 @@ tasks.register('uiCheck', JavaExec) {
 // No fixture needed, so `build` runs it everywhere.
 tasks.named('check') { dependsOn 'uiCheck', 'worldCheck' }
 
+tasks.register('firstRunCheck', JavaExec) {
+	description = 'Zero setup: default thread choice, the one-line chat budget and auto-pairing with the local T3 against the fixture.'
+	classpath = sourceSets.smoke.runtimeClasspath
+	mainClass = 'dev.maxwellyoung.t3craft.FirstRunChecks'
+	args = [project.findProperty('fixturePort') ?: '25680']
+}
+
 // Fixture-backed checks share one entry point in PR and tag builds.
 tasks.register('verifyAll') {
-	dependsOn 'build', 'officeCheck', 'connectionCheck', 'featureCheck', 'reliabilityCheck'
+	dependsOn 'build', 'officeCheck', 'connectionCheck', 'featureCheck', 'reliabilityCheck', 'firstRunCheck'
 }
 
 dependencyLocking {

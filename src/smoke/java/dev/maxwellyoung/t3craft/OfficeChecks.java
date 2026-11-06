@@ -189,11 +189,27 @@ public final class OfficeChecks {
 			blocks.put(spot, block.defaultBlockState());
 			check(!OfficeSite.occupied(bounds, null, List.of(), read, pos -> null), "plain terrain builds in one step: " + block);
 		}
-		blocks.put(spot, net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
-		check(OfficeSite.occupied(bounds, null, List.of(), read, pos -> null), "player blocks above ground require confirmation");
+		// A hill or a forest above the plaza never stops the build; crafted blocks do, and the refusal names the spot.
+		for (var block : List.of(net.minecraft.world.level.block.Blocks.STONE, net.minecraft.world.level.block.Blocks.DIRT, net.minecraft.world.level.block.Blocks.GRASS_BLOCK,
+			net.minecraft.world.level.block.Blocks.OAK_LOG, net.minecraft.world.level.block.Blocks.OAK_LEAVES, net.minecraft.world.level.block.Blocks.SAND,
+			net.minecraft.world.level.block.Blocks.GRAVEL, net.minecraft.world.level.block.Blocks.IRON_ORE, net.minecraft.world.level.block.Blocks.DEEPSLATE,
+			net.minecraft.world.level.block.Blocks.TERRACOTTA, net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace("orange_terracotta")), net.minecraft.world.level.block.Blocks.MOSSY_COBBLESTONE,
+			net.minecraft.world.level.block.Blocks.MOSS_CARPET, net.minecraft.world.level.block.Blocks.SMOOTH_BASALT, net.minecraft.world.level.block.Blocks.NETHER_QUARTZ_ORE)) {
+			blocks.put(spot, block.defaultBlockState());
+			check(!OfficeSite.occupied(bounds, null, List.of(), read, pos -> null), "natural terrain above ground builds in one step: " + block);
+		}
+		for (var block : List.of(net.minecraft.world.level.block.Blocks.OAK_PLANKS, net.minecraft.world.level.block.Blocks.GLASS, net.minecraft.world.level.block.Blocks.OAK_STAIRS,
+			net.minecraft.world.level.block.Blocks.COBBLESTONE, net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace("white_wool")), net.minecraft.world.level.block.Blocks.STONE_BRICKS,
+			net.minecraft.world.level.block.Blocks.OAK_DOOR, net.minecraft.world.level.block.Blocks.TORCH, net.minecraft.world.level.block.Blocks.CRAFTING_TABLE)) {
+			blocks.put(spot, block.defaultBlockState());
+			check(spot.equals(OfficeSite.blocker(bounds, null, List.of(), read, pos -> null)), "player-built blocks above ground are protected and located: " + block);
+		}
+		blocks.put(spot, net.minecraft.world.level.block.Blocks.OAK_PLANKS.defaultBlockState());
+		blocks.put(bounds.min(), net.minecraft.world.level.block.Blocks.OAK_PLANKS.defaultBlockState());
+		check(!OfficeSite.occupied(bounds, null, List.of(), read, pos -> null) || spot.equals(OfficeSite.blocker(bounds, null, List.of(), read, pos -> null)), "the plaza layer is always replaceable");
 		blocks.clear();
 		var chest = new net.minecraft.world.level.block.entity.ChestBlockEntity(bounds.min(), net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
-		check(OfficeSite.occupied(bounds, null, List.of(), read, pos -> pos.equals(bounds.min()) ? chest : null), "buried containers remain protected");
+		check(bounds.min().equals(OfficeSite.blocker(bounds, null, List.of(), read, pos -> pos.equals(bounds.min()) ? chest : null)), "buried containers remain protected, even empty, and are located");
 		// Recognize both lamp states and the office's own sign block entities on rebuild.
 		var lamp = origin.offset(16, 3, 20);
 		var sign = origin.offset(1, 2, 16);

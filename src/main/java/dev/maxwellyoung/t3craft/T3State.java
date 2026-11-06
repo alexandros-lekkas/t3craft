@@ -91,12 +91,16 @@ public final class T3State {
 	List<MachineHealth> machines() { return snapshot.machines(); }
 
 	List<T3Decisions.Entry> decisions() { return decisions; }
+	/** Machines whose pairing T3 no longer accepts (revoked, expired, reinstalled). */
+	public List<String> authFailedOwners() { return envs.stream().filter(env -> env.authFailed).map(env -> env.api.ownerKey()).toList(); }
 	public boolean online(String threadId) { return threadId != null && onlineThreads.getOrDefault(threadId, false); }
 	String connectionError(String threadId) { return threadId == null ? null : connectionErrors.get(threadId); }
 	List<String> offlineMachines() { return offlineMachines; }
 
 	/** One paired environment: its API, socket, and shell mirror. Owned by the executor thread. */
 	private static final class Env {
+		/** The last poll was refused as unauthorized: the pairing is gone on T3's side. */
+		volatile boolean authFailed;
 		final T3Backend api;
 		String label;
 		final Map<String, String> projectTitles = new HashMap<>();
@@ -383,9 +387,11 @@ public final class T3State {
 				if (!pollNow || env.api.publicMcp() && !refreshSoon && tick % 2 != 0) continue;
 				applyShellSnapshot(env, env.api.shell());
 				env.error = null;
+				env.authFailed = false;
 				changed = true;
 			} catch (Exception e) {
 				env.error = e.getMessage();
+				env.authFailed = e instanceof T3Api.AuthException;
 				changed = true;
 			}
 		}

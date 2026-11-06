@@ -37,8 +37,10 @@ final class T3Web {
 	}
 
 	/** The running local T3, or null. Reads the runtime file T3 writes, then confirms the server identity over HTTP. */
-	static Local find() {
-		Path home = home();
+	static Local find() { return find(home()); }
+
+	/** {@code home}: T3's data directory (normally {@code ~/.t3}); checks let a fixture stand in. */
+	static Local find(Path home) {
 		String origin = "http://127.0.0.1:3773";
 		try {
 			Path runtime = home.resolve("userdata").resolve("server-runtime.json");
@@ -78,11 +80,19 @@ final class T3Web {
 	 * Mints a short-lived pairing link ({@code <origin>/pair#token=…}). The credential lives only in memory and in the
 	 * one navigation that redeems it; the resulting session cookie stays in T3 Craft's own Chrome profile.
 	 */
-	static String mintPairingUrl(Local local) throws Exception {
+	static String mintPairingUrl(Local local) throws Exception { return mintPairingUrl(local, "T3 Craft laptop", List.of(), false); }
+
+	/**
+	 * {@code label}: how the pairing shows up in T3's device list. {@code scopes}: what the link may grant (empty keeps
+	 * the CLI's full default set, which the laptop's web session needs). {@code killOnTimeout}: for unattended
+	 * retries, so a hung CLI never piles up; the laptop leaves a slow one to finish.
+	 */
+	static String mintPairingUrl(Local local, String label, List<String> scopes, boolean killOnTimeout) throws Exception {
 		Path cli = cli(local.home());
 		if (cli == null) throw new IOException("T3's bundled CLI was not found");
-		List<String> command = List.of(cli.toString(), "auth", "pairing", "create", "--label", "T3 Craft laptop", "--ttl", "2m",
-			"--base-url", local.origin(), "--json");
+		List<String> command = new java.util.ArrayList<>(List.of(cli.toString(), "auth", "pairing", "create", "--label", label, "--ttl", "2m",
+			"--base-url", local.origin(), "--json"));
+		for (String scope : scopes) { command.add("--scope"); command.add(scope); }
 		ProcessBuilder builder = new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD);
 		builder.environment().remove("VITE_DEV_SERVER_URL");
 		Process process = builder.start();
@@ -97,13 +107,21 @@ final class T3Web {
 		reader.start();
 		// T3's CLI is never killed: a slow pairing is left to finish on its own while the laptop falls back to the native panel.
 		if (!process.waitFor(20, TimeUnit.SECONDS)) {
-			process.onExit().thenAccept(done -> T3Log.LOGGER.info("t3 pairing finished late (exit {})", done.exitValue()));
+			if (killOnTimeout) process.destroyForcibly();
+			else process.onExit().thenAccept(done -> T3Log.LOGGER.info("t3 pairing finished late (exit {})", done.exitValue()));
 			throw new IOException("t3 pairing timed out");
 		}
-		byte[] out = output.get(5, TimeUnit.SECONDS);
+		byte[] out;
+		try { out = output.get(5, TimeUnit.SECONDS); } catch (Exception e) { throw new IOException("t3 pairing output could not be read"); }
 		if (process.exitValue() != 0) throw new IOException("t3 pairing failed (exit " + process.exitValue() + ")");
-		String text = new String(out, StandardCharsets.UTF_8);
-		JsonObject json = JsonParser.parseString(text.substring(Math.max(0, text.indexOf('{')))).getAsJsonObject();
+		// The output carries the credential: it never reaches an exception message or the log, whatever shape it has.
+		JsonObject json;
+		try {
+			String text = new String(out, StandardCharsets.UTF_8);
+			var element = JsonParser.parseString(text.substring(Math.max(0, text.indexOf('{'))));
+			if (!element.isJsonObject()) throw new IllegalStateException();
+			json = element.getAsJsonObject();
+		} catch (RuntimeException e) { throw new IOException("t3 pairing returned no JSON object"); }
 		String url = T3Protocol.string(json, "pairUrl");
 		if (url != null && url.startsWith(local.origin() + "/pair#")) return url;
 		String credential = T3Protocol.string(json, "credential");
@@ -112,6 +130,12 @@ final class T3Web {
 	}
 
 	private static final java.util.Set<String> LOOPBACK = java.util.Set.of("127.0.0.1", "localhost", "::1", "[::1]", "0:0:0:0:0:0:0:1");
+
+	/** True when a paired machine's address is this computer, whatever port its T3 ran on. */
+	static boolean loopback(String ownerKey) {
+		try { String host = URI.create(ownerKey).getHost(); return host != null && LOOPBACK.contains(host.toLowerCase(Locale.ROOT)); }
+		catch (RuntimeException e) { return false; }
+	}
 
 	/** True when {@code ownerKey} (a paired machine's address) is the local T3 at {@code origin}, or is unknown. */
 	static boolean servedBy(String origin, String ownerKey) {

@@ -27,7 +27,7 @@ for port in "$legacy_port" "$((legacy_port + 1))" "$v2_port" "$((v2_port + 1))";
   if [ "$ready" != true ]; then echo "Fixture $port did not become ready" >&2; exit 1; fi
 done
 ./gradlew verifyAll "$@" -PfixturePort="$legacy_port"
-./gradlew connectionCheck featureCheck reliabilityCheck "$@" -PfixturePort="$v2_port"
+./gradlew connectionCheck featureCheck reliabilityCheck firstRunCheck "$@" -PfixturePort="$v2_port"
 # MCP scenarios mutate fixture state; keep each leg in a separate invocation.
 ./gradlew mcpCheck "$@" -PfixturePort="$legacy_port"
 ./gradlew mcpCheck "$@" -PfixturePort="$v2_port"
