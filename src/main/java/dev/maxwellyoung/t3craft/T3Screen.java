@@ -65,6 +65,10 @@ final class T3Screen extends Screen {
 
 	private record PickerEntry(T3Api.Provider provider, T3Api.Model model, boolean needsNewThread) {}
 
+	private String anchorThread;
+	private int anchorWidth;
+	private int anchorCount;
+
 	private T3State.Focus cachedFocus;
 	private int cachedWidth;
 	private List<T3Markdown.Line> cachedLines = List.of();
@@ -685,6 +689,14 @@ final class T3Screen extends Screen {
 
 		if (!pickerOpen && !newThread && focus != null && focus.threadId().equals(row.id()) && bottom > top) {
 			List<T3Markdown.Line> lines = lines(focus, x1 - x0 - 28);
+			// scroll counts lines up from the bottom, so while reading back, rows streaming in below
+			// would push the view; move it by the same amount to keep the same lines on screen.
+			if (scroll > 0 && focus.threadId().equals(anchorThread) && x1 - x0 - 28 == anchorWidth && lines.size() > anchorCount) {
+				scroll += lines.size() - anchorCount;
+			}
+			anchorThread = focus.threadId();
+			anchorWidth = x1 - x0 - 28;
+			anchorCount = lines.size();
 			int visible = Math.max(1, (bottom - top) / font.lineHeight);
 			scroll = Math.min(scroll, Math.max(0, lines.size() - visible));
 			int end = lines.size() - scroll;
