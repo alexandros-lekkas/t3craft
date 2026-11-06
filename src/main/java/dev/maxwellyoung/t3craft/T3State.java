@@ -774,7 +774,7 @@ public final class T3State {
 		return latestTurn == null ? null : string(latestTurn, "turnId");
 	}
 
-	private static String activityAt(JsonObject thread) {
+	static String activityAt(JsonObject thread) {
 		String at = string(thread, "latestUserMessageAt");
 		String updated = string(thread, "updatedAt");
 		if (at == null) return updated == null ? "" : updated;

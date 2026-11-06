@@ -33,6 +33,8 @@ final class OfficeResidents {
 	private int nextDecorationAttempt;
 	private int nextId = FIRST_ID;
 	private final OfficeBrain brain = new OfficeBrain();
+	/** Thread → skin id for the agents in the office, so two agents only look alike once their provider runs out of skins. */
+	private final Map<String, String> skins = new HashMap<>();
 	private final Map<Integer, String> boards = new HashMap<>();
 	private Boolean night;
 	private final DeskLaptops laptops = new DeskLaptops();
@@ -101,14 +103,13 @@ final class OfficeResidents {
 		if (level == null || minecraft.player == null) return;
 		OfficeFrame frame = mod.officeFrame();
 		if (frame == null) return;
+		brain.settleStragglers();
 		brain.tick();
 		for (OfficeBrain.Agent agent : brain.agents().values()) {
 			Mannequin mannequin = agents.get(agent.threadId);
 			if (mannequin == null) continue;
-			mannequin.setPos(frame.point(agent.x, agent.y(), agent.z));
-			float yaw = frame.yaw(agent.yaw);
-			mannequin.setYRot(yaw);
-			mannequin.setYBodyRot(yaw);
+			// Walk there: interpolated position, a body that turns into the heading, and legs that swing.
+			AgentWalk.step(mannequin, frame.point(agent.x, agent.y(), agent.z), frame.yaw(agent.yaw), agent.settled() && agent.goal.seat());
 			if (minecraft.player.distanceToSqr(mannequin) < 9) agent.faceHold = Math.max(agent.faceHold, 8);
 			if (agent.faceHold > 0) AgentPose.face(mannequin, minecraft.player); else AgentPose.rest(mannequin);
 			AgentPose.set(mannequin, agent.settled() && agent.goal.seat());
@@ -173,6 +174,12 @@ final class OfficeResidents {
 			}
 		}
 		if (!previousDesks.equals(prefs.desks)) mod.saveOfficePreferences();
+		// Skins in a stable order, so who gets the fallback when two agents' usual skins collide never flips between visits.
+		skins.keySet().retainAll(brain.agents().keySet());
+		for (String id : new java.util.TreeSet<>(brain.agents().keySet())) {
+			T3State.ThreadRow row = row(snapshot, id);
+			if (row != null) AgentAppearance.skin(mod.state().driverFor(row), id, skins);
+		}
 		for (OfficeBrain.Agent agent : brain.agents().values()) {
 			if (!level.isLoaded(frame.block((int) Math.floor(agent.x), (int) agent.y(), (int) Math.floor(agent.z)))) continue;
 			Mannequin mannequin = agents.get(agent.threadId);
@@ -184,14 +191,15 @@ final class OfficeResidents {
 				mannequin.setSilent(true);
 				mannequin.setCustomNameVisible(true);
 				var at = frame.point(agent.x, agent.y(), agent.z);
-				mannequin.snapTo(at.x, at.y, at.z, 0, 0);
+				mannequin.snapTo(at.x, at.y, at.z, frame.yaw(agent.yaw), 0);
 				level.addEntity(mannequin);
 				agents.put(agent.threadId, mannequin);
 				threadByEntity.put(mannequin.getId(), agent.threadId);
 			}
 			T3State.ThreadRow row = row(snapshot, agent.threadId);
 			if (row != null) {
-				AgentAppearance.update(mannequin, row, mod.state().online(row.id()), mod.state().driverFor(row));
+				String driver = mod.state().driverFor(row);
+				AgentAppearance.update(mannequin, row, mod.state().online(row.id()), driver, AgentAppearance.skin(driver, row.id(), skins));
 			}
 		}
 	}
@@ -237,6 +245,7 @@ final class OfficeResidents {
 		}
 		agents.clear();
 		threadByEntity.clear();
+		skins.clear();
 		brain.clear();
 	}
 

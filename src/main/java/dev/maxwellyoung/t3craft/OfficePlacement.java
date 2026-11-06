@@ -158,32 +158,62 @@ final class OfficePlacement {
 		AABB box = bounds(placement.frame(), floors);
 		for (int cx = ((int) box.minX) >> 4; cx <= ((int) box.maxX) >> 4; cx++)
 			for (int cz = ((int) box.minZ) >> 4; cz <= ((int) box.maxZ) >> 4; cz++) level.getChunk(cx, cz);
-		foundation(level, placement.frame());
-		place(level, placement.frame(), labels);
-		lawn(level, placement.frame());
-		BlockPos spawn = arrival(level, placement.frame());
+		// The arrival spot and the walk from it to the door lie in front of the plaza, outside the build box. An
+		// unloaded chunk's heightmap reads as the world's floor, so generate every chunk on that path first.
+		for (BlockPos column : arrivalPath(placement.frame())) level.getChunk(column.getX() >> 4, column.getZ() >> 4);
+		build(level, placement.frame(), labels);
+		BlockPos spawn = arrival(placement.frame(), level.getMinY(), new Ground() {
+			@Override public int height(int x, int z) { return level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z); }
+			@Override public BlockState state(BlockPos pos) { return level.getBlockState(pos); }
+		});
 		if (!spawn.equals(placement.spawn())) placement = new Placement(placement.frame(), facing, placement.door(), spawn, placement.spawnYaw(), placement.spawnPitch());
 		return placement;
 	}
 
 	/**
+	 * Every build on real ground (T3 World, {@code /t3 office}, the server's office): solid ground under the footprint,
+	 * the office, then grass on every lawn cell the clear left bare. On a hillside the clear cuts the slope down to the
+	 * floor and leaves dirt or stone beside the plaza; without the lawn pass that showed as a raw patch.
+	 */
+	static void build(ServerLevel level, OfficeFrame frame, List<String> labels) {
+		foundation(level, frame);
+		place(level, frame, labels);
+		lawn(level, frame);
+	}
+
+	/** What {@link #arrival} reads from the world: surface heights and block states. */
+	interface Ground {
+		int height(int x, int z);
+		BlockState state(BlockPos pos);
+	}
+
+	/** The columns from the arrival spot back to the plaza cell just outside the door, farthest first. */
+	static List<BlockPos> arrivalPath(OfficeFrame frame) {
+		int[] outside = OfficeDesign.doorOutside();
+		List<BlockPos> path = new ArrayList<>();
+		for (int back = SPAWN_DISTANCE; back >= 0; back--) path.add(frame.block(outside[0], 0, outside[1] - back));
+		return path;
+	}
+
+	/**
 	 * The arrival spot is a few blocks beyond the plaza edge, on natural ground: stand on it, not in it. A pond,
 	 * a tree or a cliff there moves it toward the door, down to the plaza cell just outside it, which is always dry.
+	 * Ground at the world's floor (an ungenerated chunk) or more than {@link #MAX_ARRIVAL_STEP} from the office
+	 * floor never counts, so the arrival is always within that many blocks of the floor.
 	 */
-	private static BlockPos arrival(ServerLevel level, OfficeFrame frame) {
-		int[] outside = OfficeDesign.doorOutside();
-		for (int back = SPAWN_DISTANCE; back > 0; back--) {
-			BlockPos column = frame.block(outside[0], 0, outside[1] - back);
-			int ground = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, column.getX(), column.getZ());
+	static BlockPos arrival(OfficeFrame frame, int minY, Ground world) {
+		List<BlockPos> path = arrivalPath(frame);
+		for (BlockPos column : path.subList(0, path.size() - 1)) {
+			int ground = world.height(column.getX(), column.getZ());
 			BlockPos feet = new BlockPos(column.getX(), ground, column.getZ());
-			if (Math.abs(ground - frame.origin().getY()) <= MAX_ARRIVAL_STEP
-				&& standable(level.getBlockState(feet.below()), level.getBlockState(feet), level.getBlockState(feet.above()))) return feet;
+			if (ground > minY && Math.abs(ground - frame.origin().getY()) <= MAX_ARRIVAL_STEP
+				&& standable(world.state(feet.below()), world.state(feet), world.state(feet.above()))) return feet;
 		}
-		return frame.block(outside[0], 0, outside[1]);
+		return path.getLast();
 	}
 
 	/** How far above or below the office floor the arrival may stand before it counts as a cliff or a hole. */
-	private static final int MAX_ARRIVAL_STEP = 4;
+	static final int MAX_ARRIVAL_STEP = 4;
 
 	/** Firm, dry ground with room to stand: not water, not the top of a trunk or a canopy. */
 	static boolean standable(BlockState below, BlockState feet, BlockState head) {

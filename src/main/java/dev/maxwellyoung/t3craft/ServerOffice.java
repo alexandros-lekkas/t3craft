@@ -32,6 +32,8 @@ final class ServerOffice {
 	private final T3Config config;
 	private final Runnable save;
 	private final OfficeBrain brain = new OfficeBrain();
+	/** Thread → skin id, so two agents only look alike once their provider runs out of skins. */
+	private final Map<String, String> skins = new java.util.HashMap<>();
 	private final Map<String, Mannequin> mannequins = new HashMap<>();
 	private final Map<Integer, String> boards = new HashMap<>();
 	private Boolean night;
@@ -111,7 +113,7 @@ final class ServerOffice {
 		BlockPos origin = request.origin();
 		config.serverOffice = new int[] {origin.getX(), origin.getY(), origin.getZ()};
 		save.run();
-		OfficePlacement.place(server.overworld(),origin,request.labels());
+		OfficePlacement.build(server.overworld(),OfficeFrame.at(origin),request.labels());
 		int litter=OfficePlacement.sweep(server.overworld(),origin,Math.max(2,request.labels().size()*2));
 		if(litter>0)T3Log.LOGGER.warn("Office rebuild swept {} dropped items",litter);
 		source.sendSuccess(() -> net.minecraft.network.chat.Component.literal("Suite 408 is up; the agents are walking in."), true);
@@ -128,7 +130,7 @@ final class ServerOffice {
 	/** Removes this office's mannequins (and any left over from a previous run). */
 	void clear(MinecraftServer server) {
 		for (Mannequin mannequin : mannequins.values()) mannequin.discard();
-		mannequins.clear(); laptops.clear();
+		mannequins.clear(); laptops.clear(); skins.clear();
 		brain.clear();
 		boards.clear();
 		night = null;
@@ -155,14 +157,12 @@ final class ServerOffice {
 		if (!level.isLoaded(o)) return;
 		ticks++;
 		if (ticks % 10 == 0) sync(server, level, frame);
+		brain.settleStragglers();
 		brain.tick();
 		for (OfficeBrain.Agent agent : brain.agents().values()) {
 			Mannequin mannequin = mannequins.get(agent.threadId);
 			if (mannequin == null || mannequin.isRemoved()) continue;
-			mannequin.setPos(frame.point(agent.x, agent.y(), agent.z));
-			float yaw = frame.yaw(agent.yaw);
-			mannequin.setYRot(yaw);
-			mannequin.setYBodyRot(yaw);
+			AgentWalk.step(mannequin, frame.point(agent.x, agent.y(), agent.z), frame.yaw(agent.yaw), agent.settled() && agent.goal.seat());
 
    var player=level.getNearestPlayer(mannequin,agent.faceHold>0?32:3);
    if(player!=null){if(player.distanceToSqr(mannequin)<9)agent.faceHold=Math.max(agent.faceHold,8);AgentPose.face(mannequin,player);}else AgentPose.rest(mannequin);
@@ -189,6 +189,9 @@ final class ServerOffice {
 			if (mannequin != null) mannequin.discard();
 		}
 		if (!previousDesks.equals(config.sharedOfficePreferences.desks)) save.run();
+		skins.keySet().retainAll(brain.agents().keySet());
+		for (String id : new java.util.TreeSet<>(brain.agents().keySet()))
+			snapshot.threads().stream().filter(r -> r.id().equals(id)).findFirst().ifPresent(row -> AgentAppearance.skin(state.driverFor(row), id, skins));
 		for (OfficeBrain.Agent agent : brain.agents().values()) {
 			Mannequin mannequin = mannequins.get(agent.threadId);
 			if (mannequin == null || mannequin.isRemoved()) {
@@ -200,7 +203,7 @@ final class ServerOffice {
 				mannequin.addTag(TAG);
 				mannequin.setCustomNameVisible(true);
 				var at = frame.point(agent.x, agent.y(), agent.z);
-				mannequin.snapTo(at.x, at.y, at.z, 0, 0);
+				mannequin.snapTo(at.x, at.y, at.z, frame.yaw(agent.yaw), 0);
 				mannequin.setUUID(OfficeBrain.agentUuid(agent.threadId));
 				mannequins.put(agent.threadId, mannequin);
 				if (!level.addFreshEntity(mannequin)) {
@@ -212,7 +215,7 @@ final class ServerOffice {
 			}
 			T3State.ThreadRow row = state.snapshot().threads().stream().filter(r -> r.id().equals(agent.threadId)).findFirst().orElse(null);
 			if (row != null) {
-				AgentAppearance.update(mannequin, row, state.online(row.id()), state.driverFor(row));
+				AgentAppearance.update(mannequin, row, state.online(row.id()), state.driverFor(row), AgentAppearance.skin(state.driverFor(row), row.id(), skins));
 			}
 		}
 		laptops.sync(level,frame,brain.agents().values(),Math.max(2,floors.size()*2));

@@ -15,6 +15,9 @@ for(let n=1;n<=2;n++){
  for(const [p,state] of d.blocks){const[x,y,z]=p.split(',').map(Number);
  const stretch=/(planks|concrete|glass_pane|smooth_quartz|carpet|bookshelf|stripped_birch|iron_block|pale_oak_planks|polished_andesite_stairs|birch_slab|moss_block)/.test(state);
  for(let xx=X(x);xx<(stretch?X(x+1):X(x)+1);xx++)for(let zz=Z(z);zz<(stretch?Z(z+1):Z(z)+1);zz++)blocks.set([xx,y,zz].join(','),state);
+ // A non-stretched block in a floor slab (the top stair tread, which sits in the slab above) keeps one cell; the
+ // rest of its stretched span is still floor, or the stair would end at a hole where the slab was widened.
+ if(!stretch&&/_stairs/.test(state)&&y%g.FLOOR_HEIGHT===g.FLOOR_HEIGHT-1)for(let xx=X(x);xx<X(x+1);xx++)for(let zz=Z(z);zz<Z(z+1);zz++)if(!(xx===X(x)&&zz===Z(z)))blocks.set([xx,y,zz].join(','),'birch_planks');
  }
  lighting.apply(blocks,n);
  const anchors=anchor(d.anchors);

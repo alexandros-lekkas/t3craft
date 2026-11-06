@@ -24,7 +24,7 @@ final class OfficeQueue {
   var level = mc.level; int token=generation; inFlight=true;
   server.execute(() -> {
    try { var target=server.getLevel(level.dimension());
-    if(token==generation && target!=null && OfficeSite.loaded(target,origin,T3Office.blueprint(floors))) OfficePlacement.place(target,origin,floors);
+    if(token==generation && target!=null && OfficeSite.loaded(target,origin,T3Office.blueprint(floors))) OfficePlacement.build(target,OfficeFrame.at(origin),floors);
    } finally { mc.execute(()->{if(token==generation)inFlight=false;}); }
   });
 	}

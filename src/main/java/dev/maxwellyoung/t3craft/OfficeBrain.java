@@ -16,7 +16,7 @@ import java.util.function.Function;
  */
 final class OfficeBrain {
 	static final int PER_FLOOR = 8;
-	private static final double WALK_SPEED = 0.09;
+	private static final double WALK_SPEED = AgentWalk.SPEED;
 	private static final int FRIDGE_PAUSE = 50;
 
 	enum Zone { WORK, NEEDS_YOU, LOUNGE }
@@ -66,6 +66,8 @@ final class OfficeBrain {
 
 	List<Agent> sync(List<T3State.ThreadRow> rows, List<String> owners, OfficeRoster.Preferences prefs, Set<String> knownOwners) {
 		Set<String> keep = new HashSet<>();
+		// The first agents a fresh brain sees (joining or rejoining the world) are already in place, not walking in.
+		boolean restoring = !populated;
 		for (OfficeRoster.Resident resident : OfficeRoster.sync(rows, owners, prefs, knownOwners)) {
 			T3State.ThreadRow row = resident.row();
 			int floor = owners.indexOf(row.ownerKey()) * 2 + resident.desk() / PER_FLOOR;
@@ -85,9 +87,15 @@ final class OfficeBrain {
 			if (agent == null) {
 				agent = new Agent(row.id());
 				agent.floor = floor;
-				// Ground-floor arrivals come in the door; upper floors, from the stair landing.
-				agent.x = floor == 0 ? T3Office.DOOR[0] + 0.5 : T3Office.LADDER[0] - 0.5;
-				agent.z = floor == 0 ? T3Office.DOOR[1] + 0.5 : T3Office.LADDER[1] + 0.5;
+				if (restoring) {
+					// A relog: everyone is back at their desk or seat as they were, not parading in from the door.
+					agent.x = spot.x() + 0.5;
+					agent.z = spot.z() + 0.5;
+				} else {
+					// Ground-floor arrivals come in the door; upper floors, from the stair landing.
+					agent.x = floor == 0 ? T3Office.DOOR[0] + 0.5 : T3Office.LADDER[0] - 0.5;
+					agent.z = floor == 0 ? T3Office.DOOR[1] + 0.5 : T3Office.LADDER[1] + 0.5;
+				}
 				agents.put(row.id(), agent);
 			}
 			agent.title = row.title();
@@ -115,6 +123,7 @@ final class OfficeBrain {
 				if (zone != Zone.LOUNGE) agent.holding = false;
 			}
 		}
+		if (!agents.isEmpty()) populated = true;
 		List<Agent> gone = new ArrayList<>();
 		agents.values().removeIf(agent -> {
 			if (keep.contains(agent.threadId)) return false;
@@ -160,6 +169,29 @@ final class OfficeBrain {
 		}
 	}
 
+	/** Whether this brain has had agents since it was made or cleared; until then, new agents start at their spots. */
+	private boolean populated;
+
+	/**
+	 * An agent held still (looking at a player standing close) within a block of its seat or desk would stand there
+	 * half a block off for as long as the player stays: put it in its spot. A detour (the fridge) is never skipped.
+	 */
+	void settleStragglers() {
+		for (Agent agent : agents.values()) {
+			if (agent.faceHold <= 0 || agent.pause > 0 || agent.goal == null || agent.path.isEmpty()) continue;
+			double gx = agent.goal.x() + 0.5, gz = agent.goal.z() + 0.5;
+			double[] last = agent.path.peekLast();
+			if (Math.hypot(last[0] - gx, last[1] - gz) > 1e-6 || Math.hypot(agent.x - gx, agent.z - gz) > 1.0) continue;
+			if (agent.path.stream().anyMatch(point -> point.length > 2)) continue;
+			agent.path.clear();
+			agent.x = gx;
+			agent.z = gz;
+			agent.walking = false;
+			agent.sink = agent.goal.sink();
+			if (!Float.isNaN(agent.goal.yaw())) agent.yaw = agent.goal.yaw();
+		}
+	}
+
 	/** What each floor's whiteboard should say: its waiting threads, oldest first. */
 	List<T3Office.Note> notes(int floor, Function<String, String> detail) {
 		List<T3Office.Note> notes = new ArrayList<>();
@@ -173,6 +205,7 @@ final class OfficeBrain {
 
 	void clear() {
 		agents.clear();
+		populated = false;
 	}
 
 	/** A shared-office agent's entity UUID, derived from its thread so any client can tell whose it is. */

@@ -28,8 +28,62 @@ public final class OfficeChecks {
   check(DeskLaptops.state(T3State.Status.NEEDS_YOU).equals("needs_you")&&DeskLaptops.state(T3State.Status.WORKING).equals("working")&&DeskLaptops.state(T3State.Status.DONE).equals("idle"),"laptop status mapping");
   check(DeskLaptops.uuid("a",true).equals(DeskLaptops.uuid("a",true))&&!DeskLaptops.uuid("a",true).equals(DeskLaptops.uuid("a",false))&&!DeskLaptops.uuid("a",true).equals(DeskLaptops.uuid("b",true)),"laptop pair identity stable and distinct");
   checkLighting();
+  checkStairs();
+  checkWalk();
   var brain=new OfficeBrain();var row=row("owner",0,T3State.Status.WORKING);brain.sync(List.of(row),List.of("owner"),new OfficeRoster.Preferences());brain.face(row.id());var a=brain.agents().get(row.id());double x=a.x,z=a.z;brain.tick();check(a.x==x&&a.z==z&&!a.walking,"head turn hold pauses the brain");
  }
+
+	/**
+	 * Owner report: agents slid across the floor. The limbs swing while an agent walks across the office at a natural
+	 * pace, come back to rest when it stands, stop the moment it sits, and the body turns into corners without snapping.
+	 */
+	private static void checkWalk() {
+		check(AgentWalk.SPEED >= 0.1 && AgentWalk.SPEED <= 0.15, "agents walk at a natural pace: " + AgentWalk.SPEED);
+		// A real brain walk: a working agent arriving at its desk from the door, fed to the walk animation tick by tick.
+		var brain = new OfficeBrain();
+		var row = row("owner", 0, T3State.Status.WORKING);
+		brain.sync(List.of(), List.of("owner"), new OfficeRoster.Preferences());
+		brain.sync(List.of(row("owner", 1, T3State.Status.DONE)), List.of("owner"), new OfficeRoster.Preferences()); // the office is already populated
+		brain.sync(List.of(row("owner", 1, T3State.Status.DONE), row), List.of("owner"), new OfficeRoster.Preferences());
+		var agent = brain.agents().get(row.id());
+		check(!agent.path.isEmpty(), "a newcomer walks in from the door");
+		var walk = new net.minecraft.world.entity.WalkAnimationState();
+		float peak = 0, stride = 0;
+		int ticks = 0;
+		while (!agent.settled() && ticks++ < 2000) {
+			double x = agent.x, z = agent.z;
+			brain.tick();
+			AgentWalk.animate(walk, Math.hypot(agent.x - x, agent.z - z), agent.settled() && agent.goal.seat());
+			if (agent.walking) { peak = Math.max(peak, walk.speed()); stride = Math.max(stride, walk.position()); }
+			if (ticks == 20) check(walk.speed() > 0.3f && walk.isMoving(), "limbs swing while walking, got " + walk.speed());
+		}
+		check(agent.settled() && peak > 0.4f && stride > 5, "the walk reached a full swing (" + peak + ") and the stride advanced (" + stride + ")");
+		check(walk.speed() == 0 && !walk.isMoving(), "sitting down at the desk stops the swing at once, got " + walk.speed());
+		// Standing still without sitting (the needs-you spot): the swing winds down to rest.
+		var stand = new net.minecraft.world.entity.WalkAnimationState();
+		for (int i = 0; i < 30; i++) AgentWalk.animate(stand, AgentWalk.SPEED, false);
+		check(stand.speed() > 0.4f, "a steady walk holds its swing");
+		for (int i = 0; i < 20; i++) AgentWalk.animate(stand, 0, false);
+		check(stand.speed() < 0.01f, "standing still, the limbs come back to rest, got " + stand.speed());
+		// Turning: a right-angle corner eases over a few ticks, never overshoots, and lands exactly on the heading.
+		float yaw = 0;
+		int turnTicks = 0;
+		while (yaw != 90 && turnTicks++ < 100) {
+			float next = AgentWalk.turn(yaw, 90);
+			check(next > yaw && next <= 90, "a corner turns steadily toward the heading");
+			yaw = next;
+		}
+		check(yaw == 90 && turnTicks >= 4 && turnTicks <= 25, "a corner takes a few ticks, not one: " + turnTicks);
+		check(Math.abs(net.minecraft.util.Mth.wrapDegrees(AgentWalk.turn(170, -170) - 176)) < 0.01f, "turns take the short way round");
+	}
+
+	/** Every tread and landing can be stood on, and every upper floor and the roof can be walked to from the door. */
+	private static void checkStairs() {
+		for (int floors = 1; floors <= 3; floors++) {
+			var problems = OfficeWalk.problems(floors);
+			check(problems.isEmpty(), "office stairs walkable on foot, " + floors + " floors: " + String.join("; ", problems));
+		}
+	}
 
 	/** The office is lit everywhere an agent can stand, day and night, and nothing can spawn on the terrace or the path. */
 	private static void checkLighting() {

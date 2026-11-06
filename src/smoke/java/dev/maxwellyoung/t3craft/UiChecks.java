@@ -15,7 +15,7 @@ public final class UiChecks {
 		cdpMessages();
 		nativeUi();
 		System.out.println("PASS diff headers inside hunks, table cells with empties/escapes, code-point-safe ellipsize, composer drafts survive a send, web viewport is 1:1 and never stretched, CDP messages, "
-			+ "native UI open-key letter guard, approval in-flight guard, failed-send restore and question option grid");
+			+ "native UI open-key letter guard, approval in-flight guard, Y/N only off the composer, laptop never on a hidden thread, new threads in the latest project, failed-send restore and question option grid");
 	}
 
 	private static void diffHeaders() {
@@ -211,6 +211,9 @@ public final class UiChecks {
 		check(!T3CraftClient.approvalInFlight(answered, "t2", List.of(), 1_100) && answered.containsKey("t1:r1"), "another thread's answer doesn't block this one");
 		check(!T3CraftClient.approvalInFlight(answered, "t1", List.of("r1"), 1_000 + T3CraftClient.APPROVAL_STALE_MS + 1), "a stuck answer frees the buttons eventually");
 
+		approvalKeys();
+		laptopThread();
+
 		// A failed send's text goes in front of what was typed since, once.
 		check(T3CraftClient.joinDraft("fix it", "").equals("fix it") && T3CraftClient.joinDraft("fix it", null).equals("fix it"), "restore into an empty box");
 		check(T3CraftClient.joinDraft("fix it", "and test").equals("fix it and test"), "restore keeps what was typed since");
@@ -223,6 +226,54 @@ public final class UiChecks {
 		check(T3Screen.optionGrid(9, 116, 20).equals(new T3Screen.OptionGrid(5, 2, 9)), "with the conversation down to one row all nine fit");
 		check(T3Screen.optionGrid(4, 5, 20).rows() == 1, "a tiny window still shows one row");
 		check(T3Screen.optionGrid(0, 100, 20).shown() == 0, "no options, no rows");
+	}
+
+	/** QA: after clicking Deny, typing "yes, go ahead" approved the next request through the hidden, still-focused button. */
+	private static void approvalKeys() {
+		var label = net.minecraft.network.chat.Component.empty();
+		var approve = net.minecraft.client.gui.components.Button.builder(label, b -> {}).build();
+		var deny = net.minecraft.client.gui.components.Button.builder(label, b -> {}).build();
+		var send = net.minecraft.client.gui.components.Button.builder(label, b -> {}).build();
+		boolean[] typing = {false};
+		// A real EditBox; only its focus flag is stubbed, since setFocused needs a running client.
+		var composer = new net.minecraft.client.gui.components.EditBox(null, 0, 0, 100, 18, label) {
+			@Override public boolean isFocused() { return typing[0]; }
+		};
+		List<net.minecraft.client.gui.components.events.GuiEventListener> children = List.of(composer, send, approve, deny);
+		check(T3Ui.approvalHotkey(true, T3Ui.keyFocus(null, children, approve, deny)), "nothing focused: Y answers");
+		check(T3Ui.approvalHotkey(true, T3Ui.keyFocus(approve, children, approve, deny)), "a shown, Tab-focused Approve: Y answers");
+		check(!T3Ui.approvalHotkey(false, T3Ui.keyFocus(null, children, approve, deny)), "no approval shown: Y is a letter");
+		typing[0] = true;
+		check(T3Ui.keyFocus(composer, children, approve, deny) == T3Ui.KeyFocus.TEXT_BOX && !T3Ui.approvalHotkey(true, T3Ui.KeyFocus.TEXT_BOX), "typing in the composer never approves");
+		check(T3Ui.keyFocus(null, children, approve, deny) == T3Ui.KeyFocus.TEXT_BOX, "any focused text box blocks Y/N, even if the screen lost track of it");
+		typing[0] = false;
+		approve.visible = false; deny.visible = false;
+		check(!T3Ui.approvalHotkey(true, T3Ui.keyFocus(deny, children, approve, deny)), "a hidden Deny left focused by the last click never answers the next approval");
+		check(!T3Ui.approvalHotkey(true, T3Ui.keyFocus(send, children, approve, deny)), "Send focused: Y is not an answer");
+		check(T3Ui.refocusText(deny, approve, deny) && T3Ui.refocusText(approve) && !T3Ui.refocusText(send, approve, deny) && !T3Ui.refocusText(null, approve, deny),
+			"clicked answer buttons and hidden widgets hand the keyboard back to the composer");
+	}
+
+	/** QA: the laptop opened on a settled thread the list didn't show, and Enter would have sent into it. */
+	private static void laptopThread() {
+		var recent = row("recent", T3State.Status.WORKING, "2026-11-06T10:00:00Z", "Craft");
+		var older = row("older", T3State.Status.DONE, "2026-11-05T10:00:00Z", "Site");
+		var waiting = row("waiting", T3State.Status.NEEDS_YOU, "2026-11-01T10:00:00Z", "Old");
+		check("recent".equals(FirstRun.laptopThread(List.of(recent, older), "recent", false)), "a listed choice stays selected");
+		check("recent".equals(FirstRun.laptopThread(List.of(recent, older), "settled-a", false)), "a hidden saved thread gives way to the default");
+		check("waiting".equals(FirstRun.laptopThread(List.of(waiting, recent, older), "settled-a", false)), "the default is the thread that needs you");
+		check("recent".equals(FirstRun.laptopThread(List.of(recent, older), null, false)), "nothing chosen: the default is selected, never an empty pick");
+		check("fresh".equals(FirstRun.laptopThread(List.of(recent), "fresh", true)), "a thread the laptop just started stays selected while it loads");
+		check("settled-a".equals(FirstRun.laptopThread(List.of(), "settled-a", false)), "still connecting: nothing changes");
+		// "+ New thread" starts in the most recently used project, not the needs-you thread sorted first.
+		check(FirstRun.newThreadTemplate(List.of(waiting, older, recent)) == recent, "a new thread borrows the most recently active project");
+		check(FirstRun.newThreadTemplate(List.of()) == null, "no threads: nowhere to start one");
+	}
+
+	private static T3State.ThreadRow row(String id, T3State.Status status, String updatedAt, String project) {
+		var raw = new com.google.gson.JsonObject();
+		raw.addProperty("updatedAt", updatedAt);
+		return new T3State.ThreadRow(id, "Thread " + id, project, "Studio", "http://127.0.0.1:1", status, null, null, raw);
 	}
 
 	private static void check(boolean ok, String message) { if (!ok) throw new AssertionError(message); }

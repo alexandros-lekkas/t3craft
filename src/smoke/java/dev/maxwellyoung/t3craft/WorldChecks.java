@@ -23,6 +23,7 @@ public final class WorldChecks {
 		checkFrame();
 		checkAdoption();
 		checkArrival();
+		checkArrivalHeight();
 		System.out.println("WorldChecks passed");
 	}
 
@@ -161,6 +162,36 @@ public final class WorldChecks {
 		check(!OfficePlacement.bareLawn(Blocks.GRASS_BLOCK.defaultBlockState(), air), "grass stays grass");
 		check(!OfficePlacement.bareLawn(Blocks.DIRT.defaultBlockState(), Blocks.OAK_PLANKS.defaultBlockState()), "covered dirt is not lawn");
 		check(!OfficePlacement.bareLawn(Blocks.SAND.defaultBlockState(), air), "sand is left as it is");
+	}
+
+	/**
+	 * Every curated place arrives within a few blocks of the office floor, whatever the ground reads: flat, an
+	 * ungenerated chunk (the heightmap's world floor, which dropped Lakeside players to Y -64), a cliff, a pit or a pond.
+	 */
+	private static void checkArrivalHeight() {
+		int minY = -64;
+		var air = Blocks.AIR.defaultBlockState();
+		for (T3Seeds.Seed seed : T3Seeds.all()) {
+			OfficePlacement.Placement plan = OfficePlacement.plan(seed.site().origin(), seed.site().facing());
+			int floor = plan.origin().getY();
+			var path = OfficePlacement.arrivalPath(plan.frame());
+			check(path.getFirst().equals(plan.spawn()) && path.getLast().equals(plan.door())
+				&& path.size() == OfficePlacement.SPAWN_DISTANCE + 1, seed.id() + ": the chunks loaded before placing run from the arrival spot to the plaza cell at the door");
+			record Case(String name, int height, boolean wet) {}
+			for (Case c : List.of(new Case("flat", floor, false), new Case("ungenerated", minY, false), new Case("cliff", floor + 12, false),
+				new Case("pit", floor - 20, false), new Case("pond", floor, true), new Case("a step up", floor + 3, false))) {
+				BlockPos arrival = OfficePlacement.arrival(plan.frame(), minY, new OfficePlacement.Ground() {
+					@Override public int height(int x, int z) { return c.height(); }
+					@Override public net.minecraft.world.level.block.state.BlockState state(BlockPos pos) {
+						return pos.getY() < c.height() ? (c.wet() ? Blocks.WATER : Blocks.GRASS_BLOCK).defaultBlockState() : air;
+					}
+				});
+				check(Math.abs(arrival.getY() - floor) <= OfficePlacement.MAX_ARRIVAL_STEP && arrival.getY() > minY,
+					seed.id() + " on " + c.name() + " ground: arrival Y " + arrival.getY() + " within " + OfficePlacement.MAX_ARRIVAL_STEP + " of the floor at " + floor);
+				check(path.contains(arrival.atY(floor)), seed.id() + " on " + c.name() + " ground: arrival on the path to the door");
+				if (c.name().equals("flat") || c.name().equals("a step up")) check(arrival.equals(new BlockPos(plan.spawn().getX(), c.height(), plan.spawn().getZ())), seed.id() + " on " + c.name() + " ground: arrive at the full distance");
+			}
+		}
 	}
 
 	private static void check(boolean ok, String message) { if (!ok) throw new AssertionError(message); }

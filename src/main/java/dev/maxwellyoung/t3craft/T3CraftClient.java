@@ -681,9 +681,12 @@ public final class T3CraftClient implements ClientModInitializer {
 	public boolean send(String text, boolean newThread, com.google.gson.JsonObject model, Runnable onFailure) {
 		// Nothing to pick first: the chosen thread, else the one that needs you, else the most recent one
 		// (a new thread only borrows its project and settings). With no threads at all, T3 itself is where to start one.
-		T3State.ThreadRow target = targetThread();
+		// "+ New thread" on the laptop starts in the most recently used project, whichever thread is selected.
+		boolean onPanel = Minecraft.getInstance().gui.screen() instanceof T3Screen;
+		T3State.ThreadRow target = newThread && onPanel ? FirstRun.newThreadTemplate(state.snapshot().threads()) : targetThread();
 		if (target == null) {
-			openPanelNextTick = true;
+			// Off the laptop, open it so the player sees why; on it, the text stays in the composer.
+			if (!onPanel) openPanelNextTick = true;
 			return false;
 		}
 		// The target's own environment: a thread from the home server goes to the home server.
@@ -691,6 +694,7 @@ public final class T3CraftClient implements ClientModInitializer {
 		state.run(() -> {
 			if (newThread) {
 				String id = api.startThread(target.raw(), text, model);
+				startedThreads.put(id, System.currentTimeMillis());
 				state.focus(id);
 				Minecraft.getInstance().execute(() -> focus(id));
 			} else {
@@ -699,6 +703,14 @@ public final class T3CraftClient implements ClientModInitializer {
 			}
 		}, e -> { reportError(e); if (onFailure != null) Minecraft.getInstance().execute(onFailure); });
 		return true;
+	}
+
+	/** Threads this game just started ("id" → when), kept selected on the laptop while they load into the list. */
+	private final java.util.Map<String, Long> startedThreads = new java.util.concurrent.ConcurrentHashMap<>();
+
+	boolean justStarted(String threadId) {
+		Long at = threadId == null ? null : startedThreads.get(threadId);
+		return at != null && System.currentTimeMillis() - at < 20_000;
 	}
 
 	public void respond(T3State.Approval approval, String decision) {
@@ -796,16 +808,19 @@ public final class T3CraftClient implements ClientModInitializer {
 	/**
 	 * The thread a command talks to (see {@link FirstRun#defaultThread}). An automatic pick is never saved as the
 	 * player's choice: chat commands pick afresh every time, so a thread that needs you is never shadowed by one
-	 * the mod chose earlier. The panel is the exception: it sends to the thread it shows, and follows the thread it
-	 * just sent to for this session, so the reply appears where the player is looking.
+	 * the mod chose earlier. The panel is the exception: it sends only to the listed thread it shows (it re-targets a
+	 * hidden one to the default first, see {@link FirstRun#laptopThread}), and follows the thread it just sent to for
+	 * this session, so the reply appears where the player is looking.
 	 */
 	private T3State.ThreadRow targetThread() {
 		T3State.Snapshot snapshot = state.snapshot();
-		boolean onPanel = Minecraft.getInstance().gui.screen() instanceof T3Screen;
-		if (onPanel && snapshot.focusedRow() != null) return snapshot.focusedRow();
-		T3State.ThreadRow row = FirstRun.defaultThread(snapshot.threads(), snapshot.focusedId());
-		if (onPanel && row != null) state.focus(row.id());
-		return row;
+		if (Minecraft.getInstance().gui.screen() instanceof T3Screen) {
+			// Only the listed thread the laptop has selected: never a hidden (settled, archived) one or one it doesn't show.
+			String id = state.focusedThreadId();
+			for (T3State.ThreadRow row : snapshot.threads()) if (row.id().equals(id)) return row;
+			return null;
+		}
+		return FirstRun.defaultThread(snapshot.threads(), snapshot.focusedId());
 	}
 
 	private void reportError(Exception e) {
@@ -845,13 +860,20 @@ public final class T3CraftClient implements ClientModInitializer {
 		lastPingThread = event.thread().id();
 		lastPingAt = System.currentTimeMillis();
 		if (config.books && event.status() == T3State.Status.DONE) T3Books.deliver(state, event.thread());
-		// Already looking at this thread in the panel: the sound is enough, a toast would cover it.
+		// The laptop shows every thread's status in its list; a toast there only covers its header. The sound is enough.
+		if (minecraft.gui.screen() instanceof T3Screen) return;
+		// Already looking at this thread on the card or web laptop: the sound is enough, a toast would cover it.
 		boolean viewing = minecraft.gui.screen() instanceof T3Screen || minecraft.gui.screen() instanceof T3AgentCardScreen || minecraft.gui.screen() instanceof T3WebScreen;
 		if (viewing && event.thread().id().equals(state.focusedThreadId())) return;
 		// Short text keeps the toast at its 190-px minimum, so it never grows over the corner status.
 		Component toastTitle = heading.copy().append(Component.literal(" · " + openKeyName() + " to open").withStyle(ChatFormatting.GRAY));
 		SystemToast.addOrUpdate(minecraft.gui.toastManager(), TOAST, toastTitle,
 			Component.literal(T3Hud.ellipsize(minecraft.font, title, 160)));
+	}
+
+	/** Opening the laptop clears a T3 toast still on screen, which would sit over its header. */
+	static void hideToast() {
+		SystemToast.forceHide(Minecraft.getInstance().gui.toastManager(), TOAST);
 	}
 
 	private int setBooks(boolean on) {

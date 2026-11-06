@@ -99,6 +99,7 @@ final class T3AgentCardScreen extends Screen {
 	@Override
 	public void tick() {
 		layout();
+		if (T3Ui.refocusText(getFocused())) setFocused(input);
 	}
 
 	private int cardWidth() { return Math.min(WIDTH, width - 12); }
@@ -227,9 +228,8 @@ final class T3AgentCardScreen extends Screen {
 		// Enter sends from the box; on a Tab-focused button it presses that button instead.
 		if (event.isConfirmation() && (getFocused() == input || getFocused() == null)) { send(); return true; }
 		// Y/N only when you are not typing: "yes, but…" in the reply box must never approve on its first letter.
-		boolean typing = input.isFocused();
 		boolean chord = event.hasControlDown() || event.hasAltDown() || (event.modifiers() & 0x8) != 0;
-		if (empty && !typing && !chord && approval != null && (event.key() == InputConstants.KEY_Y || event.key() == InputConstants.KEY_N)) {
+		if (empty && !chord && approvalHotkey() && (event.key() == InputConstants.KEY_Y || event.key() == InputConstants.KEY_N)) {
 			answer(event.key() == InputConstants.KEY_Y ? "accept" : "decline");
 			return true;
 		}
@@ -242,15 +242,23 @@ final class T3AgentCardScreen extends Screen {
 		if (input.getValue().isEmpty()) {
 			int c = event.codepoint();
 			if (mod.openKeyCloses() && mod.openKeyName().equalsIgnoreCase(Character.toString(c))) return true;
-			if (approval != null && !input.isFocused() && (c == 'y' || c == 'n' || c == 'Y' || c == 'N')) return true;
+			if (approvalHotkey() && (c == 'y' || c == 'n' || c == 'Y' || c == 'N')) return true;
 		}
 		return super.charTyped(event);
+	}
+
+	/** Y / N answer only with nothing focused or Approve / Deny focused, never while the reply box has the keyboard. */
+	private boolean approvalHotkey() {
+		return T3Ui.approvalHotkey(approval != null && approve.visible, T3Ui.keyFocus(getFocused(), children(), approve, deny));
 	}
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
 		if (event.x() < x0 || event.x() >= x1 || event.y() < y0 || event.y() >= y1) { onClose(); return true; }
-		return super.mouseClicked(event, doubleClick);
+		boolean handled = super.mouseClicked(event, doubleClick);
+		// The container focuses the clicked button after it answered; give the keyboard back to the reply box.
+		if (T3Ui.refocusText(getFocused(), approve, deny)) setFocused(input);
+		return handled;
 	}
 
 	@Override

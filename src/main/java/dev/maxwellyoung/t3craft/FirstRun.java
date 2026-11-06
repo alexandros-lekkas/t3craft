@@ -20,6 +20,28 @@ final class FirstRun {
 		return rows.isEmpty() ? null : rows.getFirst();
 	}
 
+	/**
+	 * The thread the laptop shows and sends to. The focused one while it is listed. One the player can't see in the
+	 * list (settled, archived, a child) is never shown or sent to: the default takes its place. A thread the laptop
+	 * just started is kept while it loads into the list; with nothing listed yet (connecting), nothing changes.
+	 */
+	static String laptopThread(List<T3State.ThreadRow> visible, String focusedId, boolean justStarted) {
+		if (visible.isEmpty()) return focusedId;
+		if (focusedId != null) {
+			for (T3State.ThreadRow row : visible) if (row.id().equals(focusedId)) return focusedId;
+			if (justStarted) return focusedId;
+		}
+		return defaultThread(visible, null).id();
+	}
+
+	/** Where "+ New thread" starts one: the project (and settings) of the most recently active listed thread. */
+	static T3State.ThreadRow newThreadTemplate(List<T3State.ThreadRow> visible) {
+		T3State.ThreadRow best = null;
+		for (T3State.ThreadRow row : visible)
+			if (best == null || T3State.activityAt(row.raw()).compareTo(T3State.activityAt(best.raw())) > 0) best = row;
+		return best;
+	}
+
 	/** The one line the mod says by itself: once per game, when T3 is connected and the player is in a world. */
 	static String connectedLine(String openKey) {
 		return "T3 connected · press " + openKey + " to open";

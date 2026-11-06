@@ -19,7 +19,30 @@ final class AgentAppearance {
  static JsonObject skin(String driver,String thread) {
   var choices=SKINS.getAsJsonObject("providers").getAsJsonObject(provider(driver)).getAsJsonArray("skins");
   String id=choices.get(Math.floorMod(thread.hashCode(),choices.size())).getAsString();
+  return byId(id);
+ }
+ private static JsonObject byId(String id) {
   return SKINS.getAsJsonArray("skins").asList().stream().map(JsonElement::getAsJsonObject).filter(s->s.get("id").getAsString().equals(id)).findFirst().orElseThrow();
+ }
+ private static java.util.List<String> choices(String driver) {
+  return SKINS.getAsJsonObject("providers").getAsJsonObject(provider(driver)).getAsJsonArray("skins").asList().stream().map(JsonElement::getAsString).toList();
+ }
+ /**
+  * A skin for each agent in the office: an agent keeps the one it has (while it is still one of its provider's), and a
+  * newcomer gets its usual one unless another agent wears it, then the provider's next free one. Only when every one
+  * of the provider's skins is in use do two agents look alike. {@code assigned} (thread to skin id) is updated.
+  */
+ static JsonObject skin(String driver,String thread,java.util.Map<String,String> assigned) {
+  var choices=choices(driver);
+  String current=assigned.get(thread);
+  if(current!=null&&choices.contains(current))return byId(current);
+  var taken=new java.util.HashSet<>(assigned.values());
+  if(current!=null)taken.remove(current);
+  int start=Math.floorMod(thread.hashCode(),choices.size());
+  String id=choices.get(start);
+  for(int i=0;i<choices.size();i++){String candidate=choices.get((start+i)%choices.size());if(!taken.contains(candidate)){id=candidate;break;}}
+  assigned.put(thread,id);
+  return byId(id);
  }
  static String driver(T3State.ThreadRow row) {
   JsonObject raw=row.raw(); if(raw==null)return "default";
@@ -32,7 +55,9 @@ final class AgentAppearance {
   return PROFILES.computeIfAbsent(skin.get("id").getAsString(),id->ResolvableProfile.CODEC.parse(JsonOps.INSTANCE,skin.get("profile")).getOrThrow());
  }
  static void update(Mannequin avatar,T3State.ThreadRow row,boolean online,String driver) {
-  var skin=skin(driver,row.id());
+  update(avatar,row,online,driver,skin(driver,row.id()));
+ }
+ static void update(Mannequin avatar,T3State.ThreadRow row,boolean online,String driver,JsonObject skin) {
   var profile=profile(skin);
   if(!profile.equals(avatar.getProfile())) avatar.setComponent(DataComponents.PROFILE,profile);
   avatar.addTag("t3craft_agent");avatar.setNoGravity(true);avatar.setPermanentlyInvulnerable(true);

@@ -38,6 +38,34 @@ final class T3Ui {
 	private T3Ui() {
 	}
 
+	/** What has the keyboard when Y or N is pressed on a screen with Approve / Deny. */
+	enum KeyFocus { NOTHING, ANSWER_BUTTON, TEXT_BOX, OTHER }
+
+	/**
+	 * Any focused text box wins; otherwise nothing focused, a shown Approve / Deny button, or something else (a
+	 * hidden button the last click left focused, Send, an option).
+	 */
+	static KeyFocus keyFocus(net.minecraft.client.gui.components.events.GuiEventListener focused,
+		List<? extends net.minecraft.client.gui.components.events.GuiEventListener> children, net.minecraft.client.gui.components.AbstractWidget... answers) {
+		for (var child : children) if (child instanceof net.minecraft.client.gui.components.EditBox box && box.isFocused()) return KeyFocus.TEXT_BOX;
+		if (focused instanceof net.minecraft.client.gui.components.EditBox) return KeyFocus.TEXT_BOX;
+		if (focused == null) return KeyFocus.NOTHING;
+		for (var answer : answers) if (focused == answer && answer.visible) return KeyFocus.ANSWER_BUTTON;
+		return KeyFocus.OTHER;
+	}
+
+	/** A bare Y / N answers the shown approval only with nothing focused or Approve / Deny itself focused: never while typing. */
+	static boolean approvalHotkey(boolean approvalShown, KeyFocus focus) {
+		return approvalShown && (focus == KeyFocus.NOTHING || focus == KeyFocus.ANSWER_BUTTON);
+	}
+
+	/** After a click on an answer button (which then hides), the keyboard goes back to the text box. */
+	static boolean refocusText(net.minecraft.client.gui.components.events.GuiEventListener focused, net.minecraft.client.gui.components.AbstractWidget... answers) {
+		if (focused instanceof net.minecraft.client.gui.components.AbstractWidget widget && !widget.visible) return true;
+		for (var answer : answers) if (focused == answer) return true;
+		return false;
+	}
+
 	/** A vanilla container window: black edge, light top-left bevel, dark bottom-right bevel, grey body. */
 	static void panel(GuiGraphicsExtractor g, int x0, int y0, int x1, int y1) {
 		g.fill(x0 + 1, y0, x1 - 1, y0 + 1, PANEL_EDGE);

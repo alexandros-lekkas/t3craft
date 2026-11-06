@@ -99,6 +99,8 @@ final class T3Screen extends Screen {
 	@Override
 	protected void init() {
 		mod.state().setPanelOpen(true);
+		T3CraftClient.hideToast();
+		keepFocusListed();
 		int x0 = mainLeft();
 		int x1 = mainRight();
 		int composerY = composerY();
@@ -127,6 +129,19 @@ final class T3Screen extends Screen {
 		stop = addRenderableWidget(Button.builder(Component.literal("Stop"), b -> mod.interrupt()).bounds(x1 - 34, MARGIN + PAD - 3, 34, 14).build());
 		layout(mod.state().snapshot());
 		revealFocused();
+	}
+
+	/**
+	 * The saved or pinged thread can drop out of the list (settled, archived) while the laptop is closed or open. The
+	 * laptop then selects the default instead of showing and sending into a thread the list doesn't have.
+	 */
+	private void keepFocusListed() {
+		String focused = mod.state().focusedThreadId();
+		String target = FirstRun.laptopThread(mod.state().snapshot().threads(), focused, mod.justStarted(focused));
+		if (target == null || target.equals(focused)) return;
+		Runnable change = () -> { mod.state().focus(target); selectedRequest = null; };
+		if (composer == null) change.run(); else switchDraft(change);
+		scroll = 0;
 	}
 
 	/** Opening on a thread further down (a ping, an agent, /t3 open) scrolls the list to it. */
@@ -166,14 +181,25 @@ final class T3Screen extends Screen {
 
 	@Override
 	public void tick() {
+		keepFocusListed();
 		layout(mod.state().snapshot());
+		// A Tab-focused button that has since hidden (an answered approval) hands the keyboard back to the composer.
+		if (T3Ui.refocusText(getFocused())) setFocused(composer);
 		updateHint();
 	}
 
-	/** Rows of the list: active threads, then one "Snoozed" row (null) that unfolds the snoozed ones. */
+	/** The "+ New thread" row at the top of the list; it only stands in a list, never for a real thread. */
+	private static final T3State.ThreadRow NEW_THREAD_ROW = new T3State.ThreadRow("", "+ New thread", null, null, null, T3State.Status.IDLE, null, null, new JsonObject());
+
+	/**
+	 * Rows of the list: "+ New thread" (when there is a project to start one in), active threads, then one
+	 * "Snoozed" row (null) that unfolds the snoozed ones.
+	 */
 	private List<T3State.ThreadRow> listRows() {
 		List<T3State.ThreadRow> all = mod.state().snapshot().threads();
-		List<T3State.ThreadRow> result = new ArrayList<>(all.stream().filter(r -> !T3Visibility.snoozedGroup(r)).toList());
+		List<T3State.ThreadRow> result = new ArrayList<>();
+		if (!all.isEmpty()) result.add(NEW_THREAD_ROW);
+		result.addAll(all.stream().filter(r -> !T3Visibility.snoozedGroup(r)).toList());
 		List<T3State.ThreadRow> snoozed = all.stream().filter(T3Visibility::snoozedGroup).toList();
 		if (!snoozed.isEmpty()) { result.add(null); if (snoozedExpanded) result.addAll(snoozed); }
 		return result;
@@ -216,8 +242,9 @@ final class T3Screen extends Screen {
 
 	private void updateHint() {
 		T3State.ThreadRow row = mod.state().snapshot().focusedRow();
+		T3State.ThreadRow template = newThread ? FirstRun.newThreadTemplate(mod.state().snapshot().threads()) : null;
 		String hint = newThread
-			? "New thread in " + (row == null ? "this project" : row.projectTitle()) + "…"
+			? "New thread in " + (template == null || template.projectTitle() == null ? "your latest project" : template.projectTitle()) + "…"
 			: "Message " + (row == null ? "the agent" : T3Ui.provider(mod, row)) + "…";
 		T3State.Question question = currentQuestion();
 		if (question != null && !newThread) {
@@ -346,7 +373,7 @@ final class T3Screen extends Screen {
 	}
 
 	int sidebarCountForTest() {
-		return (int) listRows().stream().filter(java.util.Objects::nonNull).count();
+		return (int) listRows().stream().filter(r -> r != null && r != NEW_THREAD_ROW).count();
 	}
 
 	/** The same path as the mouse wheel over the list. */
@@ -422,7 +449,7 @@ final class T3Screen extends Screen {
 		}
 		// Y/N only when you are not typing in the composer, and never as part of a Ctrl/Alt/Cmd chord.
 		boolean chord = event.hasControlDown() || event.hasAltDown() || (event.modifiers() & 0x8) != 0;
-		if (composerEmpty && !composer.isFocused() && !chord && (event.key() == InputConstants.KEY_Y || event.key() == InputConstants.KEY_N) && approve.visible) {
+		if (composerEmpty && !chord && (event.key() == InputConstants.KEY_Y || event.key() == InputConstants.KEY_N) && approvalHotkey()) {
 			answer(event.key() == InputConstants.KEY_Y ? "accept" : "decline");
 			return true;
 		}
@@ -440,10 +467,15 @@ final class T3Screen extends Screen {
 			return true;
 		}
 		if (composer.getValue().isEmpty() && (typesOpenKey(event.codepoint())
-			|| (approve.visible && !composer.isFocused() && (event.codepoint() == 'y' || event.codepoint() == 'n' || event.codepoint() == 'Y' || event.codepoint() == 'N')))) {
+			|| (approvalHotkey() && (event.codepoint() == 'y' || event.codepoint() == 'n' || event.codepoint() == 'Y' || event.codepoint() == 'N')))) {
 			return true;
 		}
 		return super.charTyped(event);
+	}
+
+	/** Y / N answer the shown approval only with nothing focused or Approve / Deny focused, never while typing. */
+	private boolean approvalHotkey() {
+		return T3Ui.approvalHotkey(approve.visible, T3Ui.keyFocus(getFocused(), children(), approve, deny));
 	}
 
 	/** Whether this character is what the open key types, so pressing it to open or close never lands in the composer. */
@@ -458,11 +490,18 @@ final class T3Screen extends Screen {
 			int index = (int) ((event.y() - listTop()) / ROW) + listScroll;
 			if (index < rows.size()) {
 				if (rows.get(index) == null) { snoozedExpanded = !snoozedExpanded; clampListScroll(listRows().size()); return true; }
+				if (rows.get(index) == NEW_THREAD_ROW) { startNewThread(); scroll = 0; setFocused(composer); return true; }
 				select(rows.get(index).id());
 				return true;
 			}
 		}
-		return super.mouseClicked(event, doubleClick);
+		boolean handled = super.mouseClicked(event, doubleClick);
+		// The container focuses whatever was clicked after its action ran. Approve, Deny and the options hide once
+		// answered; left focused, the next approval's Y would fire from a "yes…" typed for the composer.
+		List<Button> answers = new ArrayList<>(options);
+		answers.add(approve); answers.add(deny);
+		if (T3Ui.refocusText(getFocused(), answers.toArray(Button[]::new))) setFocused(composer);
+		return handled;
 	}
 
 	@Override
@@ -593,6 +632,13 @@ final class T3Screen extends Screen {
 				y += ROW;
 				continue;
 			}
+			if (row == NEW_THREAD_ROW) {
+				if (newThread) graphics.fill(x0, y, x1, y + ROW, 0x30000000);
+				else if (hovered) graphics.fill(x0, y, x1, y + ROW, 0x18000000);
+				graphics.text(font, row.title(), x0 + 3, y + 2, newThread ? T3Ui.TITLE : T3Ui.TEXT, false);
+				y += ROW;
+				continue;
+			}
 			boolean selected = row.id().equals(focused) && !newThread;
 			if (selected) graphics.fill(x0, y, x1, y + ROW, 0x30000000);
 			else if (hovered) graphics.fill(x0, y, x1, y + ROW, 0x18000000);
@@ -627,10 +673,11 @@ final class T3Screen extends Screen {
 			return;
 		}
 		if (row == null && !newThread) {
-			graphics.text(font, snapshot.threads().isEmpty() ? "No threads yet." : "Pick a thread on the left.", x0, y + 1, T3Ui.MUTED, false);
+			graphics.text(font, snapshot.threads().isEmpty() ? "No threads yet. Start one in T3 Code." : "Pick a thread on the left.", x0, y + 1, T3Ui.MUTED, false);
 			return;
 		}
-		if (row == null) row = snapshot.threads().isEmpty() ? null : snapshot.threads().getFirst();
+		// A new thread belongs to the machine and project it starts in.
+		if (newThread) row = FirstRun.newThreadTemplate(snapshot.threads());
 		if (row == null) return;
 
 		// Header: the title, and the status at the right end in its colour.

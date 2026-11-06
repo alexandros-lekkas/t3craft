@@ -6,6 +6,7 @@ The product calls behind T3 Craft, newest first. Each one has the date, the deci
 
 | Date | Decision | Why |
 |:--|:--|:--|
+| 2026-11-06 | [New threads from the laptop](#2026-11-06--new-threads-from-the-laptop) | A player whose threads are all done still needs a way to start one |
 | 2026-11-06 | [Simple native Minecraft UI](#2026-11-06--simple-native-minecraft-ui) | *"It was better when it was mc, but just very simple"* |
 | 2026-11-05 | Office only; real T3 UI streamed in-game (UI part superseded) | Keep one workplace and the full T3 experience |
 | 2026-11-06 | [Nothing to pick, nothing to confirm, one line in chat](#2026-11-06--nothing-to-pick-nothing-to-confirm-one-line-in-chat) | Every demand in chat is a place to get stuck |
@@ -26,6 +27,9 @@ The product calls behind T3 Craft, newest first. Each one has the date, the deci
 | 2026-11-05 | [Office design A: Scandi Studio](#2026-11-05--office-design-a-scandi-studio) | Warm, readable and modular |
 
 ---
+
+### 2026-11-06 · New threads from the laptop
+One "+ New thread" row at the top of the laptop's list opens an empty composer; sending starts the thread in the project of the most recently active listed thread, with that thread's settings. No project or model picker: in-game it is one row and one box, and anything finer is done in T3 Code. The laptop also only ever shows and sends to a thread its list contains; a saved thread that has been settled or archived gives way to the default (the thread that needs you, else the most recent). While the laptop is open, finished-thread toasts are not shown (its list already shows the status, and a toast covered its header).
 
 ### 2026-11-06 · Simple native Minecraft UI
 

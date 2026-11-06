@@ -9,7 +9,8 @@
   ],
   "client": [
     "AgentRendererMixin",
-    "AgentModelMixin"
+    "AgentModelMixin",
+    "AgentWalkMixin"
   ],
   "injectors": {
     "defaultRequire": 1
