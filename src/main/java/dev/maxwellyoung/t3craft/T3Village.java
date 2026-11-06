@@ -60,8 +60,7 @@ final class T3Village {
 					// Drain queued clicks so vanilla never sends an interact for an entity the server doesn't have.
 				}
 				brain.face(threadId);
-				mod.focus(threadId);
-				mod.openPanel();
+				mod.openAgentCard(threadId);
 				return;
 			}
 		}
@@ -207,6 +206,9 @@ final class T3Village {
 	OfficeBrain brainForTest() {
 		return brain;
 	}
+
+	/** The villager standing in for {@code threadId}, for the dev showcase; null when it is not in this world. */
+	Mannequin villagerFor(String threadId) { return villagers.get(threadId); }
 
 	/** Entity id → thread, for the self-test. */
 	Map<Integer, String> threadsByEntity() {

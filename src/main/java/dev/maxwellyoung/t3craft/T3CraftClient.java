@@ -53,6 +53,7 @@ public final class T3CraftClient implements ClientModInitializer {
 	private boolean pairingInProgress;
 	private String lastPingThread;
 	private long lastPingAt;
+	private boolean jumpNextTick;
 	private static final long PING_JUMP_WINDOW_MS = 60_000;
 	private T3Village village;
 	private final OfficeQueue office = new OfficeQueue();
@@ -87,7 +88,8 @@ public final class T3CraftClient implements ClientModInitializer {
 
 		decisionsKey = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.t3craft.decisions", InputConstants.KEY_J, category));
 
-		new T3Mcp(() -> config.agentCommands).start();
+		// Dev captures run beside the player's real game: never take over its MCP port.
+		if (System.getProperty("t3craft.webShowcase") == null) new T3Mcp(() -> config.agentCommands).start();
 		village = new T3Village(this);
 		ClientTickEvents.START_CLIENT_TICK.register(village::tick);
 		ClientTickEvents.START_CLIENT_TICK.register(ClientCommands::tick);
@@ -96,6 +98,8 @@ public final class T3CraftClient implements ClientModInitializer {
 		net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents.ALLOW_GAME.register(
 			(message, overlay) -> overlay || !(T3Books.isOwnFeedback(message.getString()) || office.hideFeedback(message)));
 		SelfTest selfTest = SelfTest.fromSystemProperty(this);
+		WebShowcase webShowcase = WebShowcase.fromSystemProperty(this);
+		if (webShowcase != null) ClientTickEvents.END_CLIENT_TICK.register(webShowcase::tick);
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			state.setPins(List.copyOf(officePreferences().pins));
 			if (selfTest != null) selfTest.tick(client);
@@ -103,15 +107,19 @@ public final class T3CraftClient implements ClientModInitializer {
 			while (openKey.consumeClick()) {
 				openPanelNextTick = true;
 				// Answering a ping: open the thread that pinged, not whatever was focused before.
-				if (lastPingThread != null && System.currentTimeMillis() - lastPingAt < PING_JUMP_WINDOW_MS) focus(lastPingThread);
+				if (lastPingThread != null && System.currentTimeMillis() - lastPingAt < PING_JUMP_WINDOW_MS) { focus(lastPingThread); jumpNextTick = true; }
 				lastPingThread = null;
 			}
 			if (openPanelNextTick && client.gui.screen() == null) {
 				openPanelNextTick = false;
-				openPanel();
+				boolean jump = jumpNextTick;
+				jumpNextTick = false;
+				openLaptop(jump);
 			}
 		});
 
+		// The hidden Chrome behind the laptop never outlives the game.
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(client -> ChromeHost.shutdown());
 		HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(MOD_ID, "status"), new T3Hud(this));
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> registerCommands(dispatcher));
 	}
@@ -419,6 +427,34 @@ public final class T3CraftClient implements ClientModInitializer {
 	}
 
 
+	/**
+	 * The panel key: T3 Code's real web app, full screen. Without a Chromium browser, or if T3's page cannot load,
+	 * the native panel opens exactly as before.
+	 */
+	public void openLaptop() { openLaptop(false); }
+
+	/** {@code jump}: the player is answering a ping, so the laptop must show that thread even if it was already open on another. */
+	public void openLaptop(boolean jump) {
+		if (!T3WebScreen.available()) { openPanel(); return; }
+		lastPingThread = null;
+		String focused = state.focusedThreadId();
+		Minecraft.getInstance().gui.setScreen(T3WebScreen.laptop(focused, ownerOf(focused), jump, this::openPanel));
+	}
+
+	/** Right-click an agent: that agent's T3 thread in a floating card over the blurred world. */
+	public void openAgentCard(String threadId) {
+		focus(threadId);
+		if (!T3WebScreen.available()) { openPanel(); return; }
+		// A thread on another paired machine cannot be streamed from the local T3; the web view falls back to the panel for it.
+		Minecraft.getInstance().gui.setScreen(T3WebScreen.card(threadId, ownerOf(threadId), this::openPanel));
+	}
+
+	/** The paired machine that owns {@code threadId} (its address), or null when unknown. */
+	private String ownerOf(String threadId) {
+		T3Backend owner = threadId == null ? null : state.apiFor(threadId);
+		return owner == null ? null : owner.ownerKey();
+	}
+
 	void openDecisions() {
 		if (paired()) Minecraft.getInstance().gui.setScreen(new T3DeskScreen(this));
 		else openPanel();
@@ -525,6 +561,13 @@ public final class T3CraftClient implements ClientModInitializer {
 			.withStyle(ChatFormatting.RED)));
 	}
 
+	/** Dev showcase only: a "Done" ping for {@code threadId}, exactly as a finished agent would raise it. */
+	void pingForShowcase(String threadId) {
+		T3State.ThreadRow row = state.snapshot().threads().stream().filter(r -> r.id().equals(threadId)).findFirst()
+			.orElse(new T3State.ThreadRow(threadId, "Thread " + threadId.substring(0, Math.min(8, threadId.length())), null, null, null, T3State.Status.DONE, null, null, null));
+		announce(new T3State.Event(row, T3State.Status.DONE));
+	}
+
 	/** The point of the mod: tell the player when an agent finishes or needs them, wherever they are. */
 	private void announce(T3State.Event event) {
 		Minecraft minecraft = Minecraft.getInstance();
@@ -550,7 +593,8 @@ public final class T3CraftClient implements ClientModInitializer {
 		lastPingAt = System.currentTimeMillis();
 		if (config.books && event.status() == T3State.Status.DONE) T3Books.deliver(state, event.thread());
 		// Already looking at this thread in the panel: the sound is enough, a toast would cover it.
-		if (minecraft.gui.screen() instanceof T3Screen && event.thread().id().equals(state.focusedThreadId())) return;
+		boolean viewing = minecraft.gui.screen() instanceof T3Screen || minecraft.gui.screen() instanceof T3WebScreen;
+		if (viewing && event.thread().id().equals(state.focusedThreadId())) return;
 		// Short text keeps the toast at its 190-px minimum, so it never grows over the corner status.
 		Component toastTitle = heading.copy().append(Component.literal(" · " + openKeyName() + " to open").withStyle(ChatFormatting.GRAY));
 		SystemToast.addOrUpdate(minecraft.gui.toastManager(), TOAST, toastTitle,

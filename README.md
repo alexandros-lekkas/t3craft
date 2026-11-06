@@ -67,7 +67,8 @@ No pairing links, no commands, no settings screens. T3 Craft finds T3 Code on yo
 <tr>
 <td width="50%" valign="top">
 
-<b>Click an agent to talk.</b> The planned experience streams its real T3 thread into a floating window. The laptop opens the full T3 web app; the native panel remains the fallback.
+<img src="docs/images/shots/ui-real-agent-card-scale5.png" alt="A real T3 thread in a floating card over the blurred Minecraft world">
+<b>Click an agent to talk.</b> Its real T3 thread opens in a floating card over the blurred world. It is T3 Code's own web app, streamed through a hidden Chrome and pixel-exact at every GUI scale. The laptop (or <kbd>`</kbd>) opens the full app. Without Chrome, Edge, Brave or Chromium, the native panel opens instead. <a href="docs/design/real-t3-ui.md">How it works →</a>
 </td>
 <td width="50%" valign="top">
 <img src="docs/images/office-ground-floor.png" alt="Ground-floor cutaway: agents at the bench, one at the whiteboard">

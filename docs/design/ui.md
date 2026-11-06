@@ -1,6 +1,6 @@
 # The real T3 UI in Minecraft
 
-> **Status:** in progress. The earlier native redesign below is an exploration, not the primary UI.
+> **Status:** shipped in [#7](https://github.com/alexandros-lekkas/t3craft/pull/7). See [the real T3 UI](real-t3-ui.md) for how it works, with real screenshots. The earlier native redesign below is an exploration, not the primary UI.
 
 The real T3 web app is streamed in-game. Right-click the laptop to open the full app. Click an agent to open its actual T3 thread in a floating window beside it. Conversations, approvals and thread tools use T3's own interface.
 

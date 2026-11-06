@@ -4,7 +4,7 @@ How T3 Craft talks to T3 Code, and where each piece runs. This page is kept shor
 
 ## Streamed UI direction
 
-The primary UI will stream the real T3 web app in-game. The laptop opens the full app; clicking an agent opens its thread in a floating window. The native panel remains the fallback. The backend architecture below supports world state and that fallback; it does not replace the web app.
+The primary UI streams the real T3 web app in-game through a hidden Chrome over the DevTools Protocol ([how it works](design/real-t3-ui.md)). The laptop opens the full app; clicking an agent opens its thread in a floating window. The native panel remains the fallback. The backend architecture below supports world state and that fallback; it does not replace the web app.
 
 ## The big picture
 

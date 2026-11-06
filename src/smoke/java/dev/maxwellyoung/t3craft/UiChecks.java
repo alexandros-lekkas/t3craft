@@ -11,7 +11,9 @@ public final class UiChecks {
 		tableCells();
 		ellipsize();
 		composerDrafts();
-		System.out.println("PASS diff headers inside hunks, table cells with empties/escapes, code-point-safe ellipsize, composer drafts survive a send");
+		webViewport();
+		cdpMessages();
+		System.out.println("PASS diff headers inside hunks, table cells with empties/escapes, code-point-safe ellipsize, composer drafts survive a send, web viewport is 1:1 and never stretched, CDP messages");
 	}
 
 	private static void diffHeaders() {
@@ -99,6 +101,86 @@ public final class UiChecks {
 		check(get.apply("t2").equals("for t2"), "text parks under the key it was loaded for");
 		composer.sent(put);
 		check(!drafts.containsKey("t2"), "sending clears the draft the text came from");
+	}
+
+	private static void webViewport() {
+		// The owner's setup: GUI scale 5 on a 2000x1250 framebuffer = 400x250 GUI.
+		WebViewport laptop = WebViewport.fit(0, 0, 400, 250, 5, WebViewport.LAPTOP_MIN_CSS);
+		check(laptop.physicalWidth() == 2000 && laptop.physicalHeight() == 1250, "laptop covers every framebuffer pixel, got " + laptop.physicalWidth() + "x" + laptop.physicalHeight());
+		check(laptop.cssWidth() >= WebViewport.LAPTOP_MIN_CSS, "laptop gets T3's desktop layout, got " + laptop.cssWidth());
+		check(Math.abs(laptop.cssWidth() * laptop.deviceScaleFactor() - laptop.physicalWidth()) < 1e-9
+			&& Math.abs(laptop.cssHeight() * laptop.deviceScaleFactor() - laptop.physicalHeight()) < 1e-9, "CSS x DPR is exactly the destination: no stretch");
+		check(laptop.matches(2000, 1250) && !laptop.matches(1999, 1250), "only an exact frame counts as 1:1");
+		// Big window, small GUI scale: DPR is exactly the GUI scale (one CSS px = one GUI px).
+		WebViewport wide = WebViewport.fit(0, 0, 1280, 720, 2, WebViewport.LAPTOP_MIN_CSS);
+		check(wide.deviceScaleFactor() == 2.0 && wide.cssWidth() == 1280 && wide.physicalWidth() == 2560, "DPR = GUI scale when there is room");
+		for (int scale = 1; scale <= 6; scale++) for (int w = 120; w <= 1000; w += 37) {
+			WebViewport v = WebViewport.fit(3, 5, w, w * 5 / 8, scale, WebViewport.LAPTOP_MIN_CSS);
+			check(v.physicalWidth() == w * scale && v.physicalHeight() == (w * 5 / 8) * scale, "dest px = gui x scale");
+			check(Math.abs(v.cssWidth() * v.deviceScaleFactor() - v.physicalWidth()) < 1e-9, "never stretched at scale " + scale + " width " + w);
+			check(v.deviceScaleFactor() >= 1.0, "never below one framebuffer pixel per CSS pixel");
+		}
+		// The agent card: centred, T3's compact (sidebar-less) layout.
+		WebViewport card = WebViewport.fit(76, 32, 248, 185, 5, WebViewport.CARD_MIN_CSS, WebViewport.CARD_MAX_CSS);
+		check(card.cssWidth() >= WebViewport.CARD_MIN_CSS && card.cssWidth() <= WebViewport.CARD_MAX_CSS, "card uses T3's compact layout, got " + card.cssWidth());
+		check(card.physicalX() == 380 && card.physicalWidth() == 1240, "card position and size in real pixels");
+		// The card is compact at every GUI scale: at scale 1 on a 2000-px window, 62% would be 1240 CSS px (T3's desktop layout).
+		for (int scale = 1; scale <= 6; scale++) {
+			WebViewport c = WebViewport.card(2000 / scale, 1250 / scale, scale);
+			check(c.cssWidth() <= WebViewport.CARD_MAX_CSS, "card is compact at GUI scale " + scale + ", got " + c.cssWidth() + " CSS px");
+			check(c.guiX() >= 0 && c.guiX() + c.guiWidth() <= 2000 / scale, "card stays inside the window at scale " + scale);
+		}
+		check(WebViewport.card(400, 250, 5).guiWidth() == 248 && WebViewport.card(400, 250, 5).guiHeight() == 185, "card size at the owner's setup");
+		// Mouse: GUI → CSS, clamped inside the page.
+		check(card.cssX(76) == 0 && card.cssX(76 + 124) == 124 * card.divisor() && card.cssX(10_000) == card.cssWidth() - 1, "mouse maps into CSS pixels");
+		check(card.contains(76, 32) && !card.contains(75, 32) && !card.contains(76 + 248, 40), "hit test is half-open");
+	}
+
+	private static void cdpMessages() {
+		WebViewport v = WebViewport.fit(0, 0, 400, 250, 5, WebViewport.LAPTOP_MIN_CSS);
+		var metrics = Cdp.metrics(v);
+		check(metrics.get("width").getAsInt() == v.cssWidth() && metrics.get("deviceScaleFactor").getAsDouble() == v.deviceScaleFactor() && !metrics.get("mobile").getAsBoolean(), "device metrics");
+		var cast = Cdp.screencast(v);
+		check(cast.get("maxWidth").getAsInt() == 2000 && cast.get("maxHeight").getAsInt() == 1250, "screencast frames are the exact physical size");
+		check("jpeg".equals(cast.get("format").getAsString()) && cast.get("quality").getAsInt() >= 90, "JPEG quality >= 90");
+		var message = Cdp.message(7, "Page.navigate", Cdp.obj("url", "http://127.0.0.1:3773/"));
+		check(message.get("id").getAsInt() == 7 && "Page.navigate".equals(message.get("method").getAsString())
+			&& "http://127.0.0.1:3773/".equals(message.getAsJsonObject("params").get("url").getAsString()), "request envelope");
+		// GLFW Shift 1, Ctrl 2, Alt 4, Super 8  ->  CDP Alt 1, Ctrl 2, Meta 4, Shift 8.
+		check(Cdp.modifiers(1) == 8 && Cdp.modifiers(2) == 2 && Cdp.modifiers(4) == 1 && Cdp.modifiers(8) == 4 && Cdp.modifiers(15) == 15, "modifier bits");
+		var press = Cdp.mouse("mousePressed", 10.5, 20, 0, 1, 2, 0);
+		check("left".equals(press.get("button").getAsString()) && press.get("clickCount").getAsInt() == 2 && press.get("buttons").getAsInt() == 1, "double click");
+		check("none".equals(Cdp.mouse("mouseMoved", 1, 1, -1, 0, 0, 0).get("button").getAsString()), "hover has no button");
+		check(Cdp.wheel(0, 0, 0, 1, 0).get("deltaY").getAsDouble() == -100, "wheel up scrolls the page up");
+		var enter = Cdp.keyEvent("keyDown", Cdp.key(257), 0, true);
+		check("Enter".equals(enter.get("key").getAsString()) && enter.get("windowsVirtualKeyCode").getAsInt() == 13 && "\r".equals(enter.get("text").getAsString()), "Enter types a newline/submits");
+		var selectAll = Cdp.keyEvent("keyDown", Cdp.key(65), 8, true);
+		check(selectAll.get("modifiers").getAsInt() == 4 && "selectAll".equals(selectAll.getAsJsonArray("commands").get(0).getAsString()), "Cmd+A selects all on macOS");
+		check(!Cdp.keyEvent("keyDown", Cdp.key(65), 2, false).has("commands"), "no mac editing commands elsewhere");
+		check(Cdp.key(290) == null && Cdp.key(256) == null, "F-keys and Esc are never forwarded");
+		check("{\"text\":\"héllo ✓\"}".equals(Cdp.insertText("héllo ✓").toString()), "text goes through insertText");
+		var local = new T3Web.Local("http://127.0.0.1:3773", "env-1", java.nio.file.Path.of("."));
+		check(local.threadUrl("t-1").equals("http://127.0.0.1:3773/env-1/t-1") && local.threadUrl(null).equals("http://127.0.0.1:3773/"), "deep link route");
+		try {
+			var out = new java.io.ByteArrayOutputStream();
+			javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(37, 21, java.awt.image.BufferedImage.TYPE_INT_RGB), "jpg", out);
+			int[] size = WebPage.jpegSize(out.toByteArray());
+			check(size != null && size[0] == 37 && size[1] == 21, "JPEG size from its header");
+		} catch (java.io.IOException e) { throw new AssertionError(e); }
+		check(WebPage.jpegSize(new byte[] {(byte) 0x89, 'P', 'N', 'G'}) == null, "PNG is not parsed as JPEG");
+		check(local.threadUrl("thread:a%3Ab").equals("http://127.0.0.1:3773/env-1/thread%3Aa%253Ab"), "thread ids are path-encoded");
+		var trigger = Cdp.trigger();
+		check(trigger.get("maxWidth").getAsInt() <= 64 && trigger.get("maxHeight").getAsInt() <= 64, "the change-trigger screencast is tiny");
+		// Only the local T3 can be streamed; a thread on another paired machine goes to the native panel.
+		check(T3Web.servedBy("http://127.0.0.1:3773", null) && T3Web.servedBy("http://127.0.0.1:3773", "http://localhost:3773")
+			&& T3Web.servedBy("http://127.0.0.1:3773", "http://127.0.0.1:3773/"), "local owners are served by the local T3");
+		check(!T3Web.servedBy("http://127.0.0.1:3773", "http://10.0.0.7:3773") && !T3Web.servedBy("http://127.0.0.1:3773", "https://mac-mini.tail.ts.net")
+			&& !T3Web.servedBy("http://127.0.0.1:3773", "http://127.0.0.1:3774"), "remote owners are not");
+		// The laptop deep-links on the first open, when focus changed, and when answering a ping; otherwise it keeps its place.
+		check(T3Web.deepLink(false, null, "t-1", false), "first open deep-links");
+		check(!T3Web.deepLink(true, "t-1", "t-1", false), "reopening on the same thread keeps the laptop's place");
+		check(T3Web.deepLink(true, "t-1", "t-2", false), "a new focused thread deep-links");
+		check(T3Web.deepLink(true, "t-1", "t-1", true), "a ping jump deep-links even to the same thread");
 	}
 
 	private static void check(boolean ok, String message) { if (!ok) throw new AssertionError(message); }

@@ -24,6 +24,8 @@ What's in the current release, inherited from the original mod and hardened sinc
 | [#1 Public T3 MCP backend](https://github.com/alexandros-lekkas/t3craft/pull/1) | Routes everything T3's public MCP supports through it, with OAuth. The legacy protocol stays for approvals, checkpoint diffs and live updates. | Merged; MCP-primary with independent health per leg. |
 | [#2 Build/CI and world fixes](https://github.com/alexandros-lekkas/t3craft/pull/2) | Release workflow runs the full checks. Gradle 9.8.2 works on JDK 27. Fixes office and village bugs: floor ownership, queues across world changes, residents after reconnect. | Merged |
 | [#3 In-game UI fixes](https://github.com/alexandros-lekkas/t3craft/pull/3) | 17 UI bugs: drafts, failed sends, approvals, scrolling, review, Markdown links, rebindable keys. Adds `uiCheck`. | Merged. |
+| [#6 PR #1 regressions](https://github.com/alexandros-lekkas/t3craft/pull/6) | Decisions shows hidden threads' approvals, MCP history refreshes, errors are per thread, and `T3Mcp` dispatches carry tokens. | Merged. |
+| [#7 The real T3 UI](https://github.com/alexandros-lekkas/t3craft/pull/7) | Streams T3 Code's own web app into the laptop and the agent card through a hidden Chrome over CDP, pixel-exact at every GUI scale, with zero-step pairing. The native panel is the fallback. ([how it works](design/real-t3-ui.md)) | In review. |
 
 **Reliability follow-up.** Continue checking: bounded per-machine workers, coalesced UI updates, off-thread config saves, socket backoff and clean shutdown. The game stays smooth even when a machine is slow.
 
@@ -37,7 +39,7 @@ In rough order. Each item ships with its docs and real screenshots ([checklist](
 4. **Office design A in the game.** Modular lobby, floor and roof. A new machine adds a floor and nothing else is rebuilt. ([design](design/office.md))
 5. **Agents as player characters.** A player model with skins replaces villagers. ([design](design/characters-and-laptop.md))
 6. **The T3 laptop.** A craftable item you right-click to open the full streamed T3 web app.
-7. **Stream the real T3 web UI.** Laptop opens the full app; clicking an agent opens its thread in a floating window. Keep the native panel as fallback. ([design](design/ui.md))
+7. **Stream the real T3 web UI.** Done in [#7](https://github.com/alexandros-lekkas/t3craft/pull/7): the laptop opens the full app and clicking an agent opens its thread in a floating card, both streamed from a hidden Chrome over CDP. The native panel stays as the fallback. ([how it works](design/real-t3-ui.md))
 8. **Modpack 0.6.** No Iris or Miniature shaders, official-launcher install, no `options.txt` in the pack.
 
 ## 🔭 Later and exploring

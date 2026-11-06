@@ -42,6 +42,16 @@ The real in-game shots the docs need. When a feature lands, the implementing PR 
 
 Capture the real full app from the laptop and a real thread floating beside an agent. Native-panel captures below document the fallback, not the primary launch UI.
 
+These were taken against the real local T3 in the dev client with `./gradlew runClient -PwebShowcase=<threadId>` (read-only), at a 2000 × 1250 window. They are kept at full size, unedited, because the [real T3 UI page](design/real-t3-ui.md) uses them as evidence that text is pixel-exact.
+
+| ✓ | Shot | Scene setup | Camera | GUI |
+|:-:|:--|:--|:--|:--|
+| ☑ | `ui-real-laptop-scale5` | Laptop open on the focused thread | Full screen | **5** |
+| ☑ | `ui-real-laptop-input-scale5` | Same, after typing `minecraft` into T3's sidebar search (input focused via the DOM; see the known gap) | Full screen | **5** |
+| ☑ | `ui-real-ping-toast-scale5` | A *Done* ping toast in the HUD, laptop closed | Full screen | **5** |
+| ☑ | `ui-real-ping-jump-scale5` | Laptop after answering that ping with `: the pinged thread is open | Full screen | **5** |
+| ☑ | `ui-real-agent-card-scale5` | Agent card open on one thread, world blurred behind | Full screen | **5** |
+
 ### Native panel fallback
 
 | ✓ | Shot | Scene setup | Camera | GUI |
@@ -79,6 +89,7 @@ Capture the real full app from the laptop and a real thread floating beside an a
 | `hero-office`, `hero-office-night` | The `<picture>` hero in the [README](../README.md) |
 | `office-*`, `agents-*` | Renders in [office.md](design/office.md) and the README's "What it feels like" |
 | `world-*` | Mockups in [world.md](design/world.md) |
-| `ui-*` | Mockups in [ui.md](design/ui.md) and the README feature table |
+| `ui-real-*` | [real-t3-ui.md](design/real-t3-ui.md) and the README feature table |
+| `ui-*` | Mockups in [ui.md](design/ui.md) |
 | `laptop-*` | The texture in [characters-and-laptop.md](design/characters-and-laptop.md) |
 | `thread-image-*`, `agent-browser-live` | [browser-and-images.md](design/browser-and-images.md) |

@@ -26,7 +26,7 @@ The product calls behind T3 Craft, newest first. Each one has the date, the deci
 
 ### 2026-11-05 · Office only and streamed T3 UI
 
-**Decision:** Focus on the office only. An arrival plaza belongs to the office; multi-building expansion is out of scope. Stream the real T3 web UI in-game: the laptop opens the full app, and clicking an agent opens its thread in a floating window. The native panel is the fallback.
+**Decision:** Focus on the office only. An arrival plaza belongs to the office; multi-building expansion is out of scope. Stream the real T3 web UI in-game: the laptop opens the full app, and clicking an agent opens its thread in a floating window. The native panel is the fallback. ([how it works](design/real-t3-ui.md), [#7](https://github.com/alexandros-lekkas/t3craft/pull/7))
 **Why:** Preserve the actual T3 experience without rebuilding it in Minecraft widgets.
 
 ### 2026-11-05 · Simple features, no settings or machine UI
@@ -66,7 +66,7 @@ The product calls behind T3 Craft, newest first. Each one has the date, the deci
 
 ### 2026-11-05 · Calm UI, like the T3 desktop app
 
-**Decision (superseded):** Earlier native-panel styling explorations are retained for reference. The primary UI is now the real T3 web app streamed in-game; the native panel is a fallback. ([design](design/ui.md))
+**Decision (superseded):** Earlier native-panel styling explorations are retained for reference. The primary UI is now the real T3 web app streamed in-game; the native panel is a fallback. ([how it works](design/real-t3-ui.md), [native exploration](design/ui.md))
 **Why:** The owner found the current panel *"way too bold and dense, can't understand anything"*.
 
 ### 2026-11-05 · Keep report books
