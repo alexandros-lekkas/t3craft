@@ -1,0 +1,61 @@
+name: 🐛 Bug report
+description: Something broke or looks wrong.
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! Please **don't paste tokens, pairing links or private thread contents.** Blur them in screenshots.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: media
+    attributes:
+      label: Screenshot or clip
+      description: Drag images or videos here. For UI bugs this is the most useful thing.
+  - type: input
+    id: version
+    attributes:
+      label: T3 Craft version
+      placeholder: "0.5.0 (see Mod Menu or the jar name)"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - T3 Craft pack (official launcher)
+        - Modrinth modpack
+        - Just the mod jar
+        - Built from source
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options: [macOS, Windows, Linux]
+    validations:
+      required: true
+  - type: input
+    id: t3
+    attributes:
+      label: T3 Code version
+      placeholder: "e.g. 0.0.31 nightly"
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Where were you playing?
+      options: [Singleplayer / T3 World, Multiplayer server (mod client-only), Multiplayer server (mod on server too)]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The relevant part of `logs/latest.log` (in your Minecraft folder). It's formatted automatically.
+      render: text

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "T3 Craft credits",
+  "description": "Single source of truth for every third-party and original work in T3 Craft. Validated by credits/generate.py (stdlib; this schema is for editors).",
+  "type": "object",
+  "required": ["format", "project", "disclaimers", "coverage", "credits"],
+  "properties": {
+    "format": {"const": 1},
+    "project": {
+      "type": "object",
+      "required": ["name", "repo", "license"],
+      "properties": {
+        "name": {"type": "string"},
+        "repo": {"type": "string", "format": "uri"},
+        "license": {"type": "string"},
+        "copyright": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "disclaimers": {
+      "type": "object",
+      "properties": {
+        "minecraft": {"type": "string"},
+        "t3": {"type": "string"},
+        "providers": {"type": "string"}
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "description": "Every file under these roots must match some credit's files glob, or an ignore glob.",
+      "properties": {
+        "roots": {"type": "array", "items": {"type": "string"}},
+        "ignore": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "modpack": {
+      "type": "object",
+      "properties": {
+        "dir": {"type": "string"},
+        "patterns": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "ingest": {
+      "type": "array",
+      "description": "Credits files written by other tools (schematic pipelines). Missing files are skipped.",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": {"type": "string"},
+          "kind": {"enum": ["code", "mod", "font", "schematic", "art", "texture", "trademark", "service"]},
+          "files_prefix": {"type": "string"},
+          "where_used": {"type": "string"}
+        }
+      }
+    },
+    "credits": {"type": "array", "items": {"$ref": "#/$defs/credit"}}
+  },
+  "$defs": {
+    "credit": {
+      "type": "object",
+      "required": ["id", "kind", "title", "author", "license", "where_used"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "kind": {"enum": ["code", "mod", "font", "schematic", "art", "texture", "trademark", "service"]},
+        "title": {"type": "string"},
+        "author": {"type": "string"},
+        "url": {"type": "string", "description": "Homepage or listing. Required unless original or a trademark."},
+        "source": {"type": "string", "description": "Source repository, when different from url."},
+        "license": {"type": "string", "description": "SPDX id, or LicenseRef-* for custom terms."},
+        "license_url": {"type": "string"},
+        "copyright": {"type": "string", "description": "Exact copyright line. Required for bundled MIT/BSD/OFL."},
+        "files": {"type": "array", "items": {"type": "string"}, "description": "Repo-relative globs (** supported)."},
+        "modifications": {"type": "string"},
+        "where_used": {"type": "string"},
+        "status": {"enum": ["bundled", "referenced"], "description": "bundled = files ship in the repo/jar; referenced = only linked or named."},
+        "original": {"type": "boolean", "description": "Made for T3 Craft (MIT)."},
+        "always": {"type": "boolean", "description": "List even when no matching file exists yet."},
+        "active_if": {
+          "type": "object",
+          "properties": {
+            "exists": {"type": "string"},
+            "grep": {"type": "object", "required": ["files", "text"], "properties": {"files": {"type": "string"}, "text": {"type": "string"}}}
+          }
+        },
+        "modpack_file": {"type": "string", "description": "Path of the .pw.toml inside the modpack; the credit disappears when it is removed."},
+        "version": {"type": "string"},
+        "notes": {"type": "string"},
+        "inspired_by": {"type": "string"},
+        "permission": {"type": "string", "description": "Link to written permission, for bundled work without a redistributable license."},
+        "featured": {"type": "boolean"},
+        "in_game": {"type": "boolean", "description": "false hides it from the in-game Credits screen."}
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "GGG",
+    "IRI",
+    "III"
+  ],
+  "key": {
+    "G": "minecraft:glass_pane",
+    "I": "minecraft:iron_ingot",
+    "R": "minecraft:redstone"
+  },
+  "result": {
+    "id": "minecraft:paper",
+    "count": 1,
+    "components": {
+      "minecraft:item_model": "t3craft:laptop",
+      "minecraft:custom_name": {
+        "text": "T3 Laptop"
+      },
+      "minecraft:custom_data": {
+        "t3craft_laptop": 1
+      }
+    }
+  }
+}

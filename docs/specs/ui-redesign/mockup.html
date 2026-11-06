@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Earlier native UI exploration — T3 Panel Redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+/* All sizes below are GUI px. The stage is zoomed by the GUI scale (2 → 1920×1080). */
+:root{
+  --bg-panel: rgba(12,12,14,.95);
+  --bg-sidebar: rgba(17,17,20,.95);
+  --bg-raised:#16161A; --bg-bubble:#222227; --bg-code:#121215;
+  --hover: rgba(255,255,255,.063); --selected: rgba(255,255,255,.10);
+  --border:#26262C; --divider: rgba(255,255,255,.07);
+  --t-primary:#EDEDF0; --t-body:#CFCFD4; --t-secondary:#A1A1AA; --t-muted:#8A8A93; --t-faint:#55555E;
+  --code-inline:#D9B48F; --code-text:#C9C9D1; --link:#8AB4F8;
+  --working:#6BA6F5; --needs:#F0B254; --done:#5FC48A; --error:#EF7A7A;
+  --claude:#E08A5B; --codex:#9CA3AF; --other:#8AB4F8;
+  --body: 8px; --meta: 7px; --title: 9px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#000;color:var(--t-body);font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden}
+.controls{position:fixed;z-index:50;top:10px;right:10px;display:flex;gap:6px;font:12px Inter,system-ui;}
+.controls button{background:#1c1c20;color:#ddd;border:1px solid #333;border-radius:6px;padding:6px 10px;cursor:pointer}
+.controls button.on{background:#ededf0;color:#111}
+body.shot .controls{display:none}
+
+#stage{position:relative;width:960px;height:540px;zoom:2;overflow:hidden}
+body.s3 #stage{width:640px;height:360px;zoom:3}
+
+/* ---------- Minecraft-ish world, blurred ---------- */
+.world{position:absolute;inset:-20px;filter:blur(5px) saturate(.9) brightness(.62)}
+.sky{position:absolute;inset:0;background:linear-gradient(#7fa9e8 0%,#a9c8f2 45%,#cfe0f5 60%)}
+.sun{position:absolute;left:68%;top:12%;width:46px;height:46px;background:#fff6c8}
+.hill{position:absolute;bottom:0;image-rendering:pixelated}
+.h1{left:-40px;width:520px;height:250px;background:
+  repeating-linear-gradient(90deg,rgba(0,0,0,.06) 0 16px,transparent 16px 32px),
+  repeating-linear-gradient(0deg,rgba(0,0,0,.06) 0 16px,transparent 16px 32px),
+  linear-gradient(#5d9b3a 0 18px,#7a5232 18px 100%);clip-path:polygon(0 30%,16% 30%,16% 20%,40% 20%,40% 12%,62% 12%,62% 26%,100% 26%,100% 100%,0 100%)}
+.h2{left:380px;width:700px;height:200px;background:
+  repeating-linear-gradient(90deg,rgba(0,0,0,.07) 0 16px,transparent 16px 32px),
+  repeating-linear-gradient(0deg,rgba(0,0,0,.05) 0 16px,transparent 16px 32px),
+  linear-gradient(#4f8d33 0 16px,#6e4a2d 16px 60%,#7d7d7d 60% 100%);clip-path:polygon(0 40%,22% 40%,22% 28%,48% 28%,48% 16%,70% 16%,70% 34%,100% 34%,100% 100%,0 100%)}
+.tree{position:absolute;bottom:200px;width:16px;height:48px;background:#6b4a2b}
+.tree::before{content:"";position:absolute;left:-24px;top:-40px;width:64px;height:48px;background:#2f6b25}
+.t1{left:150px}.t2{left:660px;bottom:150px}.t3{left:820px;bottom:150px}
+.water{position:absolute;left:300px;bottom:0;width:220px;height:40px;background:#3f6fd1}
+
+/* ---------- Panel ---------- */
+.frame{position:absolute;inset:8px}
+.panel{position:absolute;inset:0;display:flex;border-radius:4px;overflow:hidden;background:var(--bg-panel);box-shadow:0 0 0 1px rgba(255,255,255,.04)}
+
+/* sidebar */
+.side{width:164px;flex:none;background:var(--bg-sidebar);border-right:1px solid var(--divider);display:flex;flex-direction:column}
+.medium .side{width:148px}
+.narrow .side{display:none}
+.side-h{height:24px;display:flex;align-items:center;padding:0 8px 0 10px;gap:6px}
+.brand{font-weight:600;font-size:var(--body);color:var(--t-primary)}
+.cdot{width:4px;height:4px;border-radius:2px;background:var(--done)}
+.icon-btn{margin-left:auto;width:16px;height:16px;display:grid;place-items:center;border-radius:3px;color:var(--t-secondary);font-size:8px}
+.icon-btn:hover{background:var(--hover)}
+.list{flex:1;overflow:hidden;padding-top:4px}
+.grp{height:18px;display:flex;align-items:flex-end;padding:0 10px 3px 12px;font-size:var(--meta);color:var(--t-muted)}
+.grp .n{margin-left:auto;color:var(--t-faint)}
+.row{position:relative;height:30px;margin:0 4px;border-radius:3px;padding:5px 8px 0 8px}
+.row:hover{background:var(--hover)}
+.row.sel{background:var(--selected)}
+.row.sel::before{content:"";position:absolute;left:0;top:8px;width:2px;height:14px;background:rgba(237,237,240,.6);border-radius:1px}
+.r1{display:flex;gap:6px;align-items:baseline;font-size:var(--body);line-height:12px}
+.r1 .t{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t-primary)}
+.row.quiet .r1 .t{color:var(--t-secondary)}
+.r1 .age{font-size:var(--meta);color:var(--t-muted)}
+.r2{display:flex;align-items:center;gap:5px;margin-top:2px;font-size:var(--meta);line-height:10px}
+.dot{width:4px;height:4px;border-radius:2px;flex:none}
+.spin{width:6px;height:6px;border-radius:3px;border:1px solid rgba(107,166,245,.25);border-top-color:var(--working);flex:none;animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.w{color:var(--working)} .ny{color:var(--needs)} .mu{color:var(--t-muted)} .dn{color:var(--done)}
+.r2 .badge{margin-left:auto;color:var(--t-muted)}
+.snz{height:22px;display:flex;align-items:center;padding:0 12px;border-top:1px solid var(--divider);font-size:var(--meta);color:var(--t-secondary)}
+.snz .n{margin-left:auto;color:var(--t-muted);margin-right:6px}
+.snz:hover{background:var(--hover)}
+.foot{height:28px;border-top:1px solid var(--divider);display:flex;align-items:center;gap:2px;padding:0 6px}
+.fb{position:relative;width:24px;height:20px;border-radius:3px;display:grid;place-items:center;color:var(--t-secondary);font-size:9px}
+.fb:hover{background:var(--hover)}
+.fb .pill{position:absolute;right:1px;top:1px;background:var(--needs);color:#1a1205;border-radius:4px;font-size:6px;font-weight:600;padding:0 2px;line-height:7px}
+.fb.tip::after{content:"Decisions (J)";position:absolute;bottom:2px;left:26px;white-space:nowrap;z-index:5;background:var(--bg-raised);border:1px solid var(--border);color:var(--t-primary);font-size:var(--meta);padding:2px 4px;border-radius:3px}
+
+/* main */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+.hdr{height:24px;flex:none;display:flex;align-items:center;gap:6px;padding:0 10px 0 14px;border-bottom:1px solid var(--divider);font-size:var(--body)}
+.crumb{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crumb .p{color:var(--t-muted)} .crumb .s{color:var(--t-faint);margin:0 4px} .crumb .c{color:var(--t-primary)}
+.status{display:flex;align-items:center;gap:4px;font-size:var(--meta);color:var(--working);white-space:nowrap}
+.chip{display:flex;align-items:center;gap:4px;height:16px;padding:0 6px;border-radius:3px;font-size:var(--meta);color:var(--t-secondary);white-space:nowrap}
+.chip.b{background:var(--bg-raised);border:1px solid var(--border)}
+.chip:hover{background:var(--hover)}
+.lchip{display:none}
+.medium .lchip,.narrow .lchip{display:flex}
+.burger{display:none;color:var(--t-secondary);font-size:9px;width:14px}
+.narrow .burger{display:block}
+.textbtn{font-size:var(--meta);color:var(--t-secondary);padding:0 4px;height:16px;display:flex;align-items:center;border-radius:3px}
+.textbtn:hover{background:var(--hover)}
+.narrow .textbtn,.narrow .chip.model{display:none}
+
+.body{flex:1;display:flex;min-height:0}
+.conv{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
+.scroll{flex:1;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;padding:8px 0}
+.col{width:var(--colw,320px);max-width:calc(100% - 48px);margin:0 auto}
+body.s3 .col{max-width:calc(100% - 24px)}
+
+.bubble-wrap{display:flex;justify-content:flex-end;margin-bottom:10px}
+.bubble{max-width:80%;background:var(--bg-bubble);color:var(--t-primary);border-radius:4px;padding:6px 8px;font-size:var(--body);line-height:12px}
+.working{display:flex;align-items:center;gap:5px;font-size:var(--meta);color:var(--t-muted);margin-bottom:6px;line-height:10px}
+.tool{display:flex;align-items:center;gap:6px;height:16px;padding:0 4px;margin:0 -4px 6px;border-radius:3px;font-size:var(--meta);color:var(--t-secondary)}
+.tool:hover{background:var(--hover)}
+.tool .g{color:var(--t-muted);font-family:"JetBrains Mono",monospace;width:10px}
+.tool .ch{color:var(--t-muted)}
+.tool.open{margin-bottom:2px}
+.sub{margin:0 0 8px 14px}
+.sub div{height:12px;display:flex;gap:6px;align-items:center;font:var(--meta)/12px "JetBrains Mono",monospace;color:var(--t-secondary);white-space:nowrap;overflow:hidden}
+.sub .ok{color:var(--t-muted)}
+.agent{font-size:var(--body);line-height:12px;color:var(--t-body);margin-top:4px}
+.agent h3{font-weight:600;font-size:var(--title);line-height:13px;color:var(--t-primary);margin:10px 0 4px}
+.agent h3:first-child{margin-top:0}
+.agent p{margin-bottom:6px}
+.agent b{font-weight:600;color:var(--t-primary)}
+.agent code{font-family:inherit;color:var(--code-inline)}
+.agent ul{list-style:none;margin:0 0 6px}
+.agent li{position:relative;padding-left:12px}
+.agent li::before{content:"•";position:absolute;left:3px;color:var(--t-muted)}
+.agent a{color:var(--link);text-decoration:none}
+.caret{display:inline-block;width:1px;height:9px;background:var(--t-muted);vertical-align:-1px;margin-left:1px;animation:bl 1.06s steps(1) infinite}
+@keyframes bl{50%{opacity:0}}
+
+.dock{flex:none;padding:0 0 10px}
+.card{position:relative;background:linear-gradient(rgba(240,178,84,.08),rgba(240,178,84,.08)),var(--bg-raised);border:1px solid var(--border);border-radius:4px;padding:8px 10px 8px 12px;margin-bottom:8px}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--needs);border-radius:4px 0 0 4px}
+.card-h{display:flex;align-items:center;gap:6px;height:16px}
+.card-h .ttl{font-weight:600;font-size:var(--body);color:var(--t-primary)}
+.card-h .pg{font-size:var(--meta);color:var(--t-muted)}
+.btn{height:16px;display:flex;align-items:center;gap:4px;padding:0 7px;border-radius:3px;font-size:var(--meta);font-weight:600}
+.btn.fill{background:rgba(237,237,240,.92);color:#0c0c0e;margin-left:auto}
+.btn.ghost{border:1px solid var(--border);color:var(--t-secondary);font-weight:400}
+.btn .k{font-weight:400;opacity:.55}
+.card .who{font-size:var(--meta);color:var(--t-muted);margin:2px 0 6px;line-height:10px}
+.code{background:var(--bg-code);border:1px solid var(--border);border-radius:3px;padding:5px 8px;font:var(--meta)/10px "JetBrains Mono",monospace;color:var(--code-text);white-space:pre}
+
+.composer{background:var(--bg-raised);border:1px solid #3A3A42;border-radius:6px;min-height:44px;padding:8px 8px 6px 10px;display:flex;flex-direction:column}
+.ph{font-size:var(--body);line-height:12px;color:var(--t-muted);flex:1}
+.cb{display:flex;align-items:center;gap:6px;margin-top:6px}
+.hint{font-size:var(--meta);color:var(--t-faint)}
+body.s3 .hint{display:none}
+.cb .chip{margin-left:auto}
+.pdot{width:4px;height:4px;border-radius:2px;background:var(--claude)}
+.stopb{width:16px;height:16px;border-radius:8px;background:var(--error);display:grid;place-items:center}
+.stopb i{width:5px;height:5px;background:#1a0b0b;border-radius:1px}
+
+/* lineage rail */
+.rail{width:150px;flex:none;padding:8px 8px 0 0}
+.medium .rail,.narrow .rail{display:none}
+.rcard{background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;padding:8px 10px}
+.rcard .m{display:flex;align-items:center;gap:5px;font-size:var(--body);color:var(--t-primary);padding-bottom:7px;border-bottom:1px solid var(--divider)}
+.rcard .m .i{color:var(--t-muted);font-size:8px}
+.rcard .lh{font-size:var(--meta);color:var(--t-muted);margin:7px 0 3px;display:flex}
+.rcard .lh span{margin-left:auto}
+.lr{height:18px;display:flex;align-items:center;gap:5px;font-size:var(--meta);color:var(--t-primary);border-radius:3px;margin:0 -4px;padding:0 4px}
+.lr:hover{background:var(--hover)}
+.lr .tt{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lr .a{color:var(--t-muted)}
+.lr.prev{color:var(--t-secondary)}
+
+/* annotations */
+.notes{position:absolute;left:0;right:0;bottom:-1px;display:none}
+
+/* ---------- Laptop framing ---------- */
+body.laptop .world{filter:blur(6px) saturate(.8) brightness(.38)}
+.lap{display:contents}
+body.laptop .frame{inset:auto;left:50%;top:var(--lt);width:var(--lw);height:var(--lh);transform:translateX(-50%)}
+body.laptop .lid{position:absolute;inset:-7px;background:#1B1B1F;border-radius:6px;box-shadow:inset 0 1px 0 #2E2E34}
+body.laptop .cam{position:absolute;left:50%;top:-5px;width:2px;height:2px;background:#2A2A30;transform:translateX(-50%)}
+body.laptop .base{position:absolute;left:-27px;right:-27px;bottom:-21px;height:14px;background:#26262B;border-top:1px solid #34343A;border-radius:0 0 6px 6px;box-shadow:0 4px 0 rgba(0,0,0,.25),0 8px 0 rgba(0,0,0,.12)}
+body.laptop .base::after{content:"";position:absolute;left:50%;top:0;width:60px;height:3px;background:#1B1B1F;transform:translateX(-50%);border-radius:0 0 2px 2px}
+body.laptop .panel{border-radius:0;top:14px;background:#0C0C0E;box-shadow:none}
+body.laptop .side{background:#111114}
+.tbar{display:none}
+body.laptop .tbar{display:flex;position:absolute;top:0;left:0;right:0;height:14px;background:#0F0F12;border-bottom:1px solid var(--divider);align-items:center;justify-content:center;font-size:var(--meta);color:var(--t-muted)}
+body.laptop .tbar .dots{position:absolute;left:6px;display:flex;gap:3px}
+body.laptop .tbar .dots i{width:5px;height:5px;border-radius:3px;background:#3A3A40}
+.lid,.cam,.base{display:none}
+body.laptop .lid,body.laptop .cam,body.laptop .base{display:block}
+</style>
+</head>
+<body>
+<div class="controls">
+  <button id="bFull" class="on">Full panel</button>
+  <button id="bLap">Laptop framing</button>
+  <button id="bS2" class="on">GUI scale 2</button>
+  <button id="bS3">GUI scale 3</button>
+</div>
+
+<div id="stage">
+  <div class="world">
+    <div class="sky"></div><div class="sun"></div>
+    <div class="hill h1"></div><div class="hill h2"></div><div class="water"></div>
+    <div class="tree t1"></div><div class="tree t2"></div><div class="tree t3"></div>
+  </div>
+
+  <div class="frame" id="frame">
+    <div class="lid"></div><div class="cam"></div><div class="base"></div>
+    <div class="tbar"><div class="dots"><i></i><i></i><i></i></div>T3 Code</div>
+    <div class="panel" id="panel">
+
+      <!-- Sidebar -->
+      <aside class="side">
+        <div class="side-h"><span class="brand">T3 Code</span><span class="cdot" title="Connected"></span><span class="icon-btn" title="New thread">✎</span></div>
+        <div class="list">
+          <div class="grp">aflekkas/t3craft<span class="n">3</span></div>
+          <div class="row sel">
+            <div class="r1"><span class="t">Use T3 Code in Minecraft Mods</span><span class="age">1m</span></div>
+            <div class="r2"><span class="spin"></span><span class="w">Working</span><span class="badge">⑂ +3</span></div>
+          </div>
+          <div class="row">
+            <div class="r1"><span class="t">Muse PR#3 review: UI fixes</span><span class="age">4m</span></div>
+            <div class="r2"><span class="dot" style="background:var(--needs)"></span><span class="ny">Needs you</span></div>
+          </div>
+          <div class="row">
+            <div class="r1"><span class="t">PR#2 follow-up fixes (astra)</span><span class="age">4m</span></div>
+            <div class="r2"><span class="spin"></span><span class="w">Working</span></div>
+          </div>
+          <div class="grp">maxwellyoung/site<span class="n">1</span></div>
+          <div class="row quiet">
+            <div class="r1"><span class="t">Fix OG image cache headers</span><span class="age">2h</span></div>
+            <div class="r2"><span class="dot" style="background:var(--t-muted)"></span><span class="mu">Idle</span></div>
+          </div>
+          <div class="grp">No project<span class="n">2</span></div>
+          <div class="row quiet">
+            <div class="r1"><span class="t">Find a beautiful 26.3 seed</span><span class="age">1d</span></div>
+            <div class="r2"><span class="dot" style="background:var(--done)"></span><span class="mu">Done</span><span class="badge">⚲ pinned</span></div>
+          </div>
+          <div class="row quiet">
+            <div class="r1"><span class="t">Office design mockup B</span><span class="age">3h</span></div>
+            <div class="r2"><span class="dot" style="background:var(--t-muted)"></span><span class="mu">Idle</span></div>
+          </div>
+        </div>
+        <div class="snz">Snoozed<span class="n">6</span>›</div>
+        <div class="foot">
+          <span class="fb tip" title="Decisions (J)">⚑<span class="pill">2</span></span>
+          <span class="fb" title="Connections">⇄</span>
+          <span class="fb" title="Activity">≡</span>
+          <span class="fb" title="Desk">▣</span>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <section class="main">
+        <div class="hdr">
+          <span class="burger">☰</span>
+          <span class="crumb"><span class="p">aflekkas/t3craft</span><span class="s">/</span><span class="c">Use T3 Code in Minecraft Mods</span></span>
+          <span class="chip b lchip">⑂ 3 ▾</span>
+          <span class="status"><span class="spin"></span>Working 1m 12s</span>
+          <span class="chip b model"><span class="pdot"></span>Opus 5.5</span>
+          <span class="textbtn">Review</span>
+          <span class="textbtn">⋯</span>
+        </div>
+        <div class="body">
+          <div class="conv">
+            <div class="scroll">
+              <div class="col">
+                <div class="bubble-wrap"><div class="bubble">Hide finished threads from the sidebar and make the panel feel like T3 — the text is way too bold and dense, I can't really understand anything.</div></div>
+
+                <div class="tool"><span class="g">◇</span>Thought for 8s<span class="ch">›</span></div>
+                <div class="tool open"><span class="g">›_</span>Ran 3 commands<span class="ch">⌄</span></div>
+                <div class="sub">
+                  <div><span class="ok">✓</span>git fetch -q origin</div>
+                  <div><span class="ok">✓</span>git show origin/fix/ui-screens:…/T3Screen.java</div>
+                  <div><span class="ok">✓</span>./gradlew compileJava --offline</div>
+                </div>
+                <div class="tool"><span class="g">◇</span>Edited 2 files<span class="ch">›</span></div>
+
+                <div class="agent">
+                  <h3>Sidebar now mirrors T3</h3>
+                  <p>Only threads you care about are listed: active ones grouped by project, pins, and a collapsed <b>Snoozed</b> section. Settled threads and subagent children are hidden — their approvals still reach <code>Decisions</code>.</p>
+                  <ul>
+                    <li>Body text uses Inter at 8 px with a 12 px line height.</li>
+                    <li>Bold is a separate SemiBold face, never <code>withBold</code>.</li>
+                    <li>Tool calls collapse into one line you can expand.</li>
+                  </ul>
+                  <p>Next I'll run the build to check the font JSONs load.<span class="caret"></span></p>
+                </div>
+                <div class="working"><span class="spin"></span>Working for 1m 12s · Running build</div>
+              </div>
+            </div>
+
+            <div class="dock">
+              <div class="col">
+                <div class="card">
+                  <div class="card-h"><span class="ttl">Run command?</span><span class="pg">1 of 2</span>
+                    <span class="btn fill">Approve <span class="k">Y</span></span><span class="btn ghost">Deny <span class="k">N</span></span></div>
+                  <div class="who">Opus 5.5 wants to run this in aflekkas/t3craft</div>
+                  <div class="code">./gradlew build --offline -x test</div>
+                </div>
+                <div class="composer">
+                  <div class="ph">Ask anything…</div>
+                  <div class="cb"><span class="hint">Enter send · ⇧Enter stay · Esc play</span>
+                    <span class="chip"><span class="pdot"></span>Opus 5.5 Medium ▾</span>
+                    <span class="stopb" title="Stop"><i></i></span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="rail">
+            <div class="rcard">
+              <div class="m"><span class="i">▭</span>MacBook</div>
+              <div class="lh">Lineage · 3 running<span>⋯</span></div>
+              <div class="lr"><span class="dot" style="background:var(--claude)"></span><span class="tt">Opus: office details</span><span class="a">4m</span></div>
+              <div class="lr"><span class="dot" style="background:var(--other)"></span><span class="tt">Muse PR#3 review: UI</span><span class="a">4m</span></div>
+              <div class="lr"><span class="dot" style="background:var(--codex)"></span><span class="tt">Astra live E2E test</span><span class="a">5m</span></div>
+              <div class="lr prev"><span class="i" style="color:var(--t-muted)">◷</span><span class="tt">Previous agents</span><span class="a">37 ›</span></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+const b=document.body, panel=document.getElementById('panel'), frame=document.getElementById('frame');
+function sz(){
+  const s3=b.classList.contains('s3'); const W=s3?640:960, H=s3?360:540;
+  let pw;
+  if(b.classList.contains('laptop')){
+    const lw=Math.round(Math.min(W-64,(H-56)*1.6)), lh=Math.round(lw/1.6);
+    frame.style.setProperty('--lw',lw+'px'); frame.style.setProperty('--lh',lh+'px');
+    frame.style.setProperty('--lt',Math.round((H-lh-22)/2)+'px');
+    pw=lw;
+  } else pw=W-16;
+  panel.classList.remove('wide','medium','narrow');
+  panel.classList.add(pw>=880?'wide':pw>=600?'medium':'narrow');
+  // reading column: 72 chars × ~4.35 px measured advance at 8 px Inter
+  document.documentElement.style.setProperty('--colw', Math.round(72*4.35)+'px');
+}
+function tog(on,off,cls,add){document.getElementById(on).classList.add('on');document.getElementById(off).classList.remove('on');b.classList.toggle(cls,add);sz();}
+bFull.onclick=()=>tog('bFull','bLap','laptop',false);
+bLap.onclick=()=>tog('bLap','bFull','laptop',true);
+bS2.onclick=()=>tog('bS2','bS3','s3',false);
+bS3.onclick=()=>tog('bS3','bS2','s3',true);
+const q=new URLSearchParams(location.search);
+if(q.has('laptop'))b.classList.add('laptop'),bLap.classList.add('on'),bFull.classList.remove('on');
+if(q.has('s3'))b.classList.add('s3'),bS3.classList.add('on'),bS2.classList.remove('on');
+if(q.has('shot'))b.classList.add('shot');
+sz();
+</script>
+</body>
+</html>
