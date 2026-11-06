@@ -60,6 +60,8 @@ final class T3Screen extends Screen {
 	private JsonObject answers = new JsonObject();
 	private final java.util.LinkedHashSet<String> multiPicked = new java.util.LinkedHashSet<>();
 	private final List<int[]> optionRows = new ArrayList<>();
+	/** Question sets already sent ("thread:request"), hidden until the snapshot drops them or the send fails. */
+	private final java.util.Set<String> submittedInputs = new java.util.HashSet<>();
 
 	private record PickerEntry(T3Api.Provider provider, T3Api.Model model, boolean needsNewThread) {}
 
@@ -257,9 +259,19 @@ final class T3Screen extends Screen {
 	}
 
 
+	/** The desk's chosen request only matters while it is pending; once answered, the next request shows. */
+	private void dropAnsweredSelection(T3State.Focus focus) {
+		if (selectedRequest == null || !focus.threadId().equals(mod.state().focusedThreadId())) return;
+		boolean pending = focus.approvals().stream().anyMatch(a -> a.requestId().equals(selectedRequest))
+			|| focus.userInputs().stream().anyMatch(i -> i.requestId().equals(selectedRequest));
+		if (!pending) selectedRequest = null;
+	}
+
 	private T3State.Approval currentApproval() {
 		var focus = shownFocus;
-		if (focus == null || focus.approvals().isEmpty()) return null;
+		if (focus == null) return null;
+		dropAnsweredSelection(focus);
+		if (focus.approvals().isEmpty()) return null;
 		return selectedRequest == null ? focus.approvals().getFirst()
 			: focus.approvals().stream().filter(a -> a.requestId().equals(selectedRequest)).findFirst().orElse(null);
 	}
@@ -273,8 +285,13 @@ final class T3Screen extends Screen {
 	private T3State.UserInput currentInput() {
 		T3State.Focus focus = shownFocus;
 		if (focus == null || focus.userInputs().isEmpty() || !mod.state().online(focus.threadId())) return null;
-		T3State.UserInput input = selectedRequest == null ? focus.userInputs().getFirst()
-			: focus.userInputs().stream().filter(i -> i.requestId().equals(selectedRequest)).findFirst().orElse(null);
+		dropAnsweredSelection(focus);
+		String prefix = focus.threadId() + ":";
+		submittedInputs.removeIf(key -> key.startsWith(prefix) && focus.userInputs().stream().noneMatch(i -> key.equals(prefix + i.requestId())));
+		List<T3State.UserInput> open = focus.userInputs().stream().filter(i -> !submittedInputs.contains(prefix + i.requestId())).toList();
+		if (open.isEmpty()) return null;
+		T3State.UserInput input = selectedRequest == null ? open.getFirst()
+			: open.stream().filter(i -> i.requestId().equals(selectedRequest)).findFirst().orElse(null);
 		if (input == null) return null;
 		if (!(focus.threadId() + ":" + input.requestId()).equals(answeringRequest)) {
 			answeringRequest = focus.threadId() + ":" + input.requestId();
@@ -299,7 +316,11 @@ final class T3Screen extends Screen {
 		multiPicked.clear();
 		questionIndex++;
 		if (questionIndex >= input.questions().size()) {
-			mod.answer(shownFocus.threadId(), input, answers);
+			// Until the snapshot drops it, the request is still listed; don't start it over from question 1.
+			String key = shownFocus.threadId() + ":" + input.requestId();
+			submittedInputs.add(key);
+			if (input.requestId().equals(selectedRequest)) selectedRequest = null;
+			mod.answer(shownFocus.threadId(), input, answers, () -> submittedInputs.remove(key));
 			answeringRequest = null;
 		}
 		updateHint();

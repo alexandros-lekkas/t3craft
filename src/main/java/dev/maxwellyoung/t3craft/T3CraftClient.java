@@ -346,7 +346,13 @@ public final class T3CraftClient implements ClientModInitializer {
 	}
 
 	void answer(String threadId, T3State.UserInput input, com.google.gson.JsonObject answers) {
-		state.respond(threadId, input.requestId(), null, answers.deepCopy(), this::reportError);
+		answer(threadId, input, answers, null);
+	}
+
+	/** {@code onFailure} runs on the game thread if the answers didn't go through. */
+	void answer(String threadId, T3State.UserInput input, com.google.gson.JsonObject answers, Runnable onFailure) {
+		state.respond(threadId, input.requestId(), null, answers.deepCopy(),
+			e -> { reportError(e); if (onFailure != null) Minecraft.getInstance().execute(onFailure); });
 	}
 
 	/** Unsent composer text per thread ("new" for a new thread), so switching threads never loses a draft. */
