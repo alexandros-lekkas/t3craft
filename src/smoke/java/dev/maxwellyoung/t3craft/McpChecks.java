@@ -178,12 +178,14 @@ public final class McpChecks {
   try {
    get(base + "/_qa/mcp-revoke"); await(() -> api.legs().mcpError() != null && api.legs().mcpError().contains("Re-pair"), "revocation visible");
    check(state.snapshot().connected() && state.online("mcp-approval"), "revoked MCP keeps legacy online");
-   int posts = get(base + "/_qa/mcp-posts").get("count").getAsInt(); Thread.sleep(5000);
-   check(get(base + "/_qa/mcp-posts").get("count").getAsInt() == posts, "revoked token not hammered");
-   get(base + "/_qa/protocol3"); await(() -> !state.live(), "legacy disconnect while MCP revoked"); Thread.sleep(1000);
-   check(get(base + "/_qa/mcp-posts").get("count").getAsInt() == posts, "legacy disconnect does not reset revoked MCP access");
-   state.retry(api.ownerKey()); Thread.sleep(1000);
-   check(get(base + "/_qa/mcp-posts").get("count").getAsInt() == posts + 1, "retry sends one auth probe");
+   int posts = posts(); Thread.sleep(5000);
+   check(posts() == posts, "revoked token not hammered");
+   get(base + "/_qa/protocol3"); await(() -> !state.live(), "legacy disconnect while MCP revoked");
+   await(() -> api.legs().legacyError() != null && api.legs().legacyError().contains("protocol 3"), "reconnect re-checks the protocol instead of reusing the cached one");
+   Thread.sleep(1000);
+   check(posts() == posts, "legacy disconnect does not reset revoked MCP access");
+   state.retry(api.ownerKey()); await(() -> posts() == posts + 1, "retry sends an auth probe"); Thread.sleep(1000);
+   check(posts() == posts + 1, "retry sends one auth probe");
   } finally { close(state); }
  }
  static void hybridLegacyBroken() throws Exception {
@@ -277,9 +279,11 @@ public final class McpChecks {
     }
 	private static JsonObject get(String url) throws Exception { return JsonParser.parseString(HTTP.send(HttpRequest.newBuilder(URI.create(url)).GET().build(), HttpResponse.BodyHandlers.ofString()).body()).getAsJsonObject(); }
 	interface Action { void run() throws Exception; }
-	interface Condition { boolean get(); }
+	interface Condition { boolean get() throws Exception; }
 	static void check(boolean ok, String label) { if (!ok) throw new AssertionError(label); }
-	static void await(Condition condition, String label) throws Exception { long end = System.currentTimeMillis() + 15000; while (!condition.get() && System.currentTimeMillis() < end) Thread.sleep(100); check(condition.get(), label); }
+	static int posts() throws Exception { return get(base + "/_qa/mcp-posts").get("count").getAsInt(); }
+	/** Returns as soon as the condition first holds; a condition that later flips back must not fail the wait. */
+	static void await(Condition condition, String label) throws Exception { long end = System.currentTimeMillis() + 15000; while (System.currentTimeMillis() < end) { if (condition.get()) return; Thread.sleep(100); } check(condition.get(), label); }
 	static void expectLegacy(Action action) throws Exception { try { action.run(); throw new AssertionError("legacy gap accepted"); } catch (IOException e) { check(e.getMessage().contains("Needs legacy connection"), "legacy limitation explained"); } }
 	static void expectAuth(T3Backend api) throws Exception { try { api.shell(); throw new AssertionError("expired auth accepted"); } catch (IOException e) { check(e.getMessage().contains("Re-pair") && !e.getMessage().contains("private-marker"), "re-auth without leaking credentials"); } }
 }

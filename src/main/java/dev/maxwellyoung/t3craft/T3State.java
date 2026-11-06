@@ -408,7 +408,14 @@ public final class T3State {
 
 	private void ensureSocket(Env env) {
 		if (!env.api.hasLegacy()) return;
-		if (env.socket != null && env.socket.isOpen()) return;
+		if (env.socket != null) {
+			if (env.socket.isOpen()) return;
+			// The socket's close callback is still queued behind this tick. Apply it here instead of
+			// reconnecting at once, or the backoff and protocol re-check would be skipped and the queued
+			// callback would be ignored because it no longer matches the replacement socket.
+			onSocketClosed(env, env.socket.closeReason());
+			return;
+		}
 		if (System.currentTimeMillis() < env.nextSocketAttempt) return;
 		env.shellLive = false;
 		env.threadRequest = null;

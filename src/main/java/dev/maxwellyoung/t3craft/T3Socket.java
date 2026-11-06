@@ -85,6 +85,11 @@ final class T3Socket {
 		return !closed.isDone();
 	}
 
+	/** Why the socket closed, or null while it is still open. */
+	String closeReason() {
+		return closed.getNow(null);
+	}
+
 	/** Starts a streaming RPC; returns its request id so it can be interrupted. */
 	String stream(String tag, JsonObject payload, StreamHandler handler) {
 		String id = Long.toString(ids.incrementAndGet());
