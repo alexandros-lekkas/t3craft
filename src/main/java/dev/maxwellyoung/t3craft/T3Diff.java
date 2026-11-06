@@ -39,16 +39,34 @@ final class T3Diff {
 		List<File> files = new ArrayList<>();
 		String path = "Changes";
 		List<String> lines = new ArrayList<>();
+		// Inside a hunk, "--- x" and "+++ x" are removed/added content, not file headers.
+		boolean gitFile = false, inHunk = false;
+		int oldRemaining = 0, newRemaining = 0;
 		for (String line : patch.split("\n", -1)) {
 			if (line.startsWith("diff --git ")) {
 				if (!lines.isEmpty()) files.add(new File(path, List.copyOf(lines)));
 				lines.clear();
+				gitFile = true; inHunk = false; oldRemaining = newRemaining = 0;
 				// Prefer +++/--- headers below; this fallback also covers binary files and pure renames.
 				String header = line.substring(11);
 				int split = header.lastIndexOf(" b/");
 				path = split >= 0 ? header.substring(split + 3) : header;
 			}
-			if (line.startsWith("+++ ") && !line.equals("+++ /dev/null")) path = path(line.substring(4));
+			// Git puts headers only before a file's first @@; a bare unified diff can follow a finished hunk.
+			boolean header = gitFile ? !inHunk : oldRemaining <= 0 && newRemaining <= 0;
+			var hunk = HUNK.matcher(line);
+			if (line.startsWith("@@")) {
+				inHunk = true;
+				oldRemaining = newRemaining = 0;
+				if (hunk.matches()) try {
+					oldRemaining = hunk.group(2) == null ? 1 : Integer.parseInt(hunk.group(2));
+					newRemaining = hunk.group(4) == null ? 1 : Integer.parseInt(hunk.group(4));
+				} catch (NumberFormatException invalid) { oldRemaining = newRemaining = 0; }
+			} else if (!header) {
+				if (line.startsWith(" ")) { oldRemaining--; newRemaining--; }
+				else if (line.startsWith("-")) oldRemaining--;
+				else if (line.startsWith("+")) newRemaining--;
+			} else if (line.startsWith("+++ ") && !line.equals("+++ /dev/null")) path = path(line.substring(4));
 			else if (line.startsWith("--- ") && line.length() > 4 && !line.equals("--- /dev/null")) path = path(line.substring(4));
 			else if (line.startsWith("rename to ")) path = line.substring(10);
 			lines.add(line);
