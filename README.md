@@ -10,11 +10,30 @@ A release jar for ordinary Fabric profiles, with a personal client office or an 
 
 ![What it built, with the single "Done" toast](docs/agent-build.jpg)
 
-It is a Fabric mod for Minecraft Java 26.3. On the client it connects to your T3 environments the same way the mobile app does, so it works on any server, and prompts never go through server chat. Installed on a dedicated server as well, it can also run a shared village that everyone on the server sees.
+It is a Fabric mod for Minecraft Java 26.3. On the client it connects to your T3 environments using public MCP or legacy pairing, so it works on any server, and prompts never go through server chat. Installed on a dedicated server as well, it can also run a shared village that everyone on the server sees.
 
-> **Early project.** 0.3.0 checkpoint review was verified against T3 Code nightly `0.0.46-nightly.20261004.2644`. The earlier `0.0.46-nightly.20261003.2638` walkthrough also exercised a real agent edit and approvals. It uses T3's client protocol, which is not a documented public API and may change.
+> **Early project.** 0.3.0 checkpoint review was verified against T3 Code nightly `0.0.46-nightly.20261004.2644`. The earlier `0.0.46-nightly.20261003.2638` walkthrough also exercised a real agent edit and approvals. Legacy-only features use T3's client protocol, which is not a documented public API and may change.
 
 [Start with a five-minute first session](docs/FIRST_SESSION.md) if you are trying it for the first time.
+
+## Public MCP and legacy connections
+
+In **Connections**, paste the URL from **T3 Settings → Environments → Copy MCP URL**, then choose **Pair machine**. T3 Craft opens the browser for consent and listens temporarily on `127.0.0.1`. Choose write access to send prompts, launch/stop threads, change models and answer questions; T3 defaults to read-only access and caps writes by its permission mode. Authorization uses OAuth with PKCE, separate from legacy pairing. Tokens are saved in `config/t3craft.json` using the existing owner-only file handling. Sessions expire after 30 days without refresh tokens; **Re-pair** with the MCP URL authorizes again. Tokens are never shown in the connection form.
+
+| Feature | Connection used |
+| --- | --- |
+| Threads, conversation, activity, projects | Public MCP when configured |
+| Send, new thread, stop, question answers, model list/switch | Public MCP when configured; needs write access for changes |
+| Permission approvals and checkpoint patches | Legacy pairing required; public MCP does not expose them yet |
+| Live notifications | Legacy subscriptions; MCP polls every 2 seconds while active and 6 seconds while idle |
+
+To enable approvals, review and live updates as well, paste a legacy pairing link from **Settings → Connections** for the same environment address. Adding either connection preserves the other credential. If legacy breaks after a T3 update, MCP operations continue through polling. The decision desk and review show guidance for features requiring legacy. Legacy-only installations retain their existing behavior. Removing a machine removes both credentials locally; revoke access separately in T3.
+
+MCP sends explicitly **queue** behind an active turn instead of steering it. New threads retain the selected thread's project and existing worktree. The model picker uses the model shortlist returned by `orchestrator_capabilities`; the public tool may omit additional models. Activity is a recent-run snapshot, with pagination; individual messages beyond the public tool's 50,000-character limit are marked truncated. MCP exposes less checkpoint and timing metadata than the legacy projection.
+
+The public adapter targets MCP `2025-06-18` and the tool contracts in T3 nightly `0.1.7-nightly.20261103.4119`. It is separate from T3 Craft's Minecraft-facing MCP server (`T3Mcp.java`), which is unchanged.
+
+For isolated checks, run `python3 scripts/feature-fixture.py --port 25680`, then `./gradlew mcpCheck featureCheck reliabilityCheck connectionCheck officeCheck`. Repeat with `--protocol2` to check legacy protocol 2. `mcpCheck` covers OAuth state/PKCE, private persistence, JSON/SSE, pagination, public operations, polling, and missing/incompatible legacy and expired/read-only access. Gradle 9.5.1's Groovy compiler can require JDK 25 to compile an uncached build script (`JAVA_HOME=/path/to/jdk25 ./gradlew help`); Java compilation and these checks also run on JDK 27.
 
 ## What it does
 
