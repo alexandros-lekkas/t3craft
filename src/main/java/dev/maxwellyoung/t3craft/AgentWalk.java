@@ -34,7 +34,9 @@ public final class AgentWalk {
 
 	/** Whether this entity's walk is animated here, so vanilla's own (always zero) per-tick update is skipped. */
 	public static boolean driven(LivingEntity entity) {
-		return DRIVEN.contains(entity);
+		// Only client-side agents are driven, and the set belongs to the game thread: the integrated server
+		// thread runs this hook for every mob too and must never touch the unsynchronised WeakHashMap.
+		return entity.level().isClientSide() && DRIVEN.contains(entity);
 	}
 
 	/**
