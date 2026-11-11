@@ -53,6 +53,8 @@ loom {
 				vmArg "-Dt3craft.worldtest=${project.property('worldtest')}"
 				// -Pworldtalk=<seconds> then waits for a real conversation (a thread spawning a subagent); -Pworldtalk=stage starts one.
 				if (project.hasProperty('worldtalk')) vmArg "-Dt3craft.worldtalk=${project.property('worldtalk')}"
+				// -Pworldlife photographs the characters in short frame sequences (typing, glancing up, name tags, idles).
+				if (project.hasProperty('worldlife')) vmArg "-Dt3craft.worldlife=true"
 				if (project.hasProperty('config')) vmArg "-Dt3craft.config=${project.property('config')}"
 			}
 			// ./gradlew runClient -Pdemo=<output dir> -Pconfig=<pairing file> records the launch video shots (scripts/demo/record.sh runs it).

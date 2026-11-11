@@ -23,6 +23,7 @@ public final class TalkChecks {
 		checkLimiter();
 		checkConversation();
 		checkWalk();
+		checkLife();
 		System.out.println("Agent talk checks passed");
 	}
 
@@ -302,5 +303,81 @@ public final class TalkChecks {
 
 	private static int[] cell(double[] point) { return new int[] {(int) Math.floor(point[0]), (int) Math.floor(point[1])}; }
 	private static long key(int x, int z) { return ((long) x << 32) ^ (z & 0xffffffffL); }
+	// ---- Life: glances, idles, name tags ----
+
+	private static void checkLife() {
+		// A glance when you walk up, then back to work for a good while, however long you stand there.
+		int seed = AgentGlance.seed("office-1"), other = AgentGlance.seed("office-2");
+		AgentGlance glance = new AgentGlance();
+		for (int i = 0; i < 40; i++) check(!glance.tick(10, false, false, seed), "nobody looks up at a player across the room");
+		int looked = 0, first = -1, last = -1;
+		for (int i = 0; i < 20 * 10; i++) if (glance.tick(2.5, false, false, seed)) { looked++; if (first < 0) first = i; last = i; }
+		check(looked >= 40 && looked <= 80 && first <= 14 && last < 100, "one glance of a few seconds, then back to work: " + looked + " ticks from " + first + " to " + last);
+		for (int i = 0; i < 40; i++) glance.tick(10, false, false, seed);
+		for (int i = 0; i < 80; i++) glance.tick(10, false, false, seed);
+		boolean again = false;
+		for (int i = 0; i < 40; i++) again |= glance.tick(2.5, false, false, seed);
+		check(again, "walking away and back earns another glance");
+		check(new AgentGlance().tick(8, false, true, seed) && !new AgentGlance().tick(20, false, true, seed), "the agent that needs you watches you whenever you are around");
+		AgentGlance aimed = new AgentGlance();
+		for (int i = 0; i < 400; i++) check(aimed.tick(5, true, false, seed), "an agent under the crosshair looks back");
+		check(seed != other && seed >= 0 && other >= 0, "each thread has its own stable seed");
+
+		// The desk schedule: mostly typing, breaks of every kind, never two in a row, and neighbours out of step.
+		java.util.EnumMap<AgentLife.Activity, Integer> seen = new java.util.EnumMap<>(AgentLife.Activity.class);
+		int differ = 0, switches = 0;
+		AgentLife.Activity before = null;
+		for (long tick = 0; tick < 20 * 60 * 30; tick++) {
+			AgentLife.Activity now = AgentLife.desk(seed, tick);
+			seen.merge(now, 1, Integer::sum);
+			if (now != AgentLife.desk(other, tick)) differ++;
+			if (before != null && now != before) {
+				switches++;
+				check(now == AgentLife.Activity.TYPE || before == AgentLife.Activity.TYPE, "a break always follows typing, not another break");
+			}
+			before = now;
+		}
+		int total = 20 * 60 * 30;
+		check(seen.getOrDefault(AgentLife.Activity.TYPE, 0) > total * 0.7, "a worker types most of the time");
+		for (AgentLife.Activity idle : List.of(AgentLife.Activity.THINK, AgentLife.Activity.SIP, AgentLife.Activity.STRETCH))
+			check(seen.getOrDefault(idle, 0) > total / 100, "a worker sometimes takes a break to " + idle);
+		check(differ > total / 20 && switches > 20, "two workers are not in step");
+
+		// Poses: typing keeps the hands on the keys with pauses; looking at you (FREE) leaves every arm to vanilla.
+		float[] p = new float[AgentLife.CHANNELS];
+		AgentLife.target(AgentLife.Activity.FREE, 10, seed, true, false, p);
+		for (int i = AgentLife.RAX; i <= AgentLife.LAZ; i++) check(Float.isNaN(p[i]), "an agent looking at you does not type: its arms are vanilla's");
+		float paused = 1, typing = 0;
+		for (float t = 0; t < 400; t += 0.5f) {
+			AgentLife.target(AgentLife.Activity.TYPE, t, seed, true, false, p);
+			check(p[AgentLife.RAX] < -1 && p[AgentLife.RAX] > -1.3f && p[AgentLife.LAX] < -1 && p[AgentLife.LAX] > -1.3f, "typing hands stay over the keyboard");
+			float b = AgentLife.burst(seed, t);
+			paused = Math.min(paused, b); typing = Math.max(typing, b);
+		}
+		check(paused == 0 && typing == 1, "typing comes in bursts with pauses");
+		AgentLife.target(AgentLife.Activity.STRETCH, 5, seed, false, false, p);
+		check(p[AgentLife.LEAN] == 0, "only a seated agent leans back");
+		AgentLife.target(AgentLife.Activity.WAVE, 20, seed, false, false, p);
+		check(p[AgentLife.RAX] < -2.5f && Float.isNaN(p[AgentLife.LAX]), "the agent that needs you raises one hand");
+
+		// Name tags: a dot across the room, a short title close by, the whole thing under the crosshair, and needs-you always named.
+		java.util.function.ToIntFunction<String> width = text -> text.length() * 6;
+		java.util.function.BiFunction<String, Integer, String> cut = (text, max) -> text.substring(0, Math.min(text.length(), max / 6));
+		String name = "\u25CF Design the landing page for the launch";
+		var far = AgentTag.look(name, "WORKING", 20, false, false, true, 0, width, cut);
+		var near = AgentTag.look(name, "WORKING", 5, false, false, true, 0, width, cut);
+		var aim = AgentTag.look(name, "WORKING", 5, true, false, true, 0, width, cut);
+		var needs = AgentTag.look("\u25CF Choose a direction", "NEEDS YOU", 20, false, false, false, 0, width, cut);
+		check(far.text().getString().equals("\u25CF"), "across the room a tag is its status dot");
+		check(near.text().getString().endsWith("…") && width.applyAsInt(near.text().getString()) * near.scale() <= 80, "a title fits between two desks: " + near.text().getString());
+		check(!near.text().getString().contains("WORKING") && !near.text().getString().contains("working"), "one line: no status word until you look");
+		check(aim.text().getString().contains("Design the landing page for") && aim.text().getString().endsWith("working"), "under the crosshair: the title and the status in words");
+		check(needs.text().getString().equals("\u25CF Choose a direction") && needs.scale() > near.scale() && needs.scale() > 1, "the agent that needs you is named from afar, and larger");
+		check(AgentTag.look(name, "DONE", 5, false, true, true, 0, width, cut).text().getString().equals("\u25CF"), "lounge seats show a dot until you look at one");
+		check(AgentTag.look(name, "WORKING", 40, false, false, true, 0, width, cut) == null, "no tag beyond 32 blocks");
+		check(AgentTag.color("WORKING") != AgentTag.color("NEEDS YOU") && AgentTag.color("DONE") != AgentTag.color("WORKING"), "each status has its own colour");
+		System.out.println("Agent life: one glance then back to work, staggered desk idles, hands off the keys when looking, one-line name tags");
+	}
+
 	private static void check(boolean ok, String message) { if (!ok) throw new AssertionError(message); }
 }

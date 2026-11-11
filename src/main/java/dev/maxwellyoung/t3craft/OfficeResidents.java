@@ -41,6 +41,9 @@ final class OfficeResidents {
 	/** Parents meeting their subagents in person. */
 	private final OfficeTalks talks = new OfficeTalks();
 	private final UsageBoardWall usageBoard;
+	/** When each agent last looked up at the player, and what it has in its hand. */
+	private final Map<String, AgentGlance> glances = new HashMap<>();
+	private final Map<String, String> inHand = new HashMap<>();
 
 	OfficeResidents(T3CraftClient mod) {
 		this.mod = mod;
@@ -123,23 +126,45 @@ final class OfficeResidents {
 			// Walk there: interpolated position, a body that turns into the heading, and legs that swing.
 			AgentWalk.step(mannequin, frame.point(agent.x, agent.y(), agent.z), frame.yaw(agent.yaw), agent.settled() && agent.goal.seat());
 			float talking = talks.faceYaw(frame, agent.threadId);
-			if (!Float.isNaN(talking)) AgentPose.toward(mannequin, talking);
-			else {
-				// Seated or standing at its spot, an agent looks up at you; one on its way somewhere keeps walking (holding it
-				// here froze it mid-route for as long as you stood near, so it never sat down or met a helper).
-				if (minecraft.player.distanceToSqr(mannequin) < 9 && agent.settled()) agent.faceHold = Math.max(agent.faceHold, 8);
-				if (agent.faceHold > 0 && !agent.errand) AgentPose.face(mannequin, minecraft.player); else AgentPose.rest(mannequin);
+			boolean seated = agent.settled() && agent.goal.seat(), online = mod.state().online(agent.threadId);
+			int seed = AgentGlance.seed(agent.threadId);
+			AgentLife.Activity activity = AgentLife.Activity.FREE;
+			if (!Float.isNaN(talking)) {
+				AgentPose.toward(mannequin, talking);
+				activity = talks.activity(agent.threadId);
+			} else {
+				// A glance when you walk up, then back to work; the one that needs you watches you. An agent on its way
+				// somewhere keeps walking (holding it froze it mid-route for as long as you stood near).
+				double distance = Math.sqrt(minecraft.player.distanceToSqr(mannequin));
+				boolean waiting = agent.zone == OfficeBrain.Zone.NEEDS_YOU && agent.settled();
+				boolean glance = agent.settled() && glances.computeIfAbsent(agent.threadId, id -> new AgentGlance())
+					.tick(distance, minecraft.crosshairPickEntity == mannequin && distance < 6, waiting, seed);
+				boolean looking = online && !agent.errand && (agent.faceHold > 0 || glance);
+				if (looking) AgentPose.face(mannequin, minecraft.player, seated); else AgentPose.rest(mannequin);
+				// Hands follow the eyes: nobody types, sips or stretches while looking at you, and work resumes once it has turned back.
+				if (!online) activity = AgentLife.Activity.FREE;
+				else if (waiting) activity = distance > 3 && distance < AgentGlance.WAITING ? AgentLife.Activity.WAVE : AgentLife.Activity.FREE;
+				else if (seated && !looking && AgentPose.turned(mannequin) < 12) {
+					activity = agent.zone == OfficeBrain.Zone.WORK ? AgentLife.desk(seed, ticks) : AgentLife.Activity.LOUNGE;
+				}
 			}
+			AgentLife.set(mannequin, activity, seed, agent.holding);
+			activity = AgentLife.activity(mannequin);
 			AgentPose.set(mannequin, agent.settled() && agent.goal.seat());
-			// A drink from the fridge, carried to the sofa.
-			boolean holds = !mannequin.getMainHandItem().isEmpty();
-			if (agent.holding != holds) {
-				mannequin.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND,
-					agent.holding ? new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.HONEY_BOTTLE)
-						: net.minecraft.world.item.ItemStack.EMPTY);
+			// In the hand: the drink from the fridge, carried to the sofa; or the desk mug, for a sip.
+			String want = agent.holding ? "drink" : activity == AgentLife.Activity.SIP ? "mug" : "";
+			if (!want.equals(inHand.getOrDefault(agent.threadId, ""))) {
+				net.minecraft.world.item.ItemStack stack = net.minecraft.world.item.ItemStack.EMPTY;
+				if (want.equals("drink")) stack = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.HONEY_BOTTLE);
+				else if (want.equals("mug")) {
+					stack = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.PAPER);
+					stack.set(net.minecraft.core.component.DataComponents.ITEM_MODEL, net.minecraft.resources.Identifier.fromNamespaceAndPath("t3craft", "coffee_mug"));
+				}
+				mannequin.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, stack);
+				inHand.put(agent.threadId, want);
 			}
-			// Faint typing from seated workers when you're close.
-			if (mod.state().online(agent.threadId) && agent.settled() && agent.zone == OfficeBrain.Zone.WORK && Math.random() < 0.05
+			// Faint typing from seated workers when you're close, only while the hands are on the keys.
+			if (activity == AgentLife.Activity.TYPE && Math.random() < 0.07 * AgentLife.burst(seed, mannequin.tickCount + seed % 613)
 				&& minecraft.player.distanceToSqr(mannequin) < 12 * 12) {
 				level.playLocalSound(mannequin.getX(), mannequin.getY() + 0.8, mannequin.getZ(),
 					net.minecraft.sounds.SoundEvents.WOODEN_BUTTON_CLICK_ON, net.minecraft.sounds.SoundSource.NEUTRAL,
@@ -189,6 +214,8 @@ final class OfficeResidents {
 		Map<String, Integer> previousDesks = Map.copyOf(prefs.desks);
 		for (OfficeBrain.Agent gone : brain.sync(snapshot.threads(), mod.floorOwners(), prefs, snapshot.machines().stream().filter(T3State.MachineHealth::online).map(T3State.MachineHealth::owner).collect(java.util.stream.Collectors.toSet()))) {
 			Mannequin mannequin = agents.remove(gone.threadId);
+			glances.remove(gone.threadId);
+			inHand.remove(gone.threadId);
 			if (mannequin != null) {
 				threadByEntity.remove(mannequin.getId());
 				level.removeEntity(mannequin.getId(), Entity.RemovalReason.DISCARDED);
@@ -215,6 +242,7 @@ final class OfficeResidents {
 				mannequin.snapTo(at.x, at.y, at.z, frame.yaw(agent.yaw), 0);
 				level.addEntity(mannequin);
 				agents.put(agent.threadId, mannequin);
+				inHand.remove(agent.threadId);
 				threadByEntity.put(mannequin.getId(), agent.threadId);
 			}
 			T3State.ThreadRow row = row(snapshot, agent.threadId);
@@ -277,6 +305,8 @@ final class OfficeResidents {
 		}
 		talks.clear(level);
 		agents.clear();
+		glances.clear();
+		inHand.clear();
 		threadByEntity.clear();
 		skins.clear();
 		brain.clear();
@@ -284,16 +314,17 @@ final class OfficeResidents {
 
 	private void effects(Mannequin mannequin, T3State.ThreadRow row) {
 		if (row == null || !mod.state().online(row.id())) return;
+		// The tag's dot and the typing say "working"; enchant glyphs drifting through the tag only made it harder to read.
 		ParticleOptions particle = switch (row.status()) {
-			case WORKING -> ParticleTypes.ENCHANT;
-			case NEEDS_YOU -> ParticleTypes.NOTE;
+			case WORKING -> null;
+			case NEEDS_YOU -> ticks % 40 == 0 ? ParticleTypes.NOTE : null;
 			case ERROR -> ParticleTypes.ANGRY_VILLAGER;
 			case DONE -> recentlyDone(row) ? ParticleTypes.HAPPY_VILLAGER : null;
 			case IDLE -> null;
 		};
 		if (particle == null) return;
-		for (int i = 0; i < (row.status() == T3State.Status.WORKING ? 3 : 1); i++) {
-			level.addParticle(particle, mannequin.getX() + (Math.random() - 0.5) * 0.8, mannequin.getY() + 2.2 + Math.random() * 0.3,
+		for (int i = 0; i < 1; i++) {
+			level.addParticle(particle, mannequin.getX() + (Math.random() - 0.5) * 0.8, mannequin.getY() + 2.55 + Math.random() * 0.3,
 				mannequin.getZ() + (Math.random() - 0.5) * 0.8, 0, 0.05, 0);
 		}
 	}

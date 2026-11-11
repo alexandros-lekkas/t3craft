@@ -19,7 +19,7 @@ import java.util.Locale;
  * in the world, wherever the office was turned. Drives the real screens through their buttons, then quits.
  */
 final class WorldSelfTest {
-	private enum Step { TITLE, FORM, ARRIVE, OUTSIDE, DESKS, BOARD, TALK, LOOK, DONE }
+	private enum Step { TITLE, FORM, ARRIVE, OUTSIDE, DESKS, BOARD, TALK, LIFE, LOOK, DONE }
 
 	private final T3CraftClient mod;
 	private final String place;
@@ -35,6 +35,7 @@ final class WorldSelfTest {
 	 */
 	private final String talk = System.getProperty("t3craft.worldtalk");
 	private AgentTalk.Conversation conversation;
+	private final AgentLifeShots life;
 	private final java.util.Set<String> talkShots = new java.util.HashSet<>();
 	private boolean helperSeen, bubbleSeen, helperLegs, parentLegs;
 	private AgentTalk.Phase lastPhase;
@@ -54,6 +55,7 @@ final class WorldSelfTest {
 	private WorldSelfTest(T3CraftClient mod, String place) {
 		this.mod = mod;
 		this.place = place;
+		this.life = System.getProperty("t3craft.worldlife") == null ? null : new AgentLifeShots(mod);
 	}
 
 	static WorldSelfTest fromSystemProperty(T3CraftClient mod) {
@@ -142,10 +144,15 @@ final class WorldSelfTest {
 					boardFrames = mod.residents().usageBoardForTest().framesForTest().size();
 					var shown = mod.residents().usageBoardForTest().shownForTest();
 					boardShows = shown == null ? "connect T3" : shown.providers().isEmpty() ? String.valueOf(shown.title()) + ": " + shown.detail() : shown.providers().stream().map(UsageBoardData.Provider::name).toList().toString();
-					step = talk == null ? Step.LOOK : Step.TALK; wait = 0;
+					step = talk == null ? Step.LIFE : Step.TALK; wait = 0;
 				}
 				case TALK -> {
 					if (talk()) return;
+					step = Step.LIFE; wait = 0;
+				}
+				case LIFE -> {
+					// -Pworldlife: frame sequences of the characters (typing, glancing up, name tags, idles).
+					if (life != null && life.tick(minecraft, frame)) return;
 					step = Step.LOOK; wait = 0;
 				}
 				case LOOK -> {

@@ -197,6 +197,8 @@ Dev-client options, all through `-P` properties:
 | `ask: …` · `new: …` · `<prompt>` | Answer a question with the number keys; a new thread; an ordinary prompt with approval |
 | `anchor` · `skin-spike` | Print this world's office origin; render two bundled skins |
 
+`-Pworldtest=<place> -Pworldlife` (with the office fixture paired) also photographs the characters as short frame sequences in `run/screenshots/life-<scene>-<n>.png`: typing, the glance as you walk up, name tags near and far, the waiting agent, the lounge and each desk idle.
+
 Fixture-backed scenarios use the protocol 2 fixtures on 25682/25683 (`-Dt3craft.fixturePort` moves the control calls).
 
 ### Recording the launch video

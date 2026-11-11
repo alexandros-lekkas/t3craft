@@ -21,7 +21,13 @@ Two small changes make the office feel like a real place. Agents look like **pla
 | Walking | Between zones | Normal walk |
 | Offline | Wherever they were | Greyed out, still |
 
-Right-click an agent to open a small card beside it ([the simple native UI](native-ui.md)). The name tag shows the thread title and a short status.
+Agents are not statues. A worker types in bursts, and now and then leans back to think, stretches or sips from its mug, each on its own rhythm. Walk up and it glances at you a beat later (hands off the keys, over the shoulder if its back is to you), then goes back to work; only the agent that needs you keeps watching, hand up, with a wave. Finished agents sink into the sofa.
+
+<p align="center"><img src="../images/shots/agent-life-glance.jpg" width="49%" alt="Two seated agents looking over their shoulders at the player, hands off their keyboards"> <img src="../images/shots/agent-life-stretch.jpg" width="49%" alt="A row of agents stretching at their desks"></p>
+
+The name tag is one line: a dot in the status colour (blue working, amber needs you, green done) and the short title. Across the room it is only the dot; the agent under your crosshair shows its whole title and status; the one that needs you is always named, larger, on amber.
+
+Right-click an agent to open a small card beside it ([the simple native UI](native-ui.md)). 
 
 ## The T3 laptop
 

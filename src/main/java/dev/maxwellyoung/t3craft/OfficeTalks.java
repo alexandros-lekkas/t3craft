@@ -94,6 +94,9 @@ final class OfficeTalks {
 			helper.setYHeadRot(Mth.rotLerp(.25f, helper.getYHeadRot(), helper.getYRot()));
 			AgentPose.set(helper, false);
 			OfficeBrain.Agent speaker = conversation.speaker();
+			// Whoever has the line talks with its hands; the other one nods.
+			AgentLife.set(helper, speaker == null ? AgentLife.Activity.FREE : speaker == h ? AgentLife.Activity.SPEAK : AgentLife.Activity.LISTEN,
+				AgentGlance.seed(conversation.talk.childId()), false);
 			if (speaker == null) continue;
 			Entity speakingEntity = speaker == conversation.helper ? helper : parentEntity;
 			if (speakingEntity == null) continue;
@@ -115,6 +118,13 @@ final class OfficeTalks {
 		if (conversation.phase == AgentTalk.Phase.LEAVE || conversation.phase == AgentTalk.Phase.DONE) return Float.NaN;
 		OfficeBrain.Agent a = conversation.parent, b = conversation.helper;
 		return frame.yaw(AgentTalk.yaw(a.x, a.z, b.x, b.z));
+	}
+
+	/** What a parent's hands do while it talks: gesturing on its own line, nodding on the helper's. */
+	AgentLife.Activity activity(String threadId) {
+		AgentTalk.Conversation conversation = director.of(threadId);
+		OfficeBrain.Agent speaker = conversation == null ? null : conversation.speaker();
+		return speaker == null ? AgentLife.Activity.FREE : speaker == conversation.parent ? AgentLife.Activity.SPEAK : AgentLife.Activity.LISTEN;
 	}
 
 	/** The helper's Mannequin and the bubble over the speaker, for the self-test. */

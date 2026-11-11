@@ -32,6 +32,7 @@ final class ServerOffice {
 	private final T3Config config;
 	private final Runnable save;
 	private final OfficeBrain brain = new OfficeBrain();
+	private final java.util.Map<String, AgentGlance> glances = new java.util.HashMap<>();
 	/** Thread → skin id, so two agents only look alike once their provider runs out of skins. */
 	private final Map<String, String> skins = new java.util.HashMap<>();
 	private final Map<String, Mannequin> mannequins = new HashMap<>();
@@ -164,8 +165,12 @@ final class ServerOffice {
 			if (mannequin == null || mannequin.isRemoved()) continue;
 			AgentWalk.step(mannequin, frame.point(agent.x, agent.y(), agent.z), frame.yaw(agent.yaw), agent.settled() && agent.goal.seat());
 
-   var player=level.getNearestPlayer(mannequin,agent.faceHold>0?32:3);
-   if(player!=null){if(player.distanceToSqr(mannequin)<9)agent.faceHold=Math.max(agent.faceHold,8);AgentPose.face(mannequin,player);}else AgentPose.rest(mannequin);
+			// The same glance as the client office: a look when someone walks up, then back to work.
+			var player = level.getNearestPlayer(mannequin, 32);
+			boolean seated = agent.settled() && agent.goal.seat();
+			boolean look = player != null && !agent.errand && (agent.faceHold > 0 || agent.settled() && glances.computeIfAbsent(agent.threadId, id -> new AgentGlance())
+				.tick(Math.sqrt(player.distanceToSqr(mannequin)), false, agent.zone == OfficeBrain.Zone.NEEDS_YOU, AgentGlance.seed(agent.threadId)));
+			if (look) AgentPose.face(mannequin, player, seated); else AgentPose.rest(mannequin);
    AgentPose.set(mannequin,agent.settled()&&agent.goal.seat());
 			boolean holds = !mannequin.getMainHandItem().isEmpty();
 			if (agent.holding != holds) {
