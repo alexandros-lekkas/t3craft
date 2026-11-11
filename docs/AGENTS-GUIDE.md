@@ -67,7 +67,7 @@ scripts/mc world Lakeside --fixture office -- -Pworldtalk=stage
 
 A fresh `run-harness/` has no worlds; `scripts/mc test` opens the newest save there, so run `scripts/mc world` once first. Delete `run-harness/` whenever you want a clean slate.
 
-Some older scenarios expect a particular world. `nativeui` places the camera for an office that is not turned, so it misses in a Lakeside T3 World (that office is turned a quarter); give it an office save built with `/t3 office` (`--world <save>`). A scenario that fails this way ends with `RESULT FAIL the game crashed: …` and the frame it took shows where the camera was.
+Scenarios that place the camera go through the office's frame, so they work in a turned office too: `nativeui` and `office-a` both pass in a Lakeside T3 World (that office is turned a quarter) with `--fixture office`. A scenario whose camera misses ends with `RESULT FAIL the game crashed: …` and the frame it took shows where the camera was.
 
 ### Driving a background client
 

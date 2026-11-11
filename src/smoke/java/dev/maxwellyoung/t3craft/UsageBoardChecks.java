@@ -20,15 +20,15 @@ public final class UsageBoardChecks {
 	public static void main(String[] args) throws Exception {
 		var live = read("live.json");
 		var codexParsed = live.providers().stream().filter(p -> p.name().equals("codex")).findFirst().orElseThrow();
-		check(codexParsed.windowPercent() == 43 && codexParsed.resetsAt().toString().equals("2026-11-13T03:07:14Z"), "Codex weekly percent/reset parsed");
+		check(codexParsed.windowPercent() == 41 && codexParsed.resetsAt().toString().equals("2026-01-08T00:00:00Z"), "Codex weekly percent/reset parsed");
 		check(codexParsed.tokensToday() != null && codexParsed.tokensToday() > 0, "today tokens summed from token components");
-		check(live.providers().stream().anyMatch(p -> p.name().equals("claudeAgent") && p.windowPercent() == 76), "Claude window parsed");
+		check(live.providers().stream().anyMatch(p -> p.name().equals("claudeAgent") && p.windowPercent() == 64), "Claude window parsed");
 		check(live.providers().stream().anyMatch(p -> p.name().equals("opencode") && p.windowPercent() == null && p.state() == UsageBoardData.State.UNKNOWN), "unsupported provider remains unknown");
 		var museData = read("muse.json");
 		check(museData.providers().size() == 1, "Muse allowance parsed");
 		var allowance = museData.providers().get(0);
-		check(allowance.name().equals("Muse Code Power Usage") && allowance.windowPercent() == 90, "Muse tier and window parsed");
-		check(allowance.resetsAt().toEpochMilli() == 1793953152000L && allowance.state() == UsageBoardData.State.NEAR_LIMIT, "Muse reset and near-limit state parsed");
+		check(allowance.name().equals("Muse Code Power Usage") && allowance.windowPercent() == 85, "Muse tier and window parsed");
+		check(allowance.resetsAt().toEpochMilli() == 1800000000000L && allowance.state() == UsageBoardData.State.NEAR_LIMIT, "Muse reset and near-limit state parsed");
 		var contract=UsageBoardData.fromServerConfig(JsonParser.parseString("""
 		 {"providers":[
 		  {"driver":"claudeAgent","usageLimits":{"checkedAt":"2026-01-01T00:00:00Z","windows":[{"kind":"session","label":"5-hour","usedPercent":34,"resetsAt":"2026-01-01T05:00:00Z"},{"kind":"weekly","label":"Weekly","usedPercent":22,"resetsAt":"2026-01-07T00:00:00Z"}]}},
@@ -40,16 +40,16 @@ public final class UsageBoardChecks {
 		var codexConfig=named(contract,"Codex");check(codexConfig.windowPercent()==67&&codexConfig.secondaryPercent()==null&&codexConfig.secondaryLabel()==null,"Codex weekly-only window mapped as primary");
 		check(named(contract,"Muse").state()==UsageBoardData.State.UNKNOWN&&named(contract,"Muse").note().equals("T3 TRACKS NO LIMITS FOR IT"),"unsupported provider has unknown usage and says so");
 		check(contract.providers().getFirst().name().equals("Codex"),"fullest provider first");
-		// The shape the real T3 serves today (src/smoke/resources/usage-board/server-config.json): a monthly-only Codex,
+		// The shape the real T3 serves, with invented figures (src/smoke/resources/usage-board/server-config.json): a monthly-only Codex,
 		// two Claude accounts with two weekly windows each and no session, and mostly disabled providers.
 		UsageBoardData real;
 		try(var in=UsageBoardChecks.class.getResourceAsStream("/usage-board/server-config.json")){real=UsageBoardData.fromServerConfig(JsonParser.parseReader(new InputStreamReader(in,StandardCharsets.UTF_8)).getAsJsonObject());}
 		check(real.providers().stream().map(UsageBoardData.Provider::name).toList().equals(java.util.List.of("Codex","Claude","Claude Personal","Claude Team","Muse Code")),"enabled providers only, fullest first, second Claude account named apart: "+real.providers().stream().map(UsageBoardData.Provider::name).toList());
 		var codexReal=named(real,"Codex");
-		check(codexReal.windowPercent()==90&&"MONTHLY".equals(codexReal.primaryLabel())&&codexReal.state()==UsageBoardData.State.NEAR_LIMIT&&codexReal.resetsAt().toString().equals("2026-12-06T14:24:27Z"),"Codex's monthly window is shown and near its limit");
+		check(codexReal.windowPercent()==82&&"MONTHLY".equals(codexReal.primaryLabel())&&codexReal.state()==UsageBoardData.State.NEAR_LIMIT&&codexReal.resetsAt().toString().equals("2026-12-20T09:00:00Z"),"Codex's monthly window is shown and near its limit");
 		var claudeReal=named(real,"Claude");
-		check(claudeReal.windowPercent()==33&&"WEEKLY".equals(claudeReal.primaryLabel())&&claudeReal.secondaryPercent()==45&&"WEEKLY · FABLE".equals(claudeReal.secondaryLabel()),"Claude's two weekly windows, labelled as T3 labels them: "+claudeReal);
-		check(named(real,"Claude Team").windowPercent()==0&&named(real,"Claude Team").resetsAt()==null&&"SESSION".equals(named(real,"Claude Team").primaryLabel()),"a session with no reset time");
+		check(claudeReal.windowPercent()==40&&"WEEKLY".equals(claudeReal.primaryLabel())&&claudeReal.secondaryPercent()==55&&"WEEKLY · FABLE".equals(claudeReal.secondaryLabel()),"Claude's two weekly windows, labelled as T3 labels them: "+claudeReal);
+		check(named(real,"Claude Team").windowPercent()==3&&named(real,"Claude Team").resetsAt()==null&&"SESSION".equals(named(real,"Claude Team").primaryLabel()),"a session with no reset time");
 		check(named(real,"Muse Code").state()==UsageBoardData.State.UNKNOWN&&"NO USAGE DATA".equals(named(real,"Muse Code").note()),"a provider without usageLimits says it has no usage data");
 		check(real.providers().stream().noneMatch(p->p.name().equals("Opencode")||p.name().equals("Cursor")),"disabled providers are left off the board");
 		var none=UsageBoardData.fromServerConfig(JsonParser.parseString("{\"providers\":[{\"driver\":\"cursor\",\"enabled\":false}]}").getAsJsonObject());
