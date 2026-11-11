@@ -144,6 +144,11 @@ final class OfficeSite {
 		}
 		// Dynamic office furnishings are still office blocks at these exact positions: both lamp states and the whiteboards.
 		int floors = Math.max(2, (bounds(BlockPos.ZERO, blueprint).max().getY() + 1) / T3Office.FLOOR_HEIGHT - 1);
+		// An office built from an earlier design: the furniture this design moved or swapped is still the office's own.
+		for (var cell : OfficeDesign.legacy(floors)) {
+			BlockPos pos = old.block(cell.x(), cell.y(), cell.z());
+			if (BuiltInRegistries.BLOCK.getKey(blocks.apply(pos).getBlock()).toString().equals(cell.block())) existing.put(pos, cell.block());
+		}
 		for (boolean night : new boolean[] {false, true}) for (String relative : OfficeDesign.lamps(floors, night)) {
 			String[] parts = old.command(relative).split(" ");
 			BlockPos pos = new BlockPos(Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));

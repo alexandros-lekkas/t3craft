@@ -19,7 +19,7 @@ import java.util.Locale;
  * in the world, wherever the office was turned. Drives the real screens through their buttons, then quits.
  */
 final class WorldSelfTest {
-	private enum Step { TITLE, FORM, ARRIVE, OUTSIDE, DESKS, BOARD, TALK, LIFE, LOOK, DONE }
+	private enum Step { TITLE, FORM, ARRIVE, OUTSIDE, DESKS, TOUR, BOARD, TALK, LIFE, LOOK, DONE }
 
 	private final T3CraftClient mod;
 	private final String place;
@@ -51,6 +51,26 @@ final class WorldSelfTest {
 
 	private record Marker(String name, long seed, boolean setupDone, BlockPos origin, net.minecraft.world.level.block.Rotation rotation,
 		BlockPos spawn, float spawnYaw, float spawnPitch) {}
+
+	private int nightWait;
+	/** Interior tour: label, then where the camera stands and looks (x, feet y, z, yaw, pitch) in the design's own frame. */
+	private static final Object[][] TOUR = {
+		{"overview", 1.6, 2.4, 22.4, -138f, 22f},
+		{"bench", 12.5, 0.0, 8.4, 112f, 10f},
+		{"desks-close", 12.6, 0.3, 1.4, 62f, 14f},
+		{"entry-view", 25.5, 0.0, 1.5, 42f, 8f},
+		{"whiteboard", 8.5, 0.0, 15.5, 90f, 4f},
+		{"lounge", 22.5, 0.2, 22.6, 128f, 10f},
+		{"kitchen", 19.5, 0.0, 8.5, 180f, 4f},
+		{"nook", 21.5, 0.0, 18.5, -90f, 6f},
+		{"entry", 23.5, 0.0, 11.5, -172f, 6f},
+		{"team-table", 21.5, 0.3, 12.2, 122f, 12f},
+		{"upper-overview", 1.6, 8.4, 22.4, -138f, 22f},
+		{"upper-bench", 12.5, 6.0, 8.4, 112f, 10f},
+		{"night-overview", 1.6, 2.4, 22.4, -138f, 22f},
+		{"night-lounge", 22.5, 0.2, 22.6, 128f, 10f},
+		{"night-bench", 12.5, 0.0, 8.4, 112f, 10f},
+	};
 
 	private WorldSelfTest(T3CraftClient mod, String place) {
 		this.mod = mod;
@@ -122,11 +142,36 @@ final class WorldSelfTest {
 				}
 				case DESKS -> {
 					// Ground-floor studio: stand in the room behind the desk bench and watch the agents arrive and sit.
-					if (++wait == 1 || wait % 20 == 0) look(minecraft, 6.5, 0.6, 11.5, 180, 16);
+					if (++wait == 1 || wait % 20 == 0) look(minecraft, 6.5, 0.6, 9.5, 180, 16);
 					boolean paired = mod.state().snapshot().threads().stream().anyMatch(r -> r.status() == T3State.Status.WORKING);
 					int settled = settledAtDesks();
 					if (wait < 100 || (paired && settled < workers() && wait < 20 * 45)) return;
 					shot(minecraft, "desks");
+					step = Step.TOUR; wait = 0;
+				}
+				case TOUR -> {
+					// The interior from fixed design-relative angles, both floors, then again at night: the set the office
+					// design is judged by (docs/design/office.md). Hovering, so the raised overviews hold still.
+					if (++wait == 1) {
+						hud(minecraft, false);
+						minecraft.player.connection.sendCommand("time set 6000");
+						var abilities = minecraft.player.getAbilities();
+						if (abilities.mayfly) { abilities.flying = true; minecraft.player.onUpdateAbilities(); }
+					}
+					int index = (wait - 2) / 24, phase = (wait - 2) % 24;
+					if (wait < 2) return;
+					if (index < TOUR.length) {
+						Object[] t = TOUR[index];
+						if (phase == 0 && "night-overview".equals(t[0])) minecraft.player.connection.sendCommand("time set 18000");
+						if (phase == 0 || phase == 10) look(minecraft, (double) t[1], (double) t[2], (double) t[3], (float) t[4], (float) t[5]);
+						// Lamps follow the night on the office's 100-tick decoration timer, so the first night frame waits for it.
+						if ("night-overview".equals(t[0]) && phase == 23 && ++nightWait < 130) { wait--; return; }
+						if (phase == 22) shot(minecraft, "tour-" + t[0]);
+						return;
+					}
+					minecraft.player.connection.sendCommand("time set 1000");
+					var abilities = minecraft.player.getAbilities();
+					abilities.flying = false; minecraft.player.onUpdateAbilities();
 					step = Step.BOARD; wait = 0;
 				}
 				case BOARD -> {

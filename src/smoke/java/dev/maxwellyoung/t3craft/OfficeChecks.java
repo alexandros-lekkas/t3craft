@@ -21,7 +21,7 @@ public final class OfficeChecks {
   check(AgentAppearance.provider("unknown-new-driver").equals("default"),"unknown driver uses bundled fallback");
   for(var e:AgentAppearance.SKINS.getAsJsonArray("skins")) {var skin=e.getAsJsonObject();check(OfficeChecks.class.getResource("/assets/t3craft/textures/entity/agent/"+skin.get("file").getAsString())!=null,"every manifest skin is bundled");}
   check(AgentAppearance.skin("codex","thread-a").equals(AgentAppearance.skin("codex","thread-a")),"alternate selection stable");
-  check(OfficeProps.PROPS.size()==59,"complete original prop placements");
+  check(OfficeProps.PROPS.size()==93,"complete prop placements: room pack, desk kits and team table");
   check(OfficeProps.state("coffee_mug","sage",T3State.Status.WORKING,false).equals("sage_steam"),"working mug steam");
   check(OfficeProps.state("monitor","idle",T3State.Status.WORKING,false).equals("on")&&OfficeProps.state("monitor","idle",null,false).equals("off"),"monitor follows desk occupancy and status");
   check(OfficeProps.state("desk_lamp","off",null,true).equals("on")&&OfficeProps.state("desk_lamp","off",T3State.Status.IDLE,false).equals("off"),"night desk lamps");
@@ -289,6 +289,21 @@ public final class OfficeChecks {
 		blocks.put(sign, net.minecraft.world.level.block.Blocks.BIRCH_WALL_SIGN.defaultBlockState());
 		var signEntity = new net.minecraft.world.level.block.entity.SignBlockEntity(sign, blocks.get(sign));
 		check(!OfficeSite.occupied(bounds, OfficeFrame.at(origin), blueprint, read, pos -> pos.equals(sign) ? signEntity : null), "daytime lamps and office whiteboards are rebuildable");
+		// An office from the previous interior (teal lounge chairs, the old rug, table and floor lamp) rebuilds; the same blocks elsewhere do not.
+		var legacy = OfficeDesign.legacy(2);
+		check(legacy.stream().anyMatch(c -> c.block().equals("minecraft:waxed_oxidized_cut_copper_stairs")) && legacy.stream().anyMatch(c -> c.block().equals("minecraft:birch_fence")), "the previous interior is recorded");
+		for (var turn : net.minecraft.world.level.block.Rotation.values()) {
+			var older = new java.util.HashMap<net.minecraft.core.BlockPos, net.minecraft.world.level.block.state.BlockState>();
+			var frame = new OfficeFrame(origin, turn);
+			for (var cell : legacy) older.put(frame.block(cell.x(), cell.y(), cell.z()), net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.parse(cell.block())).defaultBlockState());
+			java.util.function.Function<net.minecraft.core.BlockPos, net.minecraft.world.level.block.state.BlockState> was = pos -> older.getOrDefault(pos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+			var site = OfficeSite.bounds(net.minecraft.core.BlockPos.ZERO, T3Office.blueprint(List.of("Machine")).stream().map(frame::command).toList());
+			check(OfficeSite.blocker(site, frame, T3Office.blueprint(List.of("Machine")), was, pos -> null) == null, "rebuilding over the previous interior (" + turn + ")");
+		}
+		var stray = origin.offset(15, 0, 15);
+		blocks.put(stray, net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace("waxed_oxidized_cut_copper_stairs")).defaultBlockState());
+		check(stray.equals(OfficeSite.blocker(bounds, OfficeFrame.at(origin), T3Office.blueprint(List.of("Machine")), read, pos -> null)), "a previous-interior block anywhere else is still the player's");
+		blocks.remove(stray);
 		// Use the blueprint coordinate so this protects the office's own container exemption.
 		String shulkerCommand = blueprint.stream().filter(command -> command.contains("white_shulker_box")).findFirst().orElseThrow();
 		String[] coordinates = shulkerCommand.split(" ");
@@ -337,7 +352,7 @@ public final class OfficeChecks {
 	 */
 	private static void checkProps() {
 		int perFloor = OfficeProps.PROPS.size();
-		check(perFloor == 59, "props.json has the full pack: " + perFloor);
+		check(perFloor == 93, "props.json has the full pack: " + perFloor);
 		var origin = new net.minecraft.core.BlockPos(-40, 70, 12);
 		for (var rotation : net.minecraft.world.level.block.Rotation.values()) for (int floors : new int[] {2, 4}) {
 			var frame = new OfficeFrame(origin, rotation);

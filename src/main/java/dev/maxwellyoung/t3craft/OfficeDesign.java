@@ -68,6 +68,19 @@ final class OfficeDesign {
  static List<String> lamps(int count,boolean night) {
   List<String> out=new ArrayList<>();for(var e:template(Math.max(1,count)).getAsJsonArray("lamps")){var a=e.getAsJsonObject();out.add("setblock "+a.get("x").getAsInt()+" "+a.get("y").getAsInt()+" "+a.get("z").getAsInt()+" "+a.get(night?"night":"day").getAsString());}return out;
  }
+ /** A cell an earlier design filled with a block this one dropped or swapped: still the office's own on a rebuild. */
+ record Legacy(int x,int y,int z,String block) {}
+ static List<Legacy> legacy(int count) {
+  List<Legacy> out=new ArrayList<>();
+  for(var e:template(Math.min(Math.max(1,count),2)).getAsJsonArray("legacy")){
+   var a=e.getAsJsonArray();int x=a.get(0).getAsInt(),y=a.get(1).getAsInt(),z=a.get(2).getAsInt();String block="minecraft:"+a.get(3).getAsString();
+   // The same repeat as template(): ground floor once, the upper module on every floor above it.
+   if(count<=2||y<5)out.add(new Legacy(x,y,z,block));
+   else if(y>=11)out.add(new Legacy(x,y+6*(count-2),z,block));
+   else for(int floor=1;floor<count;floor++)out.add(new Legacy(x,y+6*(floor-1),z,block));
+  }
+  return out;
+ }
  static boolean[][] blocked() {
   boolean[][] b=new boolean[30][24];
   for(var e:BASE.getAsJsonArray("blocks")){var a=e.getAsJsonObject();var p=a.getAsJsonArray("pos");int x=p.get(0).getAsInt(),y=p.get(1).getAsInt(),z=p.get(2).getAsInt();String s=a.get("state").getAsString();if(y==0&&x>=0&&x<30&&z>=0&&z<24&&!s.contains("carpet")&&!s.contains("sign")&&!s.startsWith("light["))b[x][z]=true;}

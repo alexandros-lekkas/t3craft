@@ -2,7 +2,7 @@
 
 The office has a **30 × 24 block interior and at least two occupied-capable floors**, plus a roof terrace. Birch, white concrete, quartz desks, glass, a larger kitchenette, an open lounge and generous circulation retain design A's palette. Each machine has sixteen stable desk slots: eight downstairs, then eight upstairs. Further machines append two-floor suites; existing owners keep their saved suite positions.
 
-The building is generated template data, not a preview. `scripts/office/scandi.cjs` is the original design generator; `generate.cjs` expands its footprint, removes trapdoor monitors and block chairs, and writes the block/anchor and prop manifests. `OfficeDesign` repeats the upper-floor module and moves the roof when extending the building. Regenerate with `node scripts/office/generate.cjs`.
+The building is generated template data, not a preview. `scripts/office/scandi.cjs` is the original design generator; `generate.cjs` expands its footprint, removes trapdoor monitors and block chairs, furnishes the stretched plan (`interior.cjs`), lights it (`lighting.cjs`) and writes the block/anchor and prop manifests. `OfficeDesign` repeats the upper-floor module and moves the roof when extending the building. Regenerate with `node scripts/office/generate.cjs`.
 
 In singleplayer, `OfficeQueue` schedules `OfficePlacement` on the integrated server thread. It places real block states and sign text directly, without chat commands or client block illusions. The existing site-loading, world/session binding and occupied-site checks remain. On a remote server the existing shared command budget throttles placement. The dedicated-server office uses the same template data.
 
@@ -10,7 +10,21 @@ Agents use vanilla Mannequins created through the entity factory, including its 
 
 The brain owns movement and stable desk identity. Workers sit and type at their own laptops; waiting agents stand at the whiteboard; finished agents visit the fridge and lounge. Sitting uses a synced crouching pose interpreted as a seated pose by the T3 renderer. No walk-animation values are driven manually. T3-tagged Mannequins are non-pushable. Heads ease toward the player within ±50° while the brain holds movement, triggered by needs-you/done, opening the card, or coming within three blocks.
 
-Each desk has a paper-backed ItemDisplay using FIXED transform and a separate Interaction hitbox. UUIDs encode thread identity and entity role, so display and hitbox identities are distinct and stable. States map to `idle`, `working`, or `needs_you`; the laptop faces the same direction as its user. Clicks retain the existing use-key drain and focus/open-panel route. The complete original props pack places 59 displays on each floor: every desk has its own chair and mug plus a distinct mix of monitor, succulent, lamp, headphones, nameplate and notebook. The kitchenette has an espresso machine and mugs; shared areas add a water cooler, wall clock, printer, pinboard, filing cabinets and monsteras. The generated manifest removes the old block monitors/chairs and replaced plants/appliance. Chair seats are 0.508 blocks above the floor. Working mugs steam, monitors follow status, desk lamps illuminate at night, and waiting agents' chairs swivel toward the player. Small props use the pack's shorter tracking visibility ranges.
+Each desk has a paper-backed ItemDisplay using FIXED transform and a separate Interaction hitbox. UUIDs encode thread identity and entity role, so display and hitbox identities are distinct and stable. States map to `idle`, `working`, or `needs_you`; the laptop faces the same direction as its user. Clicks retain the existing use-key drain and focus/open-panel route. The props pack places 93 displays on each floor: each of the eight seats is dealt its own desk kit (see [Interior](#interior)), the kitchenette has an espresso machine and mugs, the team table and the front desk have chairs, closed laptops and clutter, and shared areas add a water cooler, wall clock, printer, pinboard, filing cabinets and monsteras. The generated manifest removes the old block monitors/chairs and replaced plants/appliance. Chair seats are 0.508 blocks above the floor. Working mugs steam, monitors follow status, desk lamps illuminate at night, and waiting agents' chairs swivel toward the player. Small props use the pack's shorter tracking visibility ranges.
+
+## Interior
+
+`generate.cjs` stretches design A by inserting floor, which left islands of furniture in a sea of planks and gave every desk the same one-block column of props. `scripts/office/interior.cjs` runs over the stretched plan, in the final 30 × 24 frame, before the lighting pass. Seats, desk laptops, the whiteboard signs, the lectern, the lounge seats, the stair and the door do not move; walking routes are still computed over whatever is open (`OfficeDesign.blocked()`), and `talkCheck` proves every walk in all four turns.
+
+- **Desk kits.** Each desk is two blocks wide: the seat's cell with the laptop, and a free cell beside it. `KITS` deals one kit per seat, the same on every floor, placed relative to the sitter so both rows read correctly: *two screens*, *plants*, *paperwork* (lamp, a stack of notebooks, nameplate), *bare* (mug, nameplate, headphones), *side screen*, *coffee* (three mugs), *reading lamp* and *headphones*. Chairs alternate grey and oak. Monitors still follow the desk's agent, mugs still steam, lamps still come on at night.
+- **Desk lights.** The chain link that floated over each seat is now one continuous rail per row (chain by day, a white light bar at night), hung from its two end chains.
+- **Team table.** A five-block birch table with six chairs on a grey rug fills the open floor between the bench and the lounge, under the downlight row, with two closed laptops, a notebook, mugs and a plant.
+- **Meeting corner.** The whiteboard has a bordered rug under the spots where waiting agents stand, a birch perch facing it, a frame as wide as the board (the stretch had tripled one post) and a bookcase beside it.
+- **Lounge.** The rug has an even grey border, the coffee table is centred on it and one block nearer the sofa, the floor lamp stands midway between the two armchairs, and the armchairs (here and in the review nook) are the sofa's andesite instead of oxidised copper, so the room keeps to birch, white, grey and green.
+- **Front desk and entry.** A quartz front desk with a chair, screen and nameplate faces the door beside the monstera; a runner leads in from the door mat and coat hooks hang on the wall by the stair. The fridge is one door wide and the counter carries on to the entry.
+- **Reading pair.** Two armchairs and a side table sit against the credenza's books on the way from the desks to the whiteboard; the credenza's bare stretch gets plants, a lamp and notebooks.
+
+**Rebuilding over an older office.** A rebuild refuses to cover crafted blocks that are not the office's own. Every block the interior pass removes or swaps is written to the template as `legacy` (cell and old block), and `OfficeSite.existing` accepts that block at that cell, in the standing office's own turn, as the office's. The same block anywhere else is still the player's. Props keep their stable identities; ones the design dropped are discarded on load as before.
 
 ## Lighting
 
@@ -32,7 +46,12 @@ Use `/t3 office build` to place or explicitly rebuild the office. Once this worl
 ## Actual Minecraft captures
 
 ![Two-floor exterior](office/exterior.png)
-![Lower-floor desks](office/interior.png)
+![Lower floor from the lake corner: meeting corner, lounge, team table, desks](office/interior.png)
+![Desk bench: each seat has its own kit](office/interior-desks.jpg)
+![Team table on the open floor](office/interior-team-table.jpg)
+![Lounge](office/interior-lounge.jpg)
+![Entry, front desk and kitchenette](office/interior-entry.jpg)
+![The interior before this pass, same angles](office/interior-before.jpg)
 ![Kitchenette and original props](office/kitchenette.png)
 ![Upper-floor desk overflow](office/upper-floor.png)
 ![Waiting agent facing the player](office/needs-you.png)
@@ -48,6 +67,8 @@ The dev client uses Java 25, Minecraft 26.3, `guiScale:5`, muted master volume, 
 The captured needs-you head turn measured 49.99997°. The client also passed both teleport checks and shut itself down. The reported blank T3 panel was investigated: that earlier test world had failed to load its 26.3 world-generation settings, and the log contained no T3Screen render exception. After using a complete flat-world save, the laptop screenshot above proves the unchanged T3Screen renders at GUI scale 5.
 
 Smoke checks cover generated anchors, minimum floors, extension modules, provider mapping and bundled files, laptop states, deterministic identities, head-turn movement holds, stable allocation, rebuild protection and reconnect behavior. `scripts/verify-ci.sh` allocates free fixture ports on every run, so it can run beside another checkout; `T3CRAFT_FIXTURE_PORT=25730 scripts/verify-ci.sh` pins them instead.
+
+The interior is judged from a fixed set of angles: `./gradlew runClient -Pworldtest=Lakeside -Pconfig=config/office-fixture.json` saves `t3world-<place>-tour-*.png` (overview, bench, desks, entry, whiteboard, lounge, kitchen, nook, team table, upper floor, then three at night) after the desks shot, in the office's own turn, so River Bend shows the same views of a turned office.
 
 To repeat: start `python3 scripts/office/fixture.py`, create a disposable creative flat world, set the options above plus `pauseOnLostFocus:false`, and run `./gradlew runClient -Pselftest=office-a -Pworld=<save-name> -Pconfig=config/office-fixture.json`. Screenshots appear in `run/screenshots`.
 

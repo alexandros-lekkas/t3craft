@@ -27,6 +27,7 @@ The real in-game shots the docs need. When a feature lands, the implementing PR 
 | ☑ | `world-lakeside-arrival` | The first frame after loading the new world, with the welcome toast visible | Spawn view, facing the door, as loaded | **5** |
 | ☑ | `world-lakeside-hub` | A T3 world exists. Title → *T3 World* | Full screen | **5** |
 | ☑ | `world-lakeside-plaza`, `world-lakeside-lake`, `world-lakeside-desks` | Lakeside, office fixture paired | Plaza side, lake side, ground-floor desks with agents seated | HUD hidden, **5** |
+| ☑ | `t3world-<place>-tour-*` (kept in `docs/design/office/interior*.{png,jpg}`) | Same run: `-Pworldtest` walks a fixed interior tour after the desks shot | Overview, bench, desks, entry, whiteboard, lounge, kitchen, nook, team table, upper floor, three at night | HUD hidden |
 | ☑ | `world-river-bend-plaza`, `world-river-bend-desks` | River Bend (office turned 180°) | Same | HUD hidden, **5** |
 | ☑ | `office-talk-ask`, `office-talk-report`, `office-talk-thanks` | Lakeside, office fixture paired, `curl /_qa/delegate?parent=office-0&title=Take%20the%20tests` then `/_qa/finish?id=…` | `-Pworldtalk=300:Build the studio` frames the pair side-on | HUD shown, **5** |
 

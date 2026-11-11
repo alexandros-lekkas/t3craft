@@ -169,7 +169,7 @@ Dev-client options, all through `-P` properties:
 ./gradlew runClient -Pjoin=localhost:25565             # straight into a server
 ./gradlew runClient -PwebShowcase=<threadId> [-PwebPing=<threadId>] [-PwebPair=<link>]   # read-only capture of the streamed UI; never binds the MCP port
 ./gradlew runClient -Pselftest=<prompt> [-Pworld=<save>] [-Pconfig=<path>] [-Pfocus=<title>] [-PfixturePort=<n>] [-Pwidth=1000 -Pheight=625]
-./gradlew runClient -Pworldtest=<place> [-Pconfig=<path>]       # title screen → New T3 World → Create, screenshots the arrival and desks
+./gradlew runClient -Pworldtest=<place> [-Pconfig=<path>]       # title screen → New T3 World → Create, screenshots the arrival, desks and an interior tour
 ./gradlew runClient -Pworldtest=<place> -Pworldtalk=<seconds>[:<parent title>]   # … then waits for a real agent conversation and photographs it (-Pworldtalk=stage starts one)
 ./gradlew runClient -Pdemo=<output dir> -Pconfig=<path> -PfixturePort=<n>   # record the launch video shots (use scripts/demo/record.sh)
 ./gradlew runClient -PmcpPort=<n> …                             # keep a dev client off the port your real game uses

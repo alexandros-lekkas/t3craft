@@ -1,5 +1,5 @@
 // Design A expanded to a 30 x 24 interior. Insert usable space rather than scaling avatars.
-const fs=require('fs'),g=require('./scandi.cjs'),lighting=require('./lighting.cjs');
+const fs=require('fs'),g=require('./scandi.cjs'),lighting=require('./lighting.cjs'),interior=require('./interior.cjs');
 const out='src/main/resources/data/t3craft/office';fs.mkdirSync(out,{recursive:true});
 const X=x=>x+Math.max(0,Math.min(4,Math.floor(x)-3))+(x>=10?2:0)+(x>=17?2:0);
 const Z=z=>z+(z>=8?4:0)+(z>=14?2:0);
@@ -19,17 +19,20 @@ for(let n=1;n<=2;n++){
  // rest of its stretched span is still floor, or the stair would end at a hole where the slab was widened.
  if(!stretch&&/_stairs/.test(state)&&y%g.FLOOR_HEIGHT===g.FLOOR_HEIGHT-1)for(let xx=X(x);xx<X(x+1);xx++)for(let zz=Z(z);zz<Z(z+1);zz++)if(!(xx===X(x)&&zz===Z(z)))blocks.set([xx,y,zz].join(','),'birch_planks');
  }
+ // Furnish the stretched plan before lighting it, so the hidden fill grid steps around anything new.
+ const lamps=anchor(d.lamps),legacy=[];
+ interior.apply(blocks,n,lamps,legacy);
  lighting.apply(blocks,n);
  const anchors=anchor(d.anchors);
  // The usage limits board: 6 x 3 maps on the ground floor's east wall (white concrete at x=30, z=7..12), facing into
  // the room beside the stair and arrival spot. topLeft is the frame cell of the top-left map; columns run south (+z).
  anchors.floors[0].usage_board={topLeft:[29,3,7],facing:'west',columns:6,rows:3};
- fs.writeFileSync(`${out}/scandi-${n}.json`,JSON.stringify({blocks:[...blocks].map(([p,state])=>({pos:p.split(',').map(Number),state})),anchors,lamps:anchor(d.lamps)}));
+ fs.writeFileSync(`${out}/scandi-${n}.json`,JSON.stringify({blocks:[...blocks].map(([p,state])=>({pos:p.split(',').map(Number),state})),anchors,lamps,legacy}));
 }
 // Same mapping for the original prop placement sheet.
 const source=__dirname+'/props-source.json';if(fs.existsSync(source)){
- let p=JSON.parse(fs.readFileSync(source));let props=[...p.desks.flatMap(d=>d.props.map(prop=>({...prop,desk:d.slot}))),...(p.room||[])];
- // Desk kits and shared room furniture use exactly the same expanded frame.
- props=props.map(p=>({...p,pos:[X(p.pos[0]),p.pos[1],Z(p.pos[2])]}));
+ // Shared room furniture comes from the original placement sheet through the same mapping; the desk kits and the
+ // furniture of the new zones are dealt in the final frame by interior.cjs.
+ const props=interior.props(JSON.parse(fs.readFileSync(source)),X,Z);
  fs.writeFileSync(`${out}/props.json`,JSON.stringify({props}));
 }
