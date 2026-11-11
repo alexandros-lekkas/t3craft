@@ -192,7 +192,7 @@ tasks.register('firstRunCheck', JavaExec) {
 
 // Fixture-backed checks share one entry point in PR and tag builds.
 tasks.register('verifyAll') {
-	dependsOn 'build', 'officeCheck', 'talkCheck', 'connectionCheck', 'featureCheck', 'reliabilityCheck', 'firstRunCheck'
+	dependsOn 'build', 'officeCheck', 'usageBoardCheck', 'talkCheck', 'connectionCheck', 'featureCheck', 'reliabilityCheck', 'firstRunCheck'
 }
 
 dependencyLocking {

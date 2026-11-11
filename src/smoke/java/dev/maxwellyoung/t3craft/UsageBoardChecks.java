@@ -36,9 +36,25 @@ public final class UsageBoardChecks {
 		  {"driver":"muse","usageLimits":{"unavailable":{"reason":"unsupported"},"windows":[]}}
 		 ]}
 		 """).getAsJsonObject());
-		var claudeConfig=contract.providers().get(0);check(claudeConfig.windowPercent()==34&&claudeConfig.secondaryPercent()==22,"Claude session and weekly windows mapped");
-		var codexConfig=contract.providers().get(1);check(codexConfig.windowPercent()==67&&codexConfig.secondaryPercent()==null,"Codex weekly-only window mapped as primary");
-		check(contract.providers().get(2).state()==UsageBoardData.State.UNKNOWN,"unavailable provider has unknown usage");
+		var claudeConfig=named(contract,"Claude Agent");check(claudeConfig.windowPercent()==34&&claudeConfig.secondaryPercent()==22&&"5-HOUR".equals(claudeConfig.primaryLabel()),"Claude session and weekly windows mapped under T3's labels");
+		var codexConfig=named(contract,"Codex");check(codexConfig.windowPercent()==67&&codexConfig.secondaryPercent()==null&&codexConfig.secondaryLabel()==null,"Codex weekly-only window mapped as primary");
+		check(named(contract,"Muse").state()==UsageBoardData.State.UNKNOWN&&named(contract,"Muse").note().equals("T3 TRACKS NO LIMITS FOR IT"),"unsupported provider has unknown usage and says so");
+		check(contract.providers().getFirst().name().equals("Codex"),"fullest provider first");
+		// The shape the real T3 serves today (src/smoke/resources/usage-board/server-config.json): a monthly-only Codex,
+		// two Claude accounts with two weekly windows each and no session, and mostly disabled providers.
+		UsageBoardData real;
+		try(var in=UsageBoardChecks.class.getResourceAsStream("/usage-board/server-config.json")){real=UsageBoardData.fromServerConfig(JsonParser.parseReader(new InputStreamReader(in,StandardCharsets.UTF_8)).getAsJsonObject());}
+		check(real.providers().stream().map(UsageBoardData.Provider::name).toList().equals(java.util.List.of("Codex","Claude","Claude Personal","Claude Team","Muse Code")),"enabled providers only, fullest first, second Claude account named apart: "+real.providers().stream().map(UsageBoardData.Provider::name).toList());
+		var codexReal=named(real,"Codex");
+		check(codexReal.windowPercent()==90&&"MONTHLY".equals(codexReal.primaryLabel())&&codexReal.state()==UsageBoardData.State.NEAR_LIMIT&&codexReal.resetsAt().toString().equals("2026-12-06T14:24:27Z"),"Codex's monthly window is shown and near its limit");
+		var claudeReal=named(real,"Claude");
+		check(claudeReal.windowPercent()==33&&"WEEKLY".equals(claudeReal.primaryLabel())&&claudeReal.secondaryPercent()==45&&"WEEKLY · FABLE".equals(claudeReal.secondaryLabel()),"Claude's two weekly windows, labelled as T3 labels them: "+claudeReal);
+		check(named(real,"Claude Team").windowPercent()==0&&named(real,"Claude Team").resetsAt()==null&&"SESSION".equals(named(real,"Claude Team").primaryLabel()),"a session with no reset time");
+		check(named(real,"Muse Code").state()==UsageBoardData.State.UNKNOWN&&"NO USAGE DATA".equals(named(real,"Muse Code").note()),"a provider without usageLimits says it has no usage data");
+		check(real.providers().stream().noneMatch(p->p.name().equals("Opencode")||p.name().equals("Cursor")),"disabled providers are left off the board");
+		var none=UsageBoardData.fromServerConfig(JsonParser.parseString("{\"providers\":[{\"driver\":\"cursor\",\"enabled\":false}]}").getAsJsonObject());
+		check(none.providers().isEmpty()&&"NO PROVIDERS".equals(none.title()),"nothing enabled says so");
+		check(UsageBoardData.failed(T3McpBackend.LEGACY_REQUIRED).detail().equals("THIS PAIRING CANNOT READ LIMITS")&&UsageBoardData.failed(null).providers().isEmpty(),"a failed read shows no numbers and a short reason");
 		Path out=Path.of("build/usage-board");Files.createDirectories(out);
 		long now=System.currentTimeMillis();
 		var claude=new UsageBoardData.Provider("CLAUDE",34,java.time.Instant.ofEpochMilli(now+171*60_000L),3_140_000L,UsageBoardData.State.NORMAL,22,java.time.Instant.ofEpochMilli(now+3*86_400_000L),java.util.List.of(new UsageBoardData.Agent("AUTH-REFACTOR",1_210_000),new UsageBoardData.Agent("DOCS SWEEP",640_000)));
@@ -49,6 +65,9 @@ public final class UsageBoardChecks {
 		write(out.resolve("limited.png"),new UsageBoardData(java.util.List.of(new UsageBoardData.Provider("CLAUDE",100,java.time.Instant.ofEpochMilli(now+102*60_000L),claude.tokensToday(),UsageBoardData.State.LIMITED,64,claude.secondaryReset(),java.util.List.of()),codex,muse)),now);
 		write(out.resolve("unknown.png"),new UsageBoardData(java.util.List.of(claude,codex,new UsageBoardData.Provider("MUSE",null,null,null,UsageBoardData.State.UNKNOWN))),now);
 		write(out.resolve("connect.png"),null,now);
+		write(out.resolve("real.png"),real,now);
+		write(out.resolve("reading.png"),UsageBoardData.READING,now);
+		write(out.resolve("failed.png"),UsageBoardData.failed("Connection refused"),now);
 		checkWall(now);
 		System.out.println("Usage board fixtures parsed successfully.");
 	}
@@ -110,6 +129,7 @@ public final class UsageBoardChecks {
 		check(java.util.stream.IntStream.range(0,board.length).map(i->board[i]&0xff).distinct().count()>2&&java.util.stream.IntStream.range(0,board.length).allMatch(i->(board[i]&0xff)>=4),"unpaired board renders its connect-T3 screen in real map colours");
 		System.out.println("Usage board wall: "+columns+"x"+rows+" maps, every turn and template, solid backing, facing the room");
 	}
+	private static UsageBoardData.Provider named(UsageBoardData data,String name){return data.providers().stream().filter(p->p.name().equals(name)).findFirst().orElseThrow(()->new AssertionError("no provider "+name+" in "+data.providers().stream().map(UsageBoardData.Provider::name).toList()));}
 	private static void write(Path path, UsageBoardData data,long now) throws Exception {
 		int[] pixels=UsageBoardRenderer.render(data,now);
 		check(pixels.length==768*384 && java.util.Arrays.stream(pixels).distinct().count()>3,"render has nonblank 768x384 pixels");

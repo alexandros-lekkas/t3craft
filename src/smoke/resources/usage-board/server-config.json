@@ -1,0 +1,215 @@
+{
+ "_comment": "server.getConfig providers[] in the shape a real T3 Code holds them (no models, accounts or fingerprints). Every name, percentage and time here is invented. Codex reports only a monthly window, both Claude accounts two weekly windows and no session, Claude Team a session with no reset time, OpenCode unsupported, Muse no usageLimits at all, and most providers are disabled.",
+ "providers": [
+  {
+   "instanceId": "codex",
+   "driver": "codex",
+   "displayName": "Codex",
+   "enabled": true,
+   "installed": true,
+   "status": "ready",
+   "models": [],
+   "slashCommands": [],
+   "skills": [],
+   "usageLimits": {
+    "checkedAt": "2026-11-10T12:00:00.000Z",
+    "windows": [
+     {
+      "id": "primary",
+      "kind": "monthly",
+      "label": "Monthly",
+      "usedPercent": 82,
+      "windowDurationMins": 43200,
+      "resetsAt": "2026-12-20T09:00:00.000Z"
+     }
+    ],
+    "resetCredits": {
+     "availableCount": 2,
+     "nextExpiresAt": "2026-12-15T00:00:00.000Z"
+    }
+   }
+  },
+  {
+   "instanceId": "claude-personal",
+   "driver": "claudeAgent",
+   "displayName": "Claude",
+   "enabled": true,
+   "installed": true,
+   "status": "ready",
+   "models": [],
+   "slashCommands": [],
+   "skills": [],
+   "usageLimits": {
+    "checkedAt": "2026-11-10T12:00:00.000Z",
+    "windows": [
+     {
+      "id": "seven_day",
+      "kind": "weekly",
+      "label": "Weekly",
+      "windowDurationMins": 10080,
+      "usedPercent": 12,
+      "resetsAt": "2026-11-16T12:00:00.000Z"
+     },
+     {
+      "id": "seven_day_fable",
+      "kind": "weekly",
+      "label": "Weekly · Fable",
+      "windowDurationMins": 10080,
+      "usedPercent": 8,
+      "resetsAt": "2026-11-16T12:00:00.000Z"
+     }
+    ]
+   }
+  },
+  {
+   "instanceId": "claudeAgent",
+   "driver": "claudeAgent",
+   "displayName": "Claude",
+   "enabled": true,
+   "installed": true,
+   "status": "ready",
+   "models": [],
+   "slashCommands": [],
+   "skills": [],
+   "usageLimits": {
+    "checkedAt": "2026-11-10T12:00:00.000Z",
+    "windows": [
+     {
+      "id": "seven_day",
+      "kind": "weekly",
+      "label": "Weekly",
+      "windowDurationMins": 10080,
+      "usedPercent": 40,
+      "resetsAt": "2026-11-16T12:00:00.000Z"
+     },
+     {
+      "id": "seven_day_fable",
+      "kind": "weekly",
+      "label": "Weekly · Fable",
+      "windowDurationMins": 10080,
+      "usedPercent": 55,
+      "resetsAt": "2026-11-16T12:00:00.000Z"
+     }
+    ]
+   }
+  },
+  {
+   "instanceId": "claudeTeam",
+   "driver": "claudeAgent",
+   "displayName": "Claude Team",
+   "enabled": true,
+   "installed": true,
+   "status": "ready",
+   "models": [],
+   "slashCommands": [],
+   "skills": [],
+   "usageLimits": {
+    "checkedAt": "2026-11-10T12:00:00.000Z",
+    "windows": [
+     {
+      "id": "five_hour",
+      "kind": "session",
+      "label": "Session",
+      "windowDurationMins": 300,
+      "usedPercent": 3
+     }
+    ]
+   }
+  },
+  {
+   "instanceId": "cursor",
+   "driver": "cursor",
+   "displayName": "Cursor",
+   "enabled": false,
+   "installed": false,
+   "status": "disabled",
+   "models": [],
+   "slashCommands": [],
+   "skills": []
+  },
+  {
+   "instanceId": "grok",
+   "driver": "grok",
+   "displayName": "Grok",
+   "enabled": false,
+   "installed": false,
+   "status": "disabled",
+   "models": [],
+   "slashCommands": [],
+   "skills": []
+  },
+  {
+   "instanceId": "opencode",
+   "driver": "opencode",
+   "displayName": "OpenCode",
+   "enabled": false,
+   "installed": false,
+   "status": "disabled",
+   "models": [],
+   "slashCommands": [],
+   "skills": [],
+   "usageLimits": {
+    "checkedAt": "2026-11-10T12:00:00.000Z",
+    "windows": [],
+    "unavailable": {
+     "reason": "unsupported"
+    }
+   }
+  },
+  {
+   "instanceId": "antigravity",
+   "driver": "antigravity",
+   "displayName": "Antigravity",
+   "enabled": false,
+   "installed": false,
+   "status": "disabled",
+   "models": [],
+   "slashCommands": [],
+   "skills": []
+  },
+  {
+   "instanceId": "fx",
+   "driver": "fx",
+   "displayName": "fx",
+   "enabled": false,
+   "installed": false,
+   "status": "disabled",
+   "models": [],
+   "slashCommands": [],
+   "skills": []
+  },
+  {
+   "instanceId": "kiro",
+   "driver": "kiro",
+   "displayName": "Kiro",
+   "enabled": false,
+   "installed": false,
+   "status": "disabled",
+   "models": [],
+   "slashCommands": [],
+   "skills": []
+  },
+  {
+   "instanceId": "muse",
+   "driver": "muse",
+   "displayName": "Muse Code",
+   "enabled": true,
+   "installed": true,
+   "status": "ready",
+   "models": [],
+   "slashCommands": [],
+   "skills": []
+  },
+  {
+   "instanceId": "pi",
+   "driver": "pi",
+   "displayName": "Pi",
+   "enabled": false,
+   "installed": false,
+   "status": "disabled",
+   "models": [],
+   "slashCommands": [],
+   "skills": []
+  }
+ ]
+}

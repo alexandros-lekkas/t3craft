@@ -459,7 +459,7 @@ class Handler(BaseHTTPRequestHandler):
                     with self.server.lock: self.dispatch(command)
                     self.frame({'_tag': 'Exit', 'requestId': ident, 'exit': {'_tag': 'Success', 'value': {'sequence': len(self.server.dispatches)}}})
                 else:
-                    value = {'providers': []} if tag == 'server.getConfig' else {'threadId': request['payload']['threadId'], 'fromTurnCount': 0, 'toTurnCount': 1, 'diff': PATCH}
+                    value = getattr(self.server, 'config', {'providers': []}) if tag == 'server.getConfig' else {'threadId': request['payload']['threadId'], 'fromTurnCount': 0, 'toTurnCount': 1, 'diff': PATCH}
                     self.frame({'_tag': 'Exit', 'requestId': ident, 'exit': {'_tag': 'Success', 'value': value}})
         except (OSError, ValueError): pass
         finally:

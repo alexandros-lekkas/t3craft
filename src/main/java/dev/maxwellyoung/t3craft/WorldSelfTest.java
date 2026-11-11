@@ -42,6 +42,8 @@ final class WorldSelfTest {
 	private int talked;
 	private boolean staged;
 	private int boardFrames;
+	/** Providers on the usage board when it was photographed: names, or why there are none. */
+	private String boardShows = "";
 	/** The marker as last copied on the server thread (SavedData belongs to it), and a copy on its way. */
 	private Marker marker;
 	private java.util.concurrent.CompletableFuture<Marker> reading;
@@ -138,6 +140,8 @@ final class WorldSelfTest {
 					if (wait < 210) return;
 					minecraft.player.connection.sendCommand("time set 1000");
 					boardFrames = mod.residents().usageBoardForTest().framesForTest().size();
+					var shown = mod.residents().usageBoardForTest().shownForTest();
+					boardShows = shown == null ? "connect T3" : shown.providers().isEmpty() ? String.valueOf(shown.title()) + ": " + shown.detail() : shown.providers().stream().map(UsageBoardData.Provider::name).toList().toString();
 					step = talk == null ? Step.LOOK : Step.TALK; wait = 0;
 				}
 				case TALK -> {
@@ -153,11 +157,13 @@ final class WorldSelfTest {
 					int workers = workers(), seated = settledAtDesks();
 					boolean paired = !mod.state().snapshot().threads().isEmpty();
 					boolean desks = !paired || (workers > 0 && seated == workers);
-					boolean board = boardFrames == UsageBoardLayout.COLUMNS * UsageBoardLayout.ROWS;
+					// Paired, the board must show the fixture's providers (server.getConfig in the real T3's shape), not a placeholder.
+					var shown = mod.residents().usageBoardForTest().shownForTest();
+					boolean board = boardFrames == UsageBoardLayout.COLUMNS * UsageBoardLayout.ROWS && (!paired || shown != null && !shown.providers().isEmpty());
 					finish(minecraft, (onPlaza && desks && board ? "PASS" : "FAIL") + " T3 World '" + data.name() + "' place " + place + " seed " + data.seed()
 						+ " office " + data.origin().toShortString() + " rotation " + data.rotation() + " spawn " + data.spawn().toShortString()
 						+ " yaw " + data.spawnYaw() + " pitch " + data.spawnPitch() + " arrived " + arrivedAt.toShortString()
-						+ " usage board frames " + boardFrames + " agents " + mod.residents().brainForTest().agents().size() + " working " + workers + " at desks " + seated + (paired ? "" : " (unpaired)"));
+						+ " usage board frames " + boardFrames + " showing " + boardShows + " agents " + mod.residents().brainForTest().agents().size() + " working " + workers + " at desks " + seated + (paired ? "" : " (unpaired)"));
 				}
 				default -> {}
 			}

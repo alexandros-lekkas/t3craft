@@ -12,6 +12,8 @@ parser.add_argument('--demo',action='store_true',help='Launch-video staging (scr
 args=parser.parse_args()
 s=f.Fixture(args.port,'A',False)
 s.threads={}
+# server.getConfig answers with the providers and usage limits in the real T3's shape, for the usage board.
+s.config={'providers':json.loads((Path(__file__).parent.parent.parent/'src/smoke/resources/usage-board/server-config.json').read_text())['providers']}
 providers=['claudeAgent','codex','muse','grok','cursor','opencode','pi','kiro','claudeAgent','codex','muse','grok']
 for i,p in enumerate(providers):
  ident=f'office-{i}';t=f.thread(ident,waiting=i==4)

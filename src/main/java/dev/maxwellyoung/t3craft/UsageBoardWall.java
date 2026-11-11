@@ -40,7 +40,7 @@ final class UsageBoardWall {
 
 	UsageBoardWall(UsageBoardSource source) { this.source = source; }
 
-	/** Hang (or re-hang) the board in this office and repaint it when the data changed. Unpaired, it asks you to connect T3. */
+	/** Hang (or re-hang) the board in this office and repaint it when the data changed. Unpaired, it asks you to connect T3; paired, it says it is reading until T3 answers. */
 	void sync(ClientLevel level, OfficeFrame frame, boolean paired, Player player) {
 		if (level != this.level || !frame.equals(planned)) {
 			// Another world, or the office was rebuilt elsewhere or turned: this board replaces the old one.
@@ -50,8 +50,9 @@ final class UsageBoardWall {
 			plan = UsageBoardLayout.tiles(frame);
 		}
 		boolean loaded = level.isLoaded(plan.getFirst().pos()) && level.isLoaded(plan.getLast().pos());
-		if (paired && loaded && player.position().closerThan(UsageBoardLayout.centre(frame), POLL_RANGE)) source.refresh();
-		UsageBoardData data = paired ? source.data() : null;
+		if (!paired) source.reset();
+		else if (loaded && player.position().closerThan(UsageBoardLayout.centre(frame), POLL_RANGE)) source.refresh();
+		UsageBoardData data = !paired ? null : source.data() != null ? source.data() : UsageBoardData.READING;
 		if (!painted || data != shown) paint(data);
 		for (int i = 0; i < plan.size(); i++) {
 			ItemFrame current = frames[i];
@@ -113,6 +114,9 @@ final class UsageBoardWall {
 		shown = null;
 		painted = false;
 	}
+
+	/** What the maps show now (null: the connect-T3 screen), for the self-test. */
+	UsageBoardData shownForTest() { return shown; }
 
 	/** Entity ids of the hung frames, for the self-test. */
 	List<ItemFrame> framesForTest() {
