@@ -23,7 +23,7 @@ The owner-facing plan for T3 Craft. Scope is the office only. This page is updat
 - **The village** (`/t3 village`, the server's `/t3village`) and the villager residents. Only the office remains; the server pairs with `/t3office pair`.
 - **The Connections screen** and `/t3 connections`, `/t3 pair`. Pairing is automatic; `config/t3craft.json` is the only override.
 
-## 🔨 Merged since 0.5.0
+## 🔨 Shipped in 0.6.0
 
 | PR | What it does | Status |
 |:--|:--|:--|

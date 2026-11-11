@@ -7,6 +7,8 @@ All notable changes to T3 Craft. The format follows [Keep a Changelog](https://k
 ### Coming next
 - **The held T3 laptop:** a craftable item that opens the laptop screen from anywhere.
 
+## [0.6.0] (2026-11-11)
+
 ### Added
 - **An office that looks lived in.** Every seat has its own desk: two screens, plants, a stack of paperwork under a lamp, three coffee mugs, headphones, or almost nothing. The open floor gets a team table with six chairs, the whiteboard becomes a meeting corner with a rug and a perch, a front desk faces the door, two reading chairs sit by the bookshelves, and coat hooks hang by the stair. The lounge rug and table are centred, its teal chairs are now the sofa's grey, the fridge is one door wide, and the lights over the desks are one continuous bar instead of floating links. Seats, laptops and the whiteboard stay where they were; agents walk around the new furniture. `/t3 office build` rebuilds over an office from the earlier interior. `worldtest` now also saves a fixed tour of interior shots. ([design](docs/design/office.md#interior))
 - **A one-command install.** `curl -fsSL https://github.com/alexandros-lekkas/t3craft/releases/latest/download/install.sh | bash` on macOS and Linux, or `irm https://github.com/alexandros-lekkas/t3craft/releases/latest/download/install.ps1 | iex` on Windows, adds a *T3 Craft* installation to the official Minecraft Launcher: the Fabric Loader 0.20.1 profile for Minecraft 26.3, its own game folder, and T3 Craft with Fabric API, Sodium, Lithium, AppleSkin and Mouse Tweaks (`--minimal` leaves the last four out). Every download is checked against a pinned checksum first, your other installations and worlds are not touched, and running it again updates in place. Releases also carry `t3craft-<version>.mrpack` for the Modrinth App and Prism Launcher. The pack is pinned in `modpack/pack.json`, `scripts/build-dist.py` builds the release files, `scripts/check-dist.py` runs the installers against a throwaway launcher folder on every build (and on Windows in CI), and a tag now publishes the jar, the pack, both installers and `SHA256SUMS.txt`. ([install guide](docs/INSTALL.md))
@@ -80,7 +82,8 @@ All notable changes to T3 Craft. The format follows [Keep a Changelog](https://k
 - A shared server village, report books on completion, and one notification per event.
 - A Mac launcher (`T3 Craft.app`) that starts the world, joins it and stops it on quit, with optional SSH tunnels.
 
-[Unreleased]: https://github.com/alexandros-lekkas/t3craft/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/alexandros-lekkas/t3craft/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/alexandros-lekkas/t3craft/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/alexandros-lekkas/t3craft/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/alexandros-lekkas/t3craft/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/alexandros-lekkas/t3craft/compare/v0.2.1...v0.3.0

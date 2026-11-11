@@ -8,7 +8,7 @@ A Fabric mod that turns your [T3 Code](https://t3.codes) agents into characters 
 Walk up to one, click it, and answer it. No alt-tab, no pairing, no settings screen.
 
 <a href="#-get-it">
-  <img src="docs/images/launch/demo.gif" alt="Walking into the T3 Craft office, clicking an agent that needs you, approving its command, and getting a Done toast" width="100%">
+  <img src="docs/images/launch/demo.gif" alt="Playing survival when an agent pings that it needs you, then walking into the office, clicking the agent and approving its command" width="100%">
 </a>
 
 [![Minecraft 26.3](https://img.shields.io/badge/Minecraft-26.3-62B47A?style=flat-square&logo=minecraft&logoColor=white)](https://www.minecraft.net/)
