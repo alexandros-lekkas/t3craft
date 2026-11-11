@@ -45,3 +45,6 @@ scripts/*.local
 
 # Plain-JVM integration check logs
 logs/
+
+# python
+__pycache__/

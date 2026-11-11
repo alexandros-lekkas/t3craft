@@ -85,17 +85,29 @@ final class T3Hud implements HudElement {
 			status += " " + elapsed(shown.workingSince());
 			if (shown.step() != null) step = " · " + shown.step();
 		}
-		String suffix = (othersWaiting > 0 ? "  +" + othersWaiting + " waiting" : "")
-			+ (shown.status() == T3State.Status.NEEDS_YOU ? "  [" + mod.openKeyName() + "]" : "");
+		String waiting = othersWaiting > 0 ? "  +" + othersWaiting + " waiting" : "";
+		String key = shown.status() == T3State.Status.NEEDS_YOU ? "  [" + mod.openKeyName() + "]" : "";
 
-		// Stay clear of the toast column on the right; shorten the title first, then drop the step.
-		int maxWidth = graphics.guiWidth() - TOAST_COLUMN - 12;
-		int fixed = 12 + 8 + font.width(status) + font.width(suffix) + 6;
-		int titleRoom = maxWidth - fixed - font.width(step);
+		// Stay clear of the toast column on the right (the welcome toast lands there on a new world's first frame):
+		// shorten the title first, then drop the step, then shorten and drop the "+N waiting" count.
+		// A toast with a long line (the welcome toast) grows past the 190-px column, up to 230: keep clear of its real width.
+		var toast = minecraft.gui.toastManager().getToast(net.minecraft.client.gui.components.toasts.SystemToast.class, T3CraftClient.TOAST);
+		int maxWidth = graphics.guiWidth() - Math.max(TOAST_COLUMN, toast == null ? 0 : toast.width()) - 12;
+		int base = 12 + 8 + font.width(status) + font.width(key) + 6;
+		int titleRoom = maxWidth - base - font.width(waiting) - font.width(step);
 		if (titleRoom < 60) {
 			step = "";
-			titleRoom = maxWidth - fixed;
+			titleRoom = maxWidth - base - font.width(waiting);
 		}
+		if (titleRoom < 30 && !waiting.isEmpty()) {
+			waiting = "  +" + othersWaiting;
+			titleRoom = maxWidth - base - font.width(waiting);
+		}
+		if (titleRoom < 30) {
+			waiting = "";
+			titleRoom = maxWidth - base;
+		}
+		String suffix = waiting + key;
 		String title = ellipsize(font, shown.title(), Math.max(30, Math.min(160, titleRoom)));
 		String text = status + step;
 

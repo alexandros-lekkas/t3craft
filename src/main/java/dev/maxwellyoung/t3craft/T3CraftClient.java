@@ -41,7 +41,7 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
 public final class T3CraftClient implements ClientModInitializer {
 	public static final String MOD_ID = "t3craft";
 	public static final Logger LOGGER = T3Log.LOGGER;
-	private static final SystemToast.SystemToastId TOAST = new SystemToast.SystemToastId(6000L);
+	static final SystemToast.SystemToastId TOAST = new SystemToast.SystemToastId(6000L);
 
 	private static T3CraftClient instance;
 

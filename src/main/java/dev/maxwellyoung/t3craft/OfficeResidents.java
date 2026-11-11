@@ -59,6 +59,8 @@ final class OfficeResidents {
 
 		if (minecraft.gui.screen() == null && minecraft.hitResult instanceof EntityHitResult hit) {
 			String threadId = threadByEntity.get(hit.getEntity().getId());
+			// A desk laptop opens the laptop on its agent's thread; the agent itself opens the card.
+			String laptop = threadId == null ? laptopThreadForUuid(hit.getEntity().getUUID()) : null;
 			// A shared office's agents are real entities whose UUID encodes the thread.
 			if (threadId == null) threadId = threadForUuid(hit.getEntity().getUUID());
 			// A visiting helper opens the subagent it stands for.
@@ -66,6 +68,11 @@ final class OfficeResidents {
 			if (threadId != null && minecraft.options.keyUse.consumeClick()) {
 				while (minecraft.options.keyUse.consumeClick()) {
 					// Drain queued clicks so vanilla never sends an interact for an entity the server doesn't have.
+				}
+				if (laptop != null) {
+					mod.focus(laptop);
+					mod.openLaptop();
+					return;
 				}
 				brain.face(threadId);
 				mod.openAgentCard(threadId);
@@ -216,6 +223,14 @@ final class OfficeResidents {
 				AgentAppearance.update(mannequin, row, mod.state().online(row.id()), driver, AgentAppearance.skin(driver, row.id(), skins));
 			}
 		}
+	}
+
+	/** The thread a desk laptop (its display or its hitbox) belongs to, if it is one of ours. */
+	private String laptopThreadForUuid(java.util.UUID uuid) {
+		for (T3State.ThreadRow row : mod.state().snapshot().threads()) {
+			if (DeskLaptops.uuid(row.id(), true).equals(uuid) || DeskLaptops.uuid(row.id(), false).equals(uuid)) return row.id();
+		}
+		return null;
 	}
 
 	/** The thread a shared office agent or desk laptop stands for, if it is one of ours. */

@@ -1,9 +1,14 @@
 """Read-only visual fixture: twelve threads, mixed activity, no real agent calls."""
-import importlib.util,json
+import argparse,importlib.util,json
 from pathlib import Path
 spec=importlib.util.spec_from_file_location('fixture',Path(__file__).parent.parent/'feature-fixture.py')
 f=importlib.util.module_from_spec(spec);spec.loader.exec_module(f)
-s=f.Fixture(25720,'A',False)
+ap=argparse.ArgumentParser()
+ap.add_argument('--port',type=int,default=25720,help='0 picks a free port, so several checkouts can run the office fixture at once.')
+ap.add_argument('--port-file',type=Path,help='Write the chosen port here once it listens.')
+ap.add_argument('--config',type=Path,default=Path('run/config/office-fixture.json'),help='Pairing file the dev client reads (-Pconfig).')
+args=ap.parse_args()
+s=f.Fixture(args.port,'A',False)
 s.threads={}
 providers=['claudeAgent','codex','muse','grok','cursor','opencode','pi','kiro','claudeAgent','codex','muse','grok']
 for i,p in enumerate(providers):
@@ -50,6 +55,8 @@ def do_GET(self):
    return self.reply({'ok':True})
  return stock_get(self)
 f.Handler.do_GET=do_GET
-p=Path('run/config/office-fixture.json');p.parent.mkdir(parents=True,exist_ok=True)
-p.write_text(json.dumps({'environments':[{'label':'Studio Mac','baseUrl':'http://127.0.0.1:25720','accessToken':'fixture-only'}],'threadId':'office-0','books':False}));p.chmod(0o600)
+p=args.config;p.parent.mkdir(parents=True,exist_ok=True)
+p.write_text(json.dumps({'environments':[{'label':'Studio Mac','baseUrl':f'http://127.0.0.1:{s.server_port}','accessToken':'fixture-only'}],'threadId':'office-0','books':False}));p.chmod(0o600)
+if args.port_file:args.port_file.parent.mkdir(parents=True,exist_ok=True);args.port_file.write_text(str(s.server_port))
+print('Office fixture ready:',s.server_port,flush=True)
 s.serve_forever()

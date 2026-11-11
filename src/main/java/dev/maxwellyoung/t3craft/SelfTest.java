@@ -71,7 +71,7 @@ final class SelfTest {
   }
   if(visualTick==950){
    var a=mod.residents().brainForTest().agents().values().stream().filter(v->v.status==T3State.Status.NEEDS_YOU).findFirst().orElseThrow();
-   for(var entry:mod.residents().threadsByEntity().entrySet())if(entry.getValue().equals(a.threadId)&&mc.level.getEntity(entry.getKey()) instanceof Mannequin m){float angle=Math.abs(net.minecraft.util.Mth.wrapDegrees(m.getYHeadRot()-m.getYRot()));if(angle>50.1||angle<5)throw new IllegalStateException("Head turn outside hold/clamp "+angle);T3CraftClient.LOGGER.info("OFFICE_VISUAL PASS needs-you head turn {} degrees",angle);}
+   for(var entry:mod.residents().threadsByEntity().entrySet())if(entry.getValue().equals(a.threadId)&&mc.level.getEntity(entry.getKey()) instanceof Mannequin m){float angle=Math.abs(net.minecraft.util.Mth.wrapDegrees(m.getYHeadRot()-m.yBodyRot));float toPlayer=(float)(Math.toDegrees(Math.atan2(mc.player.getZ()-m.getZ(),mc.player.getX()-m.getX()))-90);float facing=Math.abs(net.minecraft.util.Mth.wrapDegrees(m.getYHeadRot()-toPlayer));if(angle>50.1||facing>10)throw new IllegalStateException("Needs-you agent not facing the player: head "+angle+" from body, "+facing+" from the player");T3CraftClient.LOGGER.info("OFFICE_VISUAL PASS needs-you agent faces the player (head {} from body, {} off)",angle,facing);}
    shot(mc,"office-needs-you");
   }
   if(visualTick==1000){visualCommand(mc,"time set midnight");var server=mc.getSingleplayerServer();server.execute(()->{for(String command:T3Office.lamps(1,true))server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(),T3Office.absolute(command,o.getX(),o.getY(),o.getZ()));});visualCamera(mc,o,12,.8,9,6,1.1,3);}
@@ -128,11 +128,14 @@ final class SelfTest {
   if (nativeTick == 300) {
    var a = mod.residents().brainForTest().agents().values().stream().filter(v -> v.status == T3State.Status.NEEDS_YOU).findFirst().orElseThrow();
    targetThread = a.threadId;
-   visualCamera(mc, o, a.x - 1.4, a.y() + .3, a.z - 2.0, a.x, a.y() + 1.5, a.z);
+   // Agent positions are design coordinates: go through the office's frame, so a turned T3 World office works too.
+   var f = mod.officeFrame();
+   var eye = f.point(a.x - 1.4, a.y() + .3, a.z - 2.0);
+   visualCameraWorld(mc, eye.x, eye.y, eye.z, f.point(a.x, a.y() + 1.5, a.z));
   }
   if (nativeTick == 340) {
    var a = mod.residents().brainForTest().agents().get(targetThread);
-   mc.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, new net.minecraft.world.phys.Vec3(o.getX() + a.x, o.getY() + a.y() + 1.4, o.getZ() + a.z));
+   mc.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, mod.officeFrame().point(a.x, a.y() + 1.4, a.z));
    if (mc.gui.hud.isHidden()) mc.gui.hud.toggle();
   }
   if (nativeTick == 370) shot(mc, "native-agent-aim");
@@ -176,10 +179,14 @@ final class SelfTest {
  }
  private static void visualCommand(Minecraft mc,String command){var server=mc.getSingleplayerServer();if(server!=null)server.execute(()->server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(),command));}
  private static void visualCamera(Minecraft mc,net.minecraft.core.BlockPos o,double x,double y,double z,double tx,double ty,double tz){
+  visualCameraWorld(mc,o.getX()+x,o.getY()+y,o.getZ()+z,new net.minecraft.world.phys.Vec3(o.getX()+tx,o.getY()+ty,o.getZ()+tz));
+ }
+ /** Stands the player at a world position (feet) looking at a world point, flying, HUD hidden. */
+ private static void visualCameraWorld(Minecraft mc,double x,double y,double z,net.minecraft.world.phys.Vec3 target){
   mc.gui.setScreen(null);if(!mc.gui.hud.isHidden())mc.gui.hud.toggle();
-  double dx=tx-x,dy=ty-(y+1.62),dz=tz-z;
+  double dx=target.x-x,dy=target.y-(y+1.62),dz=target.z-z;
   double yaw=Math.toDegrees(Math.atan2(dz,dx))-90,pitch=-Math.toDegrees(Math.atan2(dy,Math.sqrt(dx*dx+dz*dz)));
-  visualCommand(mc,"tp Player "+(o.getX()+x)+" "+(o.getY()+y)+" "+(o.getZ()+z)+" "+yaw+" "+pitch);
+  visualCommand(mc,"tp Player "+x+" "+y+" "+z+" "+yaw+" "+pitch);
 
   mc.player.getAbilities().flying=true;mc.player.onUpdateAbilities();
  }
