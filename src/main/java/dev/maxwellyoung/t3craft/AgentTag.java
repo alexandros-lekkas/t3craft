@@ -73,7 +73,13 @@ public final class AgentTag {
 			return new Look(dot.append(text(" " + fit(title, NAME_WIDTH + 30, width, cut), 0xFFF3D6)), distance < NAME_RANGE ? 1.15f : 1.5f, 0xD0402A00, lift + 0.06f + bob);
 		}
 		if (quiet || distance >= NAME_RANGE) return distance < 32 ? new Look(dot, quiet && distance < NAME_RANGE ? 1.0f : 1.5f, 0x70101418, lift) : null;
-		return new Look(dot.append(text(" " + fit(title, NAME_WIDTH, width, cut), offline ? 0x9AA0A6 : helper ? 0xC8CDD3 : 0xFFFFFF)), 0.8f, 0x90101418, lift);
+		return new Look(dot.append(text(" " + fit(title, NAME_WIDTH, width, cut), offline ? 0x9AA0A6 : helper ? 0xC8CDD3 : 0xFFFFFF)), 0.8f * near(distance), 0x90101418, lift);
+	}
+
+	/** Tags are world-sized, so one right in front of you would fill the view: shrink it inside {@code NEAR} blocks, down to half. */
+	static final double NEAR = 3.5;
+	static float near(double distance) {
+		return (float) Math.max(0.5, Math.min(1.0, distance / NEAR));
 	}
 
 	/** The title cut to {@code max} font pixels, at a word where one is close, with an ellipsis. */
