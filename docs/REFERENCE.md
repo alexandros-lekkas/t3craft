@@ -212,21 +212,39 @@ Fixture-backed scenarios use the protocol 2 fixtures on 25682/25683 (`-Dt3craft.
 
 ```sh
 export JAVA_HOME=<JDK 25>
-bash scripts/demo/record.sh     # about three minutes: fixture, dev client, encode
+bash scripts/demo/record.sh     # about four minutes: fixture, dev client, encode; prints the output paths
 bash scripts/demo/edit.sh       # only re-cut the last recording (build/demo/raw)
 ```
 
-`record.sh` starts the office fixture in its staging mode (`scripts/office/fixture.py --demo --port 0`, a free port, demo thread titles only), writes a muted `run/options.txt`, and runs the dev client with `-Pdemo`. `DemoRecorder` then creates a Lakeside T3 World from the title screen and plays the scene: the office from outside, the agents at their desks, the approval on the agent card (`./gradlew test`, approved with a real click on the button), a parent meeting its Helper (`/_qa/delegate`), the laptop, and the office at dusk. Each shot goes to `build/demo/raw/seg-<name>.mp4`, and `marks.txt` beside them records the frame of every beat for `edit.sh`.
+`record.sh` starts the office fixture in its staging mode (`scripts/office/fixture.py --demo --port 0`, a free port, staged thread titles only), writes a muted `run/options.txt`, and runs the dev client with `-Pdemo`. `DemoRecorder` then creates a Lakeside T3 World from the title screen and plays nine shots:
+
+| Shot | What happens |
+| --- | --- |
+| `hook` | A track along a row of agents typing at their desks, with the opening caption |
+| `survival` | The player, in survival, chops a tree outside; the staged thread asks for its approval (`/_qa/ask`), the Needs-you toast arrives, the player turns and runs for the door |
+| `arc` | An arc round the agent now waiting at the whiteboard |
+| `card` | First person: a click on the agent, its card, Approve pressed, the card closed |
+| `follow` | The camera leads the agent back to its desk, where it sits down and types |
+| `talk` | A parent meets its Helper (`/_qa/delegate`) |
+| `type` | First person: `ship it` typed key by key into a finished agent's card and sent; the agent goes back to work |
+| `dusk` | A pull-back from the glass front while the day runs into dusk, with the Done toast (`/_qa/finish`) |
+| `end` | The same pull-back over the lit office, coming to rest under the end card |
+
+Each shot goes to `build/demo/raw/seg-<name>.mp4`, and `marks.txt` beside them records the frame of every beat for `edit.sh`.
 
 It never uses the mouse, the keyboard or the screen, so it can run while you work:
 
 - Frames are read from the game's own framebuffer and piped to an ffmpeg child process. A 960 × 540 window gives 1920 × 1080 on a Retina Mac.
 - The game clock advances exactly 1/60 s per captured frame (`DemoClockMixin`, inert without `-Dt3craft.demo`), so the video is steady even when a frame takes long to capture.
-- The camera is a client-only marker entity moved along eased paths every tick; vanilla interpolation makes it smooth between ticks. The player follows it, invisible, and takes over for the first-person shot.
-- The window opens without taking focus (`SDL_WINDOW_ACTIVATE_WHEN_SHOWN=0`, `SDL_MAC_BACKGROUND_APP=1`). Set `T3CRAFT_DEMO_BACKGROUND_APP=0` if the client fails to start that way.
+- The cinematic camera is a client-only marker entity moved every tick at a steady speed that carries through each cut (only the last shot eases to rest); vanilla interpolation makes it smooth between ticks. The player is an unseen spectator in those shots and a survival player, turned and walked by the script, in the first-person ones.
+- The client runs without a window, like every `-Pdemo` run. If you show it (`-Pshow=true` on the Gradle line in `record.sh`), it still opens without taking focus (`SDL_WINDOW_ACTIVATE_WHEN_SHOWN=0`, `SDL_MAC_BACKGROUND_APP=1`); set `T3CRAFT_DEMO_BACKGROUND_APP=0` if the client fails to start that way.
 - The dev client never pairs with a real T3 Code and keeps its MCP server on 25611 (`T3CRAFT_DEMO_MCP_PORT`).
 
-The captions are drawn by the game in its own font, because the stock Homebrew ffmpeg has no `drawtext`. To change the shots or their timing, edit the `script` method in `DemoRecorder.java`; to change the cut, edit `scripts/demo/edit.sh`.
+Camera and stand positions come from the office itself, not from world coordinates: the door and footprint anchors, the seats the agents are actually at, where the waiting agent stands, and a line-of-sight test in the world for the spot the player clicks from. If a staged beat does not happen (the agent never reaches the whiteboard, the crosshair is not on it, a card does not open, the approval or the message does not go through, the toast never shows, there is no level ground outside the door) the client stops with `DEMO RESULT FAIL <reason>`, `record.sh` prints that reason and exits 1, and nothing is cut from the broken take.
+
+The soundtrack is mixed in by `edit.sh`, not recorded: it is the game's own music (`wet_hands` by default), found through the asset index in the local Minecraft asset cache that the dev client downloads (`~/.gradle/caches/fabric-loom/assets`), levelled to about -16 LUFS with a short fade in and a fade out under the end card. That music is Mojang's: it is read from the local game assets at export time and must never be committed to this repository. `T3CRAFT_DEMO_MUSIC=<track or audio file>` and `T3CRAFT_DEMO_MUSIC_START=<seconds>` choose another track or starting point; if the asset is missing `edit.sh` says which file it looked for and stops, and `--silent` (or `T3CRAFT_DEMO_SILENT=1`) exports without music. The GIF is always silent.
+
+The captions are drawn by the game in its own font, because the stock Homebrew ffmpeg has no `drawtext`; they are a Minecraft screen, so they cannot show while the agent card is open. To change the shots or their timing, edit the `script` method in `DemoRecorder.java`; to change the cut or the mix, edit `scripts/demo/edit.sh`.
 
 ### Fixture-backed checks
 
