@@ -7,7 +7,13 @@
 # These are Windows script files and should use crlf
 *.bat           text eol=crlf
 
+# Installers are fetched and piped into a shell; keep their line endings fixed on every checkout.
+*.sh text eol=lf
+*.ps1 text eol=lf
 
 # Launch media (docs/images/launch)
 *.mp4           binary
 *.gif           binary
+
+# Everyone appends to the changelog; keep both sides instead of conflicting.
+CHANGELOG.md merge=union

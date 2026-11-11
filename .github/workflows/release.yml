@@ -32,12 +32,18 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: t3craft-jar-java-25
+          name: t3craft-release-java-25
           path: release
-      - name: Publish verified jar and checksum
+      - name: Publish the verified jar, pack, installers and checksums
         env:
           GH_TOKEN: ${{ github.token }}
         working-directory: release
         run: |
-          sha256sum ./*.jar > SHA256SUMS.txt
-          gh release create "$GITHUB_REF_NAME" ./*.jar SHA256SUMS.txt --verify-tag --generate-notes
+          version="${GITHUB_REF_NAME#v}"
+          # docs/INSTALL.md and the installers point at these exact names.
+          for file in "t3craft-$version.jar" "t3craft-$version.mrpack" install.sh install.ps1 SHA256SUMS.txt; do
+            test -s "$file" || { echo "Missing release file: $file" >&2; exit 1; }
+          done
+          test "$(ls | wc -l)" -eq 5
+          sha256sum --check --strict SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" "t3craft-$version.jar" "t3craft-$version.mrpack" install.sh install.ps1 SHA256SUMS.txt --verify-tag --generate-notes

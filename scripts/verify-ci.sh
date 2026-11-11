@@ -46,4 +46,7 @@ done
 python3 scripts/check-launcher.py
 python3 scripts/check-installer.py
 python3 scripts/check-jar.py
+# Everything a release publishes (jar, .mrpack, installers, checksums) is built and checked here too.
+python3 scripts/build-dist.py
+python3 scripts/check-dist.py
 python3 -I scripts/check-doc-links.py
