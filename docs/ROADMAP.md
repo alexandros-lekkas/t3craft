@@ -15,7 +15,8 @@ The owner-facing plan for T3 Craft. Scope is the office only. This page is updat
 - **Approvals and questions.** <kbd>Y</kbd>/<kbd>N</kbd>, <kbd>1</kbd>–<kbd>9</kbd>, Decisions (<kbd>J</kbd>) and checkpoint review.
 - **Report books** and one completion toast when an agent finishes.
 - **Agents can build.** The mod's local MCP server (configurable port, proper JSON-RPC errors) lets agents look around and run commands in your world.
-- **Modpack:** a curated Fabric 26.3 Vanilla+ pack for the official launcher.
+- **Agents talk in person** ([#19](https://github.com/alexandros-lekkas/t3craft/pull/19)). When a thread hands work to a subagent or gets its result back, the parent walks over to a *Helper* and they trade two lines in speech bubbles.
+- **Usage limits board** ([#18](https://github.com/alexandros-lekkas/t3craft/pull/18)). A board on the ground-floor wall shows each provider's session and weekly limits with reset countdowns.
 
 ## 🗑️ Removed
 
@@ -37,7 +38,14 @@ The owner-facing plan for T3 Craft. Scope is the office only. This page is updat
 | [#12 A lit office](https://github.com/alexandros-lekkas/t3craft/pull/12) | Hidden light grid, downlights and lanterns; `officeCheck` fails on any dim walkable cell. | Merged. |
 | [#14 Simple native Minecraft UI](https://github.com/alexandros-lekkas/t3craft/pull/14) | The laptop and the agent card are plain Minecraft screens again, sized for GUI scale 5: thread list + selected thread + one input box; a small card beside a clicked agent. ([design](design/native-ui.md)) | Merged. |
 | [#15 Office furniture without a pairing](https://github.com/alexandros-lekkas/t3craft/pull/15) | Props and lamps sync whenever the office exists, even unpaired; only agents and desk laptops need a pairing. `officeCheck` covers every prop for all four turns. | Merged. |
-| [#13 Review cleanup](https://github.com/alexandros-lekkas/t3craft/pull/13) | Office only (the village and the Connections screen are gone), configurable MCP port with a free-port fallback and `config/t3craft-mcp.json`, proper JSON-RPC errors, free fixture ports, modifier keys in the streamed UI. | In review. |
+| [#13 Review cleanup](https://github.com/alexandros-lekkas/t3craft/pull/13) | Office only (the village and the Connections screen are gone), configurable MCP port with a free-port fallback and `config/t3craft-mcp.json`, proper JSON-RPC errors, free fixture ports, modifier keys in the streamed UI. | Merged. |
+| [#16 Agents in an office seen before pairing](https://github.com/alexandros-lekkas/t3craft/pull/16) | An office built before T3 paired gets its agents once it does. | Merged. |
+| [#17 Review follow-ups](https://github.com/alexandros-lekkas/t3craft/pull/17) | A recreated T3 World gets its new office, turned rebuilds see their own blocks, and the card and laptop guard against double answers. | Merged. |
+| [#18 Usage limits board](https://github.com/alexandros-lekkas/t3craft/pull/18) | Session and weekly limits per provider on the office wall, lit at night; `usageBoardCheck` covers every rotation. | Merged. |
+| [#19 Agents talk in person](https://github.com/alexandros-lekkas/t3craft/pull/19) | Parents walk over to their subagents and trade two lines in speech bubbles; `talkCheck` runs on every build. | Merged. |
+| [#20 In-game QA pass](https://github.com/alexandros-lekkas/t3craft/pull/20) | Lakeside spawn, the stair landing, Y/N focus, **+ New thread** on the laptop, and agents that walk. | Merged. |
+| [#21 Server thread out of the walk set](https://github.com/alexandros-lekkas/t3craft/pull/21) | Keeps the integrated server thread out of the agent walk set. | Merged. |
+| [#22 No replayed talks](https://github.com/alexandros-lekkas/t3craft/pull/22) | Joining a world, or T3 connecting late, never replays old agent talks. | Merged. |
 
 **Reliability follow-up.** Continue checking: bounded per-machine workers, coalesced UI updates, off-thread config saves, socket backoff and clean shutdown. The game stays smooth even when a machine is slow.
 

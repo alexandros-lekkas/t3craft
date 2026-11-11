@@ -15,6 +15,6 @@ Include what an attacker could do, the steps to reproduce it, and the version. Y
 Especially in scope:
 - anything that lets a **server, another player or a world file** send prompts, approve commands or read threads through someone's T3 Craft client
 - leaks of tokens, pairing links or prompt contents (logs, crash reports, network)
-- the release supply chain (jar, `.mrpack`, checksums)
+- the release supply chain (the jar, `SHA256SUMS.txt`, the release workflow)
 
 Vulnerabilities in T3 Code itself go to [pingdotgg/t3code](https://github.com/pingdotgg/t3code/security).

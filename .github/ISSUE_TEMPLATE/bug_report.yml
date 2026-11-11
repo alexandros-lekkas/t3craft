@@ -22,7 +22,7 @@ body:
     id: version
     attributes:
       label: T3 Craft version
-      placeholder: "0.5.0 (see Mod Menu or the jar name)"
+      placeholder: "0.5.0 (the number in the jar name)"
     validations:
       required: true
   - type: dropdown
@@ -30,10 +30,9 @@ body:
     attributes:
       label: How did you install it?
       options:
-        - T3 Craft pack (official launcher)
-        - Modrinth modpack
-        - Just the mod jar
+        - Mod jar from GitHub Releases
         - Built from source
+        - Other (say in the description)
     validations:
       required: true
   - type: dropdown

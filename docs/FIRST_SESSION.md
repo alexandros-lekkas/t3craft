@@ -4,7 +4,7 @@ This is an early Fabric mod, not a replacement for T3 Code. Use a disposable Min
 
 ## Before you start
 
-- Minecraft Java 26.3 with the T3 Craft pack (or Fabric Loader 0.19.5+, Fabric API and the jar from [Releases](https://github.com/alexandros-lekkas/t3craft/releases/latest)).
+- Minecraft Java 26.3 with Fabric Loader 0.19.5+, Fabric API and the T3 Craft jar from [Releases](https://github.com/alexandros-lekkas/t3craft/releases/latest) in `mods/`. Java 25+.
 - T3 Code running on the same computer. That's the whole setup: there is no pairing link and no settings screen.
 
 ## The useful first five minutes

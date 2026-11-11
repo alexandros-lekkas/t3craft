@@ -15,7 +15,7 @@ You need:
 
 | Tool | Version | Notes |
 |---|---|---|
-| JDK | **25** | Gradle must run on JDK 25. Minecraft 26.x targets Java 25. JDK 27 can't compile `build.gradle` yet (`Unsupported class file major version 71`). |
+| JDK | **25** | Minecraft 26.x targets Java 25 and the build uses a Java 25 toolchain. CI also runs Gradle on JDK 27. |
 | Git | any | |
 | Python | 3.10+ | Only for the test fixtures in `scripts/`. |
 | T3 Code | latest | Only for testing against a real instance. Fixtures cover the rest. |
