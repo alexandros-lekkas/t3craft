@@ -1,0 +1,15 @@
+{
+	"schemaVersion": 1,
+	"id": "t3craft-gametest",
+	"version": "1.0.0",
+	"name": "T3 Craft client game tests",
+	"description": "Dev-only: Fabric client game tests for T3 Craft. Never packaged into the mod jar.",
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"fabric-client-gametest": ["dev.maxwellyoung.t3craft.T3WorldGameTest"]
+	},
+	"depends": {
+		"t3craft": "*"
+	}
+}

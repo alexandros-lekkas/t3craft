@@ -15,6 +15,11 @@ sourceSets {
 	}
 }
 
+// Self-tests, world tests, captures and demo recordings run without a window unless -Pshow=true; -Phidden=true hides an ordinary runClient too.
+def hiddenRun() {
+	project.findProperty('show') != 'true' && (project.findProperty('hidden') == 'true' || ['selftest', 'worldtest', 'webShowcase', 'demo'].any { project.hasProperty(it) })
+}
+
 loom {
 	runs {
 		server {
@@ -68,6 +73,14 @@ loom {
 			}
 			// -PmcpPort=<port> keeps a dev client's Minecraft MCP server off the port your real game uses (25590).
 			if (project.hasProperty('mcpPort')) vmArg "-Dt3craft.mcpPort=${project.property('mcpPort')}"
+			// Automated runs never show a window or take focus (docs/AGENTS-GUIDE.md): -Pshow=true to watch one, -Phidden=true hides any run.
+			if (hiddenRun()) vmArg "-Dt3craft.hidden=true"
+			// -PclientDir=<dir> gives a run its own game directory (scripts/mc uses run-harness/); -PnoPair=true never looks for the local T3.
+			if (project.hasProperty('clientDir')) runDir project.property('clientDir')
+			if (project.findProperty('noPair') == 'true') vmArg "-Dt3craft.noAutoConnect=true"
+			if (project.hasProperty('harness')) vmArg "-Dt3craft.harness=${project.property('harness')}"
+			if (!project.hasProperty('selftest') && !project.hasProperty('join') && project.hasProperty('world')) programArgs "--quickPlaySingleplayer", project.property('world')
+			if (!project.hasProperty('selftest') && !project.hasProperty('webShowcase') && !project.hasProperty('demo') && project.hasProperty('width') && project.hasProperty('height')) programArgs "--width", project.property('width'), "--height", project.property('height')
 		}
 	}
 
@@ -76,6 +89,23 @@ loom {
 			sourceSet sourceSets.main
 		}
 	}
+}
+
+// Fabric client game tests (src/gametest): ./gradlew runClientGameTest starts a real client, drives it and saves
+// screenshots to build/run/clientGameTest/screenshots. Hidden like the self-tests; never pairs with a real T3.
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = 't3craft-gametest'
+		enableGameTests = false
+		enableClientGameTests = true
+	}
+}
+
+loom.runs.named('clientGameTest') {
+	if (project.findProperty('show') != 'true') vmArg "-Dt3craft.hidden=true"
+	// Off the real game's 25590, like scripts/mc.
+	vmArg "-Dt3craft.mcpPort=${project.findProperty('mcpPort') ?: '25690'}"
 }
 
 // The local launcher owns this invocation's stdin and sends a graceful `stop` on exit.

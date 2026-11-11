@@ -4,7 +4,7 @@ The real in-game shots the docs need. When a feature lands, the implementing PR 
 
 ## Ground rules
 
-- **Muted dev client only.** Use `./gradlew runClient` with its own run directory, and set `soundCategory_master:0.0` in that run directory's `options.txt` before launching.
+- **Muted dev client only.** `scripts/mc world`, `scripts/mc test <scenario>` and `scripts/mc run` + `scripts/mc shot <name>` do this for you, without showing a window ([guide](AGENTS-GUIDE.md)). By hand: `./gradlew runClient` with its own run directory, and `soundCategory_master:0.0` in that directory's `options.txt` before launching.
 - **Never the owner's game.** Don't open, copy from or write to `~/Library/Application Support/minecraft*`, and don't touch the owner's `options.txt`, keybinds or worlds.
 - **Fixture data, not real threads.** Run `scripts/feature-fixture.py` (protocol 2) with a throwaway config (`-Pconfig=…`). No real conversations, project names, tokens or links should appear on screen.
 - **Same look every time:** a 1920 × 1080 window, GUI scale **2** unless the shot says otherwise, no shaders, the default seed `-2085440121970745551`, Creative, weather clear, and a time set per shot. Hide the HUD (<kbd>F1</kbd>) for scenery shots. No debug overlay.

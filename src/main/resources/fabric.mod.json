@@ -18,7 +18,7 @@
 		"client": ["dev.maxwellyoung.t3craft.T3CraftClient"],
 		"server": ["dev.maxwellyoung.t3craft.T3CraftServer"]
 	},
-	"mixins": ["t3craft.mixins.json"],
+	"mixins": ["t3craft.mixins.json", {"config": "t3craft.dev.mixins.json", "environment": "client"}],
 	"depends": {
 		"fabricloader": ">=0.19.5",
 		"minecraft": "~26.3",

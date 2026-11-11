@@ -173,13 +173,18 @@ Dev-client options, all through `-P` properties:
 ./gradlew runClient -Pworldtest=<place> -Pworldtalk=<seconds>[:<parent title>]   # … then waits for a real agent conversation and photographs it (-Pworldtalk=stage starts one)
 ./gradlew runClient -Pdemo=<output dir> -Pconfig=<path> -PfixturePort=<n>   # record the launch video shots (use scripts/demo/record.sh)
 ./gradlew runClient -PmcpPort=<n> …                             # keep a dev client off the port your real game uses
+./gradlew runClient … -Pshow=true | -Phidden=true               # self-tests, captures and demo recordings run without a window; show one, or hide a plain run
+./gradlew runClient … -PclientDir=<dir> -PnoPair=true           # its own game directory; never look for the local T3
+./gradlew runClientGameTest                                     # Fabric client game tests in src/gametest (hidden)
 ```
+
+`scripts/mc` wraps all of this for people and coding agents: hidden, muted, unpaired, in `run-harness/`, with a PASS/FAIL exit code and the screenshot paths printed (`scripts/mc world`, `test <scenario>`, `gametest`, `run`, `cmd`, `shot`, `stop`, `logs`). See [Running the game without a window](AGENTS-GUIDE.md).
 
 `-PmcpPort` (or `mcpPort` in that `-Pconfig` file) keeps a dev client off a real game's 25590; the server also moves to the next free port by itself.
 
 ### Self-tests
 
-`-Pselftest=<prompt>` drives the real client. Each scenario saves framebuffer screenshots to `run/screenshots/` and logs `SELFTEST RESULT PASS` or `FAIL`:
+`-Pselftest=<prompt>` drives the real client, without showing its window unless you add `-Pshow=true`. Each scenario saves framebuffer screenshots to `run/screenshots/` (`run-harness/screenshots/` through `scripts/mc test <prompt>`) and logs `SELFTEST RESULT PASS` or `FAIL`:
 
 | Prompt | What it checks |
 | --- | --- |
@@ -254,6 +259,7 @@ python3 scripts/feature-fixture.py --protocol2 --port 0 --port-file build/fixtur
 | `reliabilityCheck` | MCP Host/Origin policy, JSON-RPC error conformance, port fallback and the port file, auth and protocol recovery |
 | `mcpCheck` | Public T3 MCP transport, OAuth, incremental history, visibility, per-leg fallback |
 | `python3 scripts/check-mcp.py [--port N]` | Against a running dev client: the real HTTP endpoint, read-only |
+| `./gradlew runClientGameTest` (`scripts/mc gametest`) | Fabric client game tests in a real, hidden client: the title screen offers T3 World, creating one builds the office ([guide](AGENTS-GUIDE.md#fabric-client-game-tests)) |
 | `python3 scripts/check-launcher.py` · `check-installer.py` · `check-jar.py` · `check-doc-links.py` | Launcher lifecycle, installer, packaged jar contract, local doc links |
 
 `./gradlew reviewProbe -Pconfig=<existing-local-config>` is a read-only compatibility probe against a saved pairing. `./gradlew liveCheck -Pconfig=… -PqaProject=<descriptor>` is opt-in and calls a real agent in a disposable project you supply. `./gradlew webProbe -Pthread=<id>` loads the real local T3 in the hidden Chrome without Minecraft and saves frames.

@@ -116,6 +116,7 @@ public final class T3CraftClient implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(residents::animate);
 		net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents.ALLOW_GAME.register(
 			(message, overlay) -> overlay || !(T3Books.isOwnFeedback(message.getString()) || office.hideFeedback(message)));
+		DevHarness.register();
 		SelfTest selfTest = SelfTest.fromSystemProperty(this);
 		WorldSelfTest worldTest = WorldSelfTest.fromSystemProperty(this);
 		WebShowcase webShowcase = WebShowcase.fromSystemProperty(this);
@@ -479,7 +480,9 @@ public final class T3CraftClient implements ClientModInitializer {
 	/** Self-tests and captures run against fixtures beside the real game: they must never pair with the real T3. */
 	private static boolean devRun() {
 		return System.getProperty("t3craft.selftest") != null || System.getProperty("t3craft.worldtest") != null || System.getProperty("t3craft.webShowcase") != null
-			|| System.getProperty("t3craft.demo") != null;
+			|| System.getProperty("t3craft.demo") != null
+			// Fabric client game tests and harness runs (scripts/mc): -Dt3craft.noAutoConnect=true.
+			|| System.getProperty("fabric.client.gametest") != null || Boolean.getBoolean("t3craft.noAutoConnect");
 	}
 
 	/**

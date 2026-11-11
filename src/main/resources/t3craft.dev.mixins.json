@@ -1,0 +1,13 @@
+{
+  "required": false,
+  "package": "dev.maxwellyoung.t3craft.devmixin",
+  "compatibilityLevel": "JAVA_25",
+  "plugin": "dev.maxwellyoung.t3craft.HiddenWindow",
+  "client": [
+    "HiddenWindowMixin",
+    "HiddenAppMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

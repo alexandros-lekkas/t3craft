@@ -1,0 +1,547 @@
+#!/usr/bin/env python3
+"""One entry point for launching, driving and looking at the T3 Craft dev client.
+
+Every run is hidden (no window, no Dock icon, no stolen focus), muted, unpaired from any real T3 Code, in its
+own game directory (run-harness/) and on its own Minecraft MCP port. Screenshots are the game's own framebuffer.
+
+  scripts/mc doctor                      check JDK 25, Python, ports and leftovers
+  scripts/mc world [Lakeside]            title screen -> New T3 World -> office; screenshots; PASS/FAIL
+  scripts/mc test <scenario> [...]       one in-game self-test (docs/REFERENCE.md#self-tests); PASS/FAIL
+  scripts/mc gametest                    Fabric client game tests (src/gametest); PASS/FAIL
+  scripts/mc run [--world NAME]          start a client in the background and return once it is up
+  scripts/mc cmd "time set day"          run a command in that client (through its Minecraft MCP server)
+  scripts/mc status                      where the player is, what they look at
+  scripts/mc shot [name]                 save a screenshot of that client and print its path
+  scripts/mc stop                        save and quit that client
+  scripts/mc logs [-n 80] [--grep TEXT]  the game log of the last run
+  scripts/mc shots [-n 10]               newest screenshots
+
+Add --show to watch a run in a real window, --fixture office|feature to pair it with a loopback T3 fixture
+(never a real T3), --timeout SECONDS, --mcp-port N, --width/--height for the window size, and `-- <gradle args>`.
+Exit code: 0 PASS, 1 FAIL, 2 no verdict (build error, timeout, crash).  See docs/AGENTS-GUIDE.md.
+"""
+import argparse
+import json
+import os
+import queue
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import threading
+import time
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+RUN = ROOT / os.environ.get('T3CRAFT_HARNESS_DIR', 'run-harness')
+STATE = RUN / 'harness'
+SHOTS = RUN / 'screenshots'
+GAME_LOG = RUN / 'logs' / 'latest.log'
+GRADLE_LOG = STATE / 'gradle.log'
+PID_FILE = STATE / 'client.pid'
+DEFAULT_MCP_PORT = int(os.environ.get('T3CRAFT_HARNESS_MCP_PORT') or 25690)
+WINDOWS = os.name == 'nt'
+# Written only when the harness directory has no options.txt yet; the game fills in the rest. `version` is 26.3's
+# data version, so the game does not run old-format upgrades over these lines.
+OPTIONS = {
+    'version': '5023', 'soundCategory_master': '0.0', 'pauseOnLostFocus': 'false', 'onboardAccessibility': 'false',
+    'skipMultiplayerWarning': 'true', 'joinedFirstServer': 'true', 'tutorialStep': 'none', 'narrator': '0',
+}
+# Enforced on every run, whatever a previous run or a person left in the file.
+ENFORCED = ('soundCategory_master', 'pauseOnLostFocus')
+VERDICT = re.compile(r'(?:SELFTEST|WORLDTEST) RESULT (PASS|FAIL)\b(.*)')
+# Scenarios that end without a RESULT line: their last check is the verdict.
+FINAL_PASS = {'nativeui': 'NATIVE_UI PASS all captures taken', 'office-a': 'OFFICE_VISUAL PASS bare /t3 office returns'}
+NOTABLE = re.compile(r'RESULT (PASS|FAIL)|Game crashed!|IllegalStateException|AssertionError|(OFFICE_VISUAL|NATIVE_UI|WORLDTEST talk) (PASS|failed)|Exception in|BUILD FAILED|Minecraft MCP server on|Created window using')
+
+
+def say(text=''):
+    print(text, flush=True)
+
+
+def java_major(home):
+    try:
+        text = (Path(home) / 'release').read_text()
+        return int(re.search(r'JAVA_VERSION="(\d+)', text).group(1))
+    except (OSError, AttributeError, ValueError):
+        return None
+
+
+def find_jdk():
+    """JAVA_HOME when it is a JDK 25 (what Minecraft 26.x compiles with), else the usual install locations."""
+    candidates = [os.environ.get('JAVA_HOME')]
+    if sys.platform == 'darwin':
+        try:
+            candidates.append(subprocess.run(['/usr/libexec/java_home', '-v', '25'], capture_output=True, text=True, timeout=10).stdout.strip())
+        except (OSError, subprocess.SubprocessError):
+            pass
+        candidates += ['/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home', '/usr/local/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home']
+        candidates += sorted(str(p / 'Contents/Home') for p in Path('/Library/Java/JavaVirtualMachines').glob('*25*'))
+    elif WINDOWS:
+        for root in filter(None, (os.environ.get('ProgramFiles'), os.environ.get('ProgramFiles(x86)'))):
+            for vendor in ('Eclipse Adoptium', 'Java', 'Microsoft', 'Zulu'):
+                candidates += sorted(str(p) for p in Path(root, vendor).glob('*25*'))
+    else:
+        candidates += sorted(str(p) for p in Path('/usr/lib/jvm').glob('*25*'))
+        candidates += sorted(str(p) for p in Path.home().glob('.sdkman/candidates/java/25*'))
+    for home in candidates:
+        if home and java_major(home) == 25 and (Path(home) / 'bin').is_dir():
+            return home
+    return None
+
+
+def gradle_env():
+    home = find_jdk()
+    if not home:
+        raise SystemExit('JDK 25 not found. Install one (macOS: brew install openjdk@25; elsewhere: Temurin 25) or point JAVA_HOME at it.')
+    env = dict(os.environ, JAVA_HOME=home)
+    env['PATH'] = str(Path(home) / 'bin') + os.pathsep + env.get('PATH', '')
+    return env
+
+
+def alive(pid):
+    if not pid:
+        return False
+    if WINDOWS:
+        out = subprocess.run(['tasklist', '/FI', f'PID eq {pid}', '/NH'], capture_output=True, text=True).stdout
+        return str(pid) in out
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
+def running_pid():
+    try:
+        pid = int(PID_FILE.read_text().strip())
+    except (OSError, ValueError):
+        return None
+    if alive(pid):
+        return pid
+    PID_FILE.unlink(missing_ok=True)
+    return None
+
+
+def kill_tree(process_or_pid):
+    pid = process_or_pid if isinstance(process_or_pid, int) else process_or_pid.pid
+    if WINDOWS:
+        subprocess.run(['taskkill', '/T', '/F', '/PID', str(pid)], capture_output=True)
+        return
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.killpg(pid, sig)
+        except (ProcessLookupError, PermissionError):
+            return
+        for _ in range(50):
+            if not alive(pid):
+                return
+            time.sleep(0.1)
+
+
+def prepare_run_dir():
+    """The harness game directory: muted, no first-run screens, never anybody's real options or worlds."""
+    STATE.mkdir(parents=True, exist_ok=True)
+    options = RUN / 'options.txt'
+    if not options.exists():
+        options.write_text(''.join(f'{key}:{value}\n' for key, value in OPTIONS.items()))
+        return
+    lines = options.read_text().splitlines()
+    kept = [line for line in lines if line.split(':', 1)[0] not in ENFORCED]
+    wanted = kept + [f'{key}:{OPTIONS[key]}' for key in ENFORCED]
+    if sorted(wanted) != sorted(lines):
+        options.write_text('\n'.join(wanted) + '\n')
+
+
+def start_fixture(kind):
+    """A loopback T3 fixture on free ports. Returns (process, pairing file, control port)."""
+    config = RUN / 'config' / f'{kind}-fixture.json'
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.unlink(missing_ok=True)
+    log = open(STATE / f'{kind}-fixture.log', 'w')
+    script = 'scripts/office/fixture.py' if kind == 'office' else 'scripts/feature-fixture.py'
+    command = [sys.executable, str(ROOT / script), '--port', '0', '--config', str(config)] + ([] if kind == 'office' else ['--protocol2'])
+    process = subprocess.Popen(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise SystemExit(f'The {kind} fixture exited early; see {log.name}')
+        try:
+            url = json.loads(config.read_text())['environments'][0]['baseUrl']
+            port = int(url.rsplit(':', 1)[1])
+            urllib.request.urlopen(f'{url}/.well-known/t3/environment', timeout=2).read()
+            return process, config, port
+        except (OSError, ValueError, KeyError, IndexError):
+            time.sleep(0.2)
+    process.kill()
+    raise SystemExit(f'The {kind} fixture did not come up; see {log.name}')
+
+
+def gradle_command(task, args, properties, fixture):
+    gradlew = ROOT / ('gradlew.bat' if WINDOWS else 'gradlew')
+    config, fixture_port = RUN / 'config' / 't3craft.json', None
+    if fixture:
+        config, fixture_port = fixture[1], fixture[2]
+    props = {'mcpPort': args.mcp_port}
+    if task == 'runClient':
+        # Every harness client reads its pairing from the harness directory and never looks for the local T3.
+        props.update(clientDir=RUN.name if RUN.parent == ROOT else str(RUN), config=str(config), noPair='true', harness=str(STATE))
+        if getattr(args, 'width', None) and getattr(args, 'height', None):
+            props.update(width=args.width, height=args.height)
+    if fixture_port:
+        props['fixturePort'] = fixture_port
+    props['show' if args.show else 'hidden'] = 'true'
+    props.update(properties)
+    return [str(gradlew), task, '--console=plain'] + [f'-P{key}={value}' for key, value in props.items()] + list(getattr(args, 'gradle', []) or [])
+
+
+def shots_since(directory, started):
+    if not directory.is_dir():
+        return []
+    return sorted((p for p in directory.rglob('*.png') if p.stat().st_mtime >= started - 1), key=lambda p: p.stat().st_mtime)
+
+
+def report(verdict, detail, started, shots_dir, log):
+    say()
+    say(f'RESULT   {verdict}{(" " + detail) if detail else ""}')
+    shots = shots_since(shots_dir, started)
+    say(f'SHOTS    {len(shots)} in {shots_dir}')
+    for path in shots[-40:]:
+        say(f'  {path}')
+    say(f'LOG      {log}')
+    say(f'TIME     {int(time.monotonic() - report.clock)} s')
+    return {'PASS': 0, 'FAIL': 1}.get(verdict, 2)
+
+
+def foreground(args, task, properties, final_pass=None, shots_dir=SHOTS, exit_is_verdict=False):
+    """Runs one client to completion, streaming only the lines that matter, and returns the exit code."""
+    if task == 'runClient' and running_pid():
+        raise SystemExit('A harness client is already running (scripts/mc stop). One Minecraft client at a time.')
+    env = gradle_env()
+    prepare_run_dir()
+    fixture = start_fixture(args.fixture) if getattr(args, 'fixture', None) else None
+    command = gradle_command(task, args, properties, fixture)
+    started, report.clock = time.time(), time.monotonic()
+    say(f'$ {" ".join(command[1:])}   (JAVA_HOME={env["JAVA_HOME"]}, {"visible window" if args.show else "hidden"}, game dir {RUN.name}/)')
+    verdict, detail, passed_final = None, '', False
+    (STATE / 'quit-request').unlink(missing_ok=True)
+    process = subprocess.Popen(command, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace',
+                               start_new_session=not WINDOWS)
+    lines = queue.Queue()
+
+    def pump():
+        for line in iter(process.stdout.readline, ''):
+            lines.put(line)
+        lines.put(None)
+
+    threading.Thread(target=pump, daemon=True).start()
+    deadline = time.monotonic() + args.timeout
+    quit_at = kill_at = None
+    try:
+        with open(GRADLE_LOG, 'w', buffering=1) as log:
+            while True:
+                try:
+                    line = lines.get(timeout=0.5)
+                except queue.Empty:
+                    line = ''
+                if line is None:
+                    break
+                if line:
+                    log.write(line)
+                    match = VERDICT.search(line)
+                    if match:
+                        verdict, detail = match.group(1), match.group(2).strip()
+                    if final_pass and final_pass in line:
+                        passed_final = True
+                    if 'Game crashed!' in line and verdict is None:
+                        verdict, detail = 'FAIL', 'the game crashed: ' + line.split('#@!@#')[-1].strip()
+                    # Some scenarios report and leave the game running: give it a moment, then ask it to quit.
+                    if (match or passed_final) and quit_at is None:
+                        quit_at = time.monotonic() + 15
+                    if args.verbose or NOTABLE.search(line):
+                        say('  ' + line.rstrip()[:400])
+                now = time.monotonic()
+                if quit_at and now > quit_at and kill_at is None:
+                    (STATE / 'quit-request').write_text('quit')
+                    kill_at = now + 20
+                if kill_at and now > kill_at:
+                    kill_tree(process)
+                    break
+                if now > deadline:
+                    if verdict is None and not passed_final:
+                        verdict, detail = 'TIMEOUT', f'after {args.timeout} s'
+                    kill_tree(process)
+                    break
+        try:
+            process.wait(timeout=60)
+        except subprocess.TimeoutExpired:
+            kill_tree(process)
+    except KeyboardInterrupt:
+        kill_tree(process)
+        raise
+    finally:
+        if process.poll() is None:
+            kill_tree(process)
+        (STATE / 'quit-request').unlink(missing_ok=True)
+        if fixture:
+            fixture[0].kill()
+    if verdict is None:
+        if passed_final or (exit_is_verdict and process.returncode == 0):
+            verdict = 'PASS'
+        elif exit_is_verdict:
+            verdict, detail = 'FAIL', f'gradle exit {process.returncode}'
+        else:
+            verdict, detail = 'NONE', f'no verdict line (gradle exit {process.returncode}); read the log'
+    return report(verdict, detail, started, shots_dir, GRADLE_LOG)
+
+
+def cmd_world(args):
+    return foreground(args, 'runClient', {'worldtest': args.place})
+
+
+def cmd_test(args):
+    properties = {'selftest': args.scenario}
+    if args.world:
+        properties['world'] = args.world
+    elif not args.join:
+        saves = sorted((p for p in (RUN / 'saves').glob('*') if p.is_dir()), key=lambda p: p.stat().st_mtime) if (RUN / 'saves').is_dir() else []
+        if not saves:
+            raise SystemExit('No world in the harness directory yet. Create one first: scripts/mc world   (or pass --world NAME / --join host:port)')
+        properties['world'] = saves[-1].name
+    if args.join:
+        properties['join'] = args.join
+    if args.focus:
+        properties['focus'] = args.focus
+    return foreground(args, 'runClient', properties, FINAL_PASS.get(args.scenario))
+
+
+def cmd_gametest(args):
+    return foreground(args, 'runClientGameTest', {}, shots_dir=ROOT / 'build/run/clientGameTest/screenshots', exit_is_verdict=True)
+
+
+def mcp_url():
+    try:
+        info = json.loads((RUN / 'config' / 't3craft-mcp.json').read_text())
+        return info['url'] if alive(info.get('pid')) else None
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def cmd_run(args):
+    if running_pid():
+        raise SystemExit('A harness client is already running (scripts/mc stop).')
+    env = gradle_env()
+    prepare_run_dir()
+    for leftover in ('shot-request', 'shot-done', 'quit-request'):
+        (STATE / leftover).unlink(missing_ok=True)
+    (RUN / 'config' / 't3craft-mcp.json').unlink(missing_ok=True)
+    fixture = start_fixture(args.fixture) if args.fixture else None
+    properties = {'world': args.world} if args.world else {}
+    if args.join:
+        properties['join'] = args.join
+    command = gradle_command('runClient', args, properties, fixture)
+    log = open(GRADLE_LOG, 'w')
+    process = subprocess.Popen(command, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=not WINDOWS)
+    PID_FILE.write_text(str(process.pid))
+    if fixture:
+        (STATE / 'fixture.pid').write_text(str(fixture[0].pid))
+    say(f'$ {" ".join(command[1:])}')
+    deadline = time.monotonic() + args.timeout
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            PID_FILE.unlink(missing_ok=True)
+            say(f'RESULT   FAIL the client exited (gradle exit {process.returncode})\nLOG      {GRADLE_LOG}')
+            return 1
+        url = mcp_url()
+        if url:
+            say(f'RESULT   PASS client is up ({"visible window" if args.show else "hidden"}), pid {process.pid}')
+            say(f'MCP      {url}   (scripts/mc cmd / status, or any MCP client)')
+            say(f'LOG      {GAME_LOG}')
+            say('NEXT     scripts/mc shot <name> · scripts/mc cmd "<command>" · scripts/mc stop')
+            return 0
+        time.sleep(0.5)
+    kill_tree(process)
+    PID_FILE.unlink(missing_ok=True)
+    say(f'RESULT   TIMEOUT the client did not come up in {args.timeout} s\nLOG      {GRADLE_LOG}')
+    return 2
+
+
+def cmd_stop(args):
+    pid = running_pid()
+    if not pid:
+        say('No harness client is running.')
+    else:
+        (STATE / 'quit-request').write_text('quit')
+        for _ in range(args.timeout * 2):
+            if not alive(pid):
+                break
+            time.sleep(0.5)
+        else:
+            say('The client did not quit by itself; stopping it.')
+            kill_tree(pid)
+        PID_FILE.unlink(missing_ok=True)
+        (STATE / 'quit-request').unlink(missing_ok=True)
+        say('Stopped.')
+    try:
+        # The fixture is a single process started by `scripts/mc run`, not a process group.
+        fixture = int((STATE / 'fixture.pid').read_text())
+        if WINDOWS:
+            subprocess.run(['taskkill', '/F', '/PID', str(fixture)], capture_output=True)
+        else:
+            os.kill(fixture, signal.SIGTERM)
+    except (OSError, ValueError):
+        pass
+    (STATE / 'fixture.pid').unlink(missing_ok=True)
+    return 0
+
+
+def cmd_shot(args):
+    if not running_pid():
+        raise SystemExit('No harness client is running. Start one: scripts/mc run')
+    done = STATE / 'shot-done'
+    done.unlink(missing_ok=True)
+    (STATE / 'shot-request').write_text(args.name)
+    deadline = time.monotonic() + args.timeout
+    while time.monotonic() < deadline:
+        if done.exists():
+            # The PNG is written off-thread after the name is reported.
+            path = SHOTS / done.read_text().strip()
+            for _ in range(50):
+                if path.exists() and path.stat().st_size > 0:
+                    break
+                time.sleep(0.1)
+            say(str(path))
+            return 0
+        time.sleep(0.1)
+    say('RESULT   TIMEOUT no screenshot (is the client still loading? scripts/mc logs)')
+    return 2
+
+
+def mcp_call(tool, arguments):
+    url = mcp_url()
+    if not url:
+        raise SystemExit('No harness client with a Minecraft MCP server is running. Start one: scripts/mc run')
+    body = json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call', 'params': {'name': tool, 'arguments': arguments}}).encode()
+    request = urllib.request.Request(url, body, {'Content-Type': 'application/json'})
+    reply = json.loads(urllib.request.urlopen(request, timeout=30).read())
+    if 'error' in reply:
+        say(json.dumps(reply['error']))
+        return 1
+    result = reply['result']
+    for item in result.get('content', []):
+        say(item.get('text', json.dumps(item)))
+    return 1 if result.get('isError') else 0
+
+
+def cmd_cmd(args):
+    return mcp_call('minecraft_run_command', {'command': args.command.lstrip('/')})
+
+
+def cmd_status(args):
+    return mcp_call('minecraft_status', {})
+
+
+def cmd_logs(args):
+    source = GAME_LOG if GAME_LOG.exists() and not args.gradle else GRADLE_LOG
+    if not source.exists():
+        raise SystemExit(f'No log yet at {source}')
+    lines = source.read_text(errors='replace').splitlines()
+    if args.grep:
+        lines = [line for line in lines if args.grep.lower() in line.lower()]
+    say('\n'.join(lines[-args.n:]))
+    say(f'# {source}')
+    return 0
+
+
+def cmd_shots(args):
+    shots = sorted(SHOTS.rglob('*.png'), key=lambda p: p.stat().st_mtime) if SHOTS.is_dir() else []
+    for path in shots[-args.n:]:
+        say(str(path))
+    if not shots:
+        say(f'No screenshots in {SHOTS}')
+    return 0
+
+
+def cmd_doctor(args):
+    ok = True
+    home = find_jdk()
+    say(f'JDK 25        {home or "MISSING: brew install openjdk@25, or install Temurin 25 and set JAVA_HOME"}')
+    ok &= bool(home)
+    say(f'Python        {sys.version.split()[0]}{"" if sys.version_info >= (3, 10) else "  (3.10+ needed for the fixtures)"}')
+    ok &= sys.version_info >= (3, 10)
+    say(f'Game dir      {RUN}{"" if RUN.exists() else "  (created on first run)"}')
+    say(f'Client        {"running, pid " + str(running_pid()) if running_pid() else "not running"}')
+    say(f'MCP           {mcp_url() or "none (default port " + str(DEFAULT_MCP_PORT) + " when a client starts)"}')
+    remotes = subprocess.run(['git', 'remote'], cwd=ROOT, capture_output=True, text=True).stdout.split()
+    if 'upstream' in remotes:
+        say('Git           an `upstream` remote exists: push and open PRs against origin (gh -R alexandros-lekkas/t3craft)')
+    if shutil.which('xvfb-run') is None and sys.platform.startswith('linux') and not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
+        say('Display       none: on a headless Linux box run under a virtual display, e.g. xvfb-run -a scripts/mc world')
+    return 0 if ok else 1
+
+
+def main():
+    parser = argparse.ArgumentParser(prog='scripts/mc', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest='action', required=True)
+
+    def client(name, handler, timeout, **kwargs):
+        p = sub.add_parser(name, **kwargs)
+        p.set_defaults(handler=handler)
+        p.add_argument('--show', action='store_true', help='show the window instead of running hidden')
+        p.add_argument('--fixture', choices=['office', 'feature'], help='pair with a loopback T3 fixture on free ports (never a real T3)')
+        p.add_argument('--mcp-port', type=int, default=DEFAULT_MCP_PORT, help=f'Minecraft MCP port for this client (default {DEFAULT_MCP_PORT}; never 25590, the real game)')
+        p.add_argument('--timeout', type=int, default=timeout, help=f'seconds before the run is stopped (default {timeout})')
+        p.add_argument('--width', type=int, help='window width in points (framebuffer is 2x on a Retina Mac)')
+        p.add_argument('--height', type=int, help='window height in points')
+        p.add_argument('--verbose', action='store_true', help='stream the whole Gradle and game output')
+        return p
+
+    p = client('world', cmd_world, 900, help='create a T3 World through the real screens and photograph the office')
+    p.add_argument('place', nargs='?', default='Lakeside', help='Lakeside, "Cherry Plains", "River Bend" (default Lakeside)')
+    p = client('test', cmd_test, 900, help='run one in-game self-test scenario')
+    p.add_argument('scenario', help='look, nativeui, threads, office-a, … (docs/REFERENCE.md#self-tests)')
+    p.add_argument('--world', help='save to open (default: the newest in the harness directory)')
+    p.add_argument('--join', help='host:port of a server to join instead of a singleplayer save')
+    p.add_argument('--focus', help='thread title to focus')
+    client('gametest', cmd_gametest, 900, help='run the Fabric client game tests in src/gametest')
+    p = client('run', cmd_run, 300, help='start a client in the background; returns once its MCP server answers')
+    p.add_argument('--world', help='save to open straight away (default: stay on the title screen)')
+    p.add_argument('--join', help='host:port of a server to join')
+
+    p = sub.add_parser('stop', help='save and quit the background client')
+    p.set_defaults(handler=cmd_stop)
+    p.add_argument('--timeout', type=int, default=30)
+    p = sub.add_parser('shot', help='screenshot the background client')
+    p.set_defaults(handler=cmd_shot)
+    p.add_argument('name', nargs='?', default='shot')
+    p.add_argument('--timeout', type=int, default=20)
+    p = sub.add_parser('cmd', help='run a Minecraft command in the background client')
+    p.set_defaults(handler=cmd_cmd)
+    p.add_argument('command')
+    sub.add_parser('status', help='player position, target, time, game mode').set_defaults(handler=cmd_status)
+    p = sub.add_parser('logs', help='tail the last game log')
+    p.set_defaults(handler=cmd_logs)
+    p.add_argument('-n', type=int, default=60)
+    p.add_argument('--grep')
+    p.add_argument('--gradle', action='store_true', help='the Gradle output instead of the game log')
+    p = sub.add_parser('shots', help='list the newest screenshots')
+    p.set_defaults(handler=cmd_shots)
+    p.add_argument('-n', type=int, default=10)
+    sub.add_parser('doctor', help='check the toolchain and the harness state').set_defaults(handler=cmd_doctor)
+
+    # Everything after a bare `--` goes to Gradle untouched, e.g. scripts/mc world -- -Pworldtalk=stage
+    argv = sys.argv[1:]
+    extra = []
+    if '--' in argv:
+        argv, extra = argv[:argv.index('--')], argv[argv.index('--') + 1:]
+    args = parser.parse_args(argv)
+    args.gradle = extra
+    sys.exit(args.handler(args))
+
+
+if __name__ == '__main__':
+    main()

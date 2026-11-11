@@ -39,8 +39,8 @@ replay_*.log
 *.hprof
 *.jfr
 run-server/
-# Extra local worlds (launcher profiles with T3CRAFT_SERVER_DIR)
-run-*/
+# Extra local worlds (launcher profiles with T3CRAFT_SERVER_DIR) and the scripts/mc game directory (run-harness/)
+/run-*/
 scripts/*.local
 
 # Plain-JVM integration check logs
