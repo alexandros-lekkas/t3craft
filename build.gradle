@@ -55,6 +55,15 @@ loom {
 				if (project.hasProperty('worldtalk')) vmArg "-Dt3craft.worldtalk=${project.property('worldtalk')}"
 				if (project.hasProperty('config')) vmArg "-Dt3craft.config=${project.property('config')}"
 			}
+			// ./gradlew runClient -Pdemo=<output dir> -Pconfig=<pairing file> records the launch video shots (scripts/demo/record.sh runs it).
+			if (project.hasProperty('demo')) {
+				vmArg "-Dt3craft.demo=${project.property('demo')}"
+				if (project.hasProperty('demoPlace')) vmArg "-Dt3craft.demoPlace=${project.property('demoPlace')}"
+				if (project.hasProperty('demoFfmpeg')) vmArg "-Dt3craft.demoFfmpeg=${project.property('demoFfmpeg')}"
+				if (project.hasProperty('config')) vmArg "-Dt3craft.config=${project.property('config')}"
+				if (project.hasProperty('fixturePort')) vmArg "-Dt3craft.fixturePort=${project.property('fixturePort')}"
+				if (project.hasProperty('width') && project.hasProperty('height')) programArgs "--width", project.property('width'), "--height", project.property('height')
+			}
 			// -PmcpPort=<port> keeps a dev client's Minecraft MCP server off the port your real game uses (25590).
 			if (project.hasProperty('mcpPort')) vmArg "-Dt3craft.mcpPort=${project.property('mcpPort')}"
 		}

@@ -120,6 +120,8 @@ public final class T3CraftClient implements ClientModInitializer {
 		WorldSelfTest worldTest = WorldSelfTest.fromSystemProperty(this);
 		WebShowcase webShowcase = WebShowcase.fromSystemProperty(this);
 		if (webShowcase != null) ClientTickEvents.END_CLIENT_TICK.register(webShowcase::tick);
+		DemoRecorder demo = DemoRecorder.fromSystemProperty(this);
+		if (demo != null) ClientTickEvents.END_CLIENT_TICK.register(demo::tick);
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			state.setPins(List.copyOf(officePreferences().pins));
 			// The one line the mod says on its own: once per game, when connected and in a world. Reconnects stay in the log.
@@ -476,7 +478,8 @@ public final class T3CraftClient implements ClientModInitializer {
 
 	/** Self-tests and captures run against fixtures beside the real game: they must never pair with the real T3. */
 	private static boolean devRun() {
-		return System.getProperty("t3craft.selftest") != null || System.getProperty("t3craft.worldtest") != null || System.getProperty("t3craft.webShowcase") != null;
+		return System.getProperty("t3craft.selftest") != null || System.getProperty("t3craft.worldtest") != null || System.getProperty("t3craft.webShowcase") != null
+			|| System.getProperty("t3craft.demo") != null;
 	}
 
 	/**

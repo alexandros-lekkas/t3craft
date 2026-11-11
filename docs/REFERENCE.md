@@ -171,6 +171,7 @@ Dev-client options, all through `-P` properties:
 ./gradlew runClient -Pselftest=<prompt> [-Pworld=<save>] [-Pconfig=<path>] [-Pfocus=<title>] [-PfixturePort=<n>] [-Pwidth=1000 -Pheight=625]
 ./gradlew runClient -Pworldtest=<place> [-Pconfig=<path>]       # title screen → New T3 World → Create, screenshots the arrival and desks
 ./gradlew runClient -Pworldtest=<place> -Pworldtalk=<seconds>[:<parent title>]   # … then waits for a real agent conversation and photographs it (-Pworldtalk=stage starts one)
+./gradlew runClient -Pdemo=<output dir> -Pconfig=<path> -PfixturePort=<n>   # record the launch video shots (use scripts/demo/record.sh)
 ./gradlew runClient -PmcpPort=<n> …                             # keep a dev client off the port your real game uses
 ```
 
@@ -197,6 +198,28 @@ Dev-client options, all through `-P` properties:
 | `anchor` · `skin-spike` | Print this world's office origin; render two bundled skins |
 
 Fixture-backed scenarios use the protocol 2 fixtures on 25682/25683 (`-Dt3craft.fixturePort` moves the control calls).
+
+### Recording the launch video
+
+`docs/images/launch/demo.mp4`, `demo-readme.mp4`, `demo.gif` and `demo-poster.png` come from the real game, and one command retakes them:
+
+```sh
+export JAVA_HOME=<JDK 25>
+bash scripts/demo/record.sh     # about three minutes: fixture, dev client, encode
+bash scripts/demo/edit.sh       # only re-cut the last recording (build/demo/raw)
+```
+
+`record.sh` starts the office fixture in its staging mode (`scripts/office/fixture.py --demo --port 0`, a free port, demo thread titles only), writes a muted `run/options.txt`, and runs the dev client with `-Pdemo`. `DemoRecorder` then creates a Lakeside T3 World from the title screen and plays the scene: the office from outside, the agents at their desks, the approval on the agent card (`./gradlew test`, approved with a real click on the button), a parent meeting its Helper (`/_qa/delegate`), the laptop, and the office at dusk. Each shot goes to `build/demo/raw/seg-<name>.mp4`, and `marks.txt` beside them records the frame of every beat for `edit.sh`.
+
+It never uses the mouse, the keyboard or the screen, so it can run while you work:
+
+- Frames are read from the game's own framebuffer and piped to an ffmpeg child process. A 960 × 540 window gives 1920 × 1080 on a Retina Mac.
+- The game clock advances exactly 1/60 s per captured frame (`DemoClockMixin`, inert without `-Dt3craft.demo`), so the video is steady even when a frame takes long to capture.
+- The camera is a client-only marker entity moved along eased paths every tick; vanilla interpolation makes it smooth between ticks. The player follows it, invisible, and takes over for the first-person shot.
+- The window opens without taking focus (`SDL_WINDOW_ACTIVATE_WHEN_SHOWN=0`, `SDL_MAC_BACKGROUND_APP=1`). Set `T3CRAFT_DEMO_BACKGROUND_APP=0` if the client fails to start that way.
+- The dev client never pairs with a real T3 Code and keeps its MCP server on 25611 (`T3CRAFT_DEMO_MCP_PORT`).
+
+The captions are drawn by the game in its own font, because the stock Homebrew ffmpeg has no `drawtext`. To change the shots or their timing, edit the `script` method in `DemoRecorder.java`; to change the cut, edit `scripts/demo/edit.sh`.
 
 ### Fixture-backed checks
 

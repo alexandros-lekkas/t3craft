@@ -1,30 +1,13 @@
 <div align="center">
 
 <!--
-  ╔══════════════════════════════════════════════════════════════════════╗
-  ║  HERO DEMO SLOT: swap the poster below for the real demo before launch ║
-  ╚══════════════════════════════════════════════════════════════════════╝
-
-  WHAT TO CAPTURE (10 s, one continuous take, no cuts if possible):
-    0.0–2.0  First person on the spawn path, walking toward the office door (daylight, default seed).
-    2.0–3.5  Inside: three agents type at the bench. One waits at the whiteboard with an orange "needs you" tag.
-    3.5–5.0  Look at that agent and right-click. A small card opens beside it.
-    5.0–6.5  The card reads "Run command? ./gradlew test". Press Y, and the status flips to Working.
-    6.5–9.0  Cut (or turn) to the window: blocks appear one by one as the agent builds (2× speed).
-    9.0–10.0 A "Done" toast slides in. Hold for 1 s.
-
-  CAPTURE SETTINGS: 1920×1080 at 60 fps, GUI scale 3, FOV 70, HUD on (we want the UI), muted test client,
-  separate game dir. Staged demo threads only, no real thread titles. Smooth camera off for first person.
-
-  EXPORT:
-    • demo.mp4: H.264, ≤ 10 MB, no audio. Drag it into the GitHub README editor (or an issue). GitHub
-      uploads it and gives you a https://github.com/user-attachments/assets/<id> URL. Paste that URL alone
-      on its own line here; GitHub renders it as an inline autoplay-on-click player.
-    • demo.gif: 960 px wide, 15 fps, ≤ 8 MB (gifski: `gifski --fps 15 --width 960 -o docs/images/launch/demo.gif frames/*.png`).
-      Use it in place of the poster img below if you want it to loop with no click.
+  Hero: the launch demo, recorded from the real game by scripts/demo/record.sh (see docs/REFERENCE.md,
+  "Recording the launch video"). For an inline player with controls, drag docs/images/launch/demo-readme.mp4
+  into the GitHub README editor and paste the https://github.com/user-attachments/assets/<id> URL it gives you
+  on its own line in place of the image below.
 -->
-<a href="https://github.com/alexandros-lekkas/t3craft/releases/latest">
-  <img src="docs/images/office-exterior-day.png" alt="Design render of the T3 Craft office" width="100%">
+<a href="docs/images/launch/demo-readme.mp4">
+  <img src="docs/images/launch/demo.gif" alt="T3 Craft in the game: approving an agent's request on its card, then two agents talking in the office" width="100%">
 </a>
 
 # T3 Craft

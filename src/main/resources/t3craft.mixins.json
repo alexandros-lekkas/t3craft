@@ -12,7 +12,8 @@
   "client": [
     "AgentRendererMixin",
     "AgentModelMixin",
-    "AgentWalkMixin"
+    "AgentWalkMixin",
+    "DemoClockMixin"
   ],
   "injectors": {
     "defaultRequire": 1
