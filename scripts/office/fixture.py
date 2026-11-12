@@ -1,5 +1,5 @@
 """Read-only visual fixture: twelve threads, mixed activity, no real agent calls."""
-import argparse,importlib.util,json
+import argparse,datetime,importlib.util,json
 from pathlib import Path
 spec=importlib.util.spec_from_file_location('fixture',Path(__file__).parent.parent/'feature-fixture.py')
 f=importlib.util.module_from_spec(spec);spec.loader.exec_module(f)
@@ -18,14 +18,18 @@ providers=['claudeAgent','codex','muse','grok','cursor','opencode','pi','kiro','
 # The launch video: the agent that asks is a name people know, and the titles read like real work.
 if args.demo:providers=['claudeAgent','codex','muse','grok','claudeAgent','codex','opencode','pi','kiro','cursor','muse','grok']
 demo_titles=['Fix the flaky login test','Why is CI red','Bump the dependencies','Migrate off moment.js','Fix the build','Center the div','Write the README','Remove console.logs','Make the tests pass','Add dark mode','Rename utils2.ts','Explain this regex']
-demo_done={5:'Centered it. The parent was missing a flex.',6:'README is written. Setup is three steps now.',7:'Removed 47 console.log calls. All checks pass.'}
+demo_done={5:'Centered it. The parent was missing a flex.',6:'README is written. Setup is three steps now.',7:'Removed 47 console.log calls. All checks pass.',10:'Renamed it to dates.ts. 14 imports updated.',11:'It matches an ISO date. Added a comment.'}
+# Desks go to working threads first, newest first: these seven fill the ground floor (bench row A: four at work, the third of
+# them the thread that will ask; row B: three more) and the eighth desk is the finished thread the player types to, which rests on the sofa.
+demo_order=[0,1,4,2,3,8,9,5,6,7,10,11];demo_working={0,1,2,3,4,8,9}
 asks={}
 for i,p in enumerate(providers):
  ident=f'office-{i}';t=f.thread(ident,waiting=i==4)
  t['title']=['Build the studio','Review the API','Ship the release','Run the checks','Choose a direction','Polish the UI','Document the work','Ready for review','Design the landing page','Fix the renderer','Test the build','Tidy the docs'][i]
  t['driverId']=p;t['modelSelection']['instanceId']=p
- if i<4 or i>=8:t['latestTurn']['state']='running';t['messages']=[];t['activities']=[]
+ if (i in demo_working and i!=4 if args.demo else i<4 or i>=8):t['latestTurn']['state']='running';t['messages']=[];t['activities']=[]
  if args.demo:
+  stamp=(f.datetime.now(f.timezone.utc)-datetime.timedelta(seconds=demo_order.index(i))).isoformat();t['updatedAt']=stamp;t['latestTurn']['requestedAt']=stamp
   t['title']=demo_titles[i];t['messages']=t['messages'][:1]
   if i in demo_done:t['messages'][0]['text']=demo_done[i]
   if i==4:
@@ -58,7 +62,7 @@ def broadcast(server,t):
   except OSError: pass
 stock_get=f.Handler.do_GET
 def do_GET(self):
- """/_qa/delegate?parent=office-0&title=…[&driver=…] spawns a subagent of that thread; /_qa/finish?id=… completes it (agents talking, see AgentTalk); /_qa/ask?id=… makes a --demo thread ask for its approval now."""
+ """/_qa/delegate?parent=office-0&title=…[&driver=…] spawns a subagent of that thread; /_qa/finish?id=… completes it (agents talking, see AgentTalk); /_qa/ask?id=… makes a --demo thread ask for its approval now; /_qa/approve?id=… and /_qa/work?id=… answer it or set a thread working without the game (to record one shot on its own)."""
  q=f.parse_qs(f.urlparse(self.path).query)
  if self.path.startswith('/_qa/delegate?'):
   with self.server.lock:
@@ -73,6 +77,12 @@ def do_GET(self):
   with self.server.lock:
    t=self.server.threads[q['id'][0]];now=f.datetime.now(f.timezone.utc).isoformat()
    t.update(asks[t['id']]);t['activities'][0]['createdAt']=now;t['hasPendingApprovals']=True;t['updatedAt']=now
+   broadcast(self.server,t)
+   return self.reply({'ok':True})
+ if self.path.startswith('/_qa/approve?') or self.path.startswith('/_qa/work?'):
+  with self.server.lock:
+   t=self.server.threads[q['id'][0]];t['hasPendingApprovals']=t['hasPendingUserInput']=False;t['latestTurn']['state']='running';t['updatedAt']=f.datetime.now(f.timezone.utc).isoformat()
+   if self.path.startswith('/_qa/approve?'):t['activities'].append({'kind':'approval.resolved','payload':{'requestId':'shared-request'}})
    broadcast(self.server,t)
    return self.reply({'ok':True})
  if self.path.startswith('/_qa/finish?'):

@@ -13,7 +13,8 @@
     "AgentRendererMixin",
     "AgentModelMixin",
     "AgentWalkMixin",
-    "DemoClockMixin"
+    "DemoClockMixin",
+    "DemoCameraMixin"
   ],
   "injectors": {
     "defaultRequire": 1

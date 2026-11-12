@@ -67,6 +67,9 @@ loom {
 				vmArg "-Dt3craft.demo=${project.property('demo')}"
 				if (project.hasProperty('demoPlace')) vmArg "-Dt3craft.demoPlace=${project.property('demoPlace')}"
 				if (project.hasProperty('demoFfmpeg')) vmArg "-Dt3craft.demoFfmpeg=${project.property('demoFfmpeg')}"
+				// -PdemoShots=card,ship records only those shots; -PdemoSeed=<n> varies the hand (the human input model's random choices).
+				if (project.hasProperty('demoShots')) vmArg "-Dt3craft.demoShots=${project.property('demoShots')}"
+				if (project.hasProperty('demoSeed')) vmArg "-Dt3craft.demoSeed=${project.property('demoSeed')}"
 				if (project.hasProperty('config')) vmArg "-Dt3craft.config=${project.property('config')}"
 				if (project.hasProperty('fixturePort')) vmArg "-Dt3craft.fixturePort=${project.property('fixturePort')}"
 				if (project.hasProperty('width') && project.hasProperty('height')) programArgs "--width", project.property('width'), "--height", project.property('height')

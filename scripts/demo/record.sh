@@ -16,7 +16,9 @@ out=$root/build/demo
 raw=$out/raw
 ffmpeg=${FFMPEG:-$(command -v ffmpeg)}
 mcp_port=${T3CRAFT_DEMO_MCP_PORT:-25611}
-rm -rf "$raw"; mkdir -p "$raw" run
+# A full recording starts clean; a retake of some shots (T3CRAFT_DEMO_SHOTS) replaces only those and keeps the rest.
+[ -n "${T3CRAFT_DEMO_SHOTS:-}" ] || rm -rf "$raw"
+mkdir -p "$raw" run
 
 # The dev client's own run directory: muted, never paused in the background, no first-run screens.
 touch run/options.txt
@@ -36,12 +38,13 @@ trap 'kill $fixture 2>/dev/null || true' EXIT
 for _ in $(seq 50); do [ -s "$out/fixture.port" ] && break; sleep 0.2; done
 [ -s "$out/fixture.port" ] || { echo "The office fixture did not start; see $out/fixture.log" >&2; exit 1; }
 port=$(cat "$out/fixture.port")
-echo "Office fixture on $port; recording to $raw (about four minutes)"
+echo "Office fixture on $port; recording to $raw (about seven minutes)"
 
+# The offline name picks the default skin: "Playtest" is Steve, the player everybody knows (the name itself is never on screen).
 # SDL (Minecraft's window backend) reads these: show the window without activating it, and stay a background app.
 SDL_WINDOW_ACTIVATE_WHEN_SHOWN=0 SDL_MAC_BACKGROUND_APP=${T3CRAFT_DEMO_BACKGROUND_APP:-1} \
-	./gradlew runClient -Pdemo="$raw" -Pconfig="$out/office-fixture.json" -PfixturePort="$port" -PmcpPort="$mcp_port" \
-	-PdemoFfmpeg="$ffmpeg" -Pwidth=960 -Pheight=540 > "$out/client.log" 2>&1 || true
+	./gradlew runClient -Pdemo="$raw" -Pusername="${T3CRAFT_DEMO_USERNAME:-Playtest}" -Pconfig="$out/office-fixture.json" -PfixturePort="$port" -PmcpPort="$mcp_port" \
+	-PdemoFfmpeg="$ffmpeg" -Pwidth=960 -Pheight=540 ${T3CRAFT_DEMO_SHOTS:+-PdemoShots="$T3CRAFT_DEMO_SHOTS"} ${T3CRAFT_DEMO_SEED:+-PdemoSeed="$T3CRAFT_DEMO_SEED"} > "$out/client.log" 2>&1 || true
 result=$(grep -o "DEMO RESULT .*" "$out/client.log" | tail -1 || true)
 if [ -z "$result" ]; then
 	echo "The recording did not finish: the client stopped without a result. See $out/client.log" >&2
@@ -50,7 +53,7 @@ fi
 if [ "${result#DEMO RESULT PASS}" = "$result" ]; then
 	echo "The recording FAILED and nothing was cut: ${result#DEMO RESULT }" >&2
 	echo "Last steps:" >&2
-	grep -o "DEMO \(step\|mark\|standing\|survival\|opening\) .*" "$out/client.log" | tail -6 >&2 || true
+	grep -o "DEMO \(step\|shot\|mark\|standing\|survival\|opening\) .*" "$out/client.log" | tail -6 >&2 || true
 	echo "Full log: $out/client.log" >&2
 	exit 1
 fi

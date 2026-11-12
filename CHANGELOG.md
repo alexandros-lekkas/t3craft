@@ -4,6 +4,9 @@ All notable changes to T3 Craft. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Changed
+- **Launch demo video, third cut: played, not scripted.** The video now follows one player through a real session: three agents at the bench, chopping a tree in third person, the Needs-you toast (which grows to the middle of the frame while it is read), a sprint across the lawn and in through the office door past the usage board, a held wide of the whole floor and a pass along the agents' faces, a crouch-bob hello at the whiteboard, the approval clicked on the agent's card, a look over its shoulder at its screen, a helper walking in to be handed work, the laptop with every agent listed and `ship it` typed and sent there (the agent throws its arms up and the player jumps for it), and an animated title that says what T3 Craft is. The player is driven through the game's own movement input and its view by a model of a hand on a mouse (fast, slightly inaccurate turns with small corrections, big turns in two swipes, drift instead of stillness, human reaction and reading times, keys on the frame they fall in); it arrives at a mark already facing what it came for. On a card or the laptop the mouse pointer the game shows is drawn, rests like a real mouse and makes real clicks. Third-person shots use camera rigs that follow like an operator and stay level (no view bobbing, no bounce when the player jumps), captions are words that pop in over the HUD, and the cut pushes in on the cards and the laptop so they read on a phone. `T3CRAFT_DEMO_SHOTS=<names>` retakes single shots. See [Recording the launch video](docs/REFERENCE.md#recording-the-launch-video).
+
 ### Coming next
 - **The held T3 laptop:** a craftable item that opens the laptop screen from anywhere.
 

@@ -212,39 +212,58 @@ Fixture-backed scenarios use the protocol 2 fixtures on 25682/25683 (`-Dt3craft.
 
 ```sh
 export JAVA_HOME=<JDK 25>
-bash scripts/demo/record.sh     # about four minutes: fixture, dev client, encode; prints the output paths
+bash scripts/demo/record.sh     # about ten minutes: fixture, dev client, encode; prints the output paths
 bash scripts/demo/edit.sh       # only re-cut the last recording (build/demo/raw)
+T3CRAFT_DEMO_SHOTS=card,ship T3CRAFT_DEMO_NO_EDIT=1 bash scripts/demo/record.sh   # retake some shots only, without cutting
 ```
 
-`record.sh` starts the office fixture in its staging mode (`scripts/office/fixture.py --demo --port 0`, a free port, staged thread titles only), writes a muted `run/options.txt`, and runs the dev client with `-Pdemo`. `DemoRecorder` then creates a Lakeside T3 World from the title screen and plays nine shots:
+`record.sh` starts the office fixture in its staging mode (`scripts/office/fixture.py --demo --port 0`, a free port, staged thread titles only; the usage board shows the fixture's invented figures), writes a muted `run/options.txt`, and runs the dev client with `-Pdemo`. `DemoRecorder` then creates a Lakeside T3 World from the title screen and plays fourteen shots, in this order:
 
-| Shot | What happens |
-| --- | --- |
-| `hook` | A track along a row of agents typing at their desks, with the opening caption |
-| `survival` | The player, in survival, chops a tree outside; the staged thread asks for its approval (`/_qa/ask`), the Needs-you toast arrives, the player turns and runs for the door |
-| `arc` | An arc round the agent now waiting at the whiteboard |
-| `card` | First person: a click on the agent, its card, Approve pressed, the card closed |
-| `follow` | The camera leads the agent back to its desk, where it sits down and types |
-| `talk` | A parent meets its Helper (`/_qa/delegate`) |
-| `type` | First person: `ship it` typed key by key into a finished agent's card and sent; the agent goes back to work |
-| `dusk` | A pull-back from the glass front while the day runs into dusk, with the Done toast (`/_qa/finish`) |
-| `end` | The same pull-back over the lit office, coming to rest under the end card |
+| Shot | View | What happens |
+| --- | --- | --- |
+| `hook` | camera | Across the bench at the first row from the front: three agents, their name tags apart, the middle one stretching; the opening caption is up on the first frame |
+| `chop` | third person | The player walks up to an oak outside the office and chops it |
+| `ping` | first person | Still chopping; the staged thread asks for its approval (`/_qa/ask`) and the Needs-you toast slides in mid-log, grows to the middle of the frame while it is read and goes back to its corner; the player finishes the log, turns round in two swipes and runs |
+| `dash` | third person, chase | Sprinting across the lawn, a jump, both door leaves opened on the run |
+| `burst` | third person, fixed camera | In through the door past the usage board on the wall, a vault over the end of the front desk |
+| `floor` | third person, held wide | The whole bench from its end, every agent at work on both sides of it, the player sprinting through |
+| `row` | third person, tracking | Along the second row from the front, over the bench: faces, name tags with their dots, a different desk each, the player passing behind |
+| `arrive` | third person, two-shot | The agent waves at its whiteboard; the player comes up already turned to it and crouches a few times to say hello |
+| `card` | first person | The agent waves; a right-click, its card; the pointer rests where the game put it, goes to Approve and clicks; what it says now; the card closes and the agent turns to go |
+| `desk` | third person | Over the agent's shoulder as it sits back down and types, hands and screen in view; the player comes up beside it and ducks in to look |
+| `talk` | camera | A Helper walks up to the agent that spawned it (`/_qa/delegate`) and is handed work; both speech bubbles |
+| `ship` | first person | The player walks up to a finished agent; its card, then Open on laptop: the list of every agent and this one's report; `ship it` typed there and sent with Shift+Enter, so the message is seen arriving |
+| `cheer` | third person, locked off | The agent throws its arms up, the player jumps for it a beat later, and it goes back to work |
+| `end` | camera | A pull-back from the lit office at dusk under the title; its last frame is the poster |
 
-Each shot goes to `build/demo/raw/seg-<name>.mp4`, and `marks.txt` beside them records the frame of every beat for `edit.sh`.
+Each shot goes to `build/demo/raw/seg-<name>.mp4`; `marks.txt` beside them records the frame of every beat for `edit.sh`, `look.csv` the player's view and position in every recorded frame, and `camera.csv` the camera's in the filmed shots (for checking the motion). `T3CRAFT_DEMO_SHOTS=<names>` records only those shots: each one stages what it films through the fixture (`/_qa/ask`, `/_qa/approve`, `/_qa/work`), so a shot can be retaken on its own. `T3CRAFT_DEMO_SEED=<n>` varies the hand (see below); the same seed gives the same take.
 
 It never uses the mouse, the keyboard or the screen, so it can run while you work:
 
-- Frames are read from the game's own framebuffer and piped to an ffmpeg child process. A 960 × 540 window gives 1920 × 1080 on a Retina Mac.
+- Frames are read from the game's own framebuffer and piped to an ffmpeg child process. A 960 × 540 window gives 1920 × 1080 on a Retina Mac, where the game's largest GUI scale is 4.
 - The game clock advances exactly 1/60 s per captured frame (`DemoClockMixin`, inert without `-Dt3craft.demo`), so the video is steady even when a frame takes long to capture.
-- The cinematic camera is a client-only marker entity moved every tick at a steady speed that carries through each cut (only the last shot eases to rest); vanilla interpolation makes it smooth between ticks. The player is an unseen spectator in those shots and a survival player, turned and walked by the script, in the first-person ones.
 - The client runs without a window, like every `-Pdemo` run. If you show it (`-Pshow=true` on the Gradle line in `record.sh`), it still opens without taking focus (`SDL_WINDOW_ACTIVATE_WHEN_SHOWN=0`, `SDL_MAC_BACKGROUND_APP=1`); set `T3CRAFT_DEMO_BACKGROUND_APP=0` if the client fails to start that way.
 - The dev client never pairs with a real T3 Code and keeps its MCP server on 25611 (`T3CRAFT_DEMO_MCP_PORT`).
 
-Camera and stand positions come from the office itself, not from world coordinates: the door and footprint anchors, the seats the agents are actually at, where the waiting agent stands, and a line-of-sight test in the world for the spot the player clicks from. If a staged beat does not happen (the agent never reaches the whiteboard, the crosshair is not on it, a card does not open, the approval or the message does not go through, the toast never shows, there is no level ground outside the door) the client stops with `DEMO RESULT FAIL <reason>`, `record.sh` prints that reason and exits 1, and nothing is cut from the broken take.
+**The player is played, not animated.** It is a survival player throughout (a yellow jacket and the stone axe tell it from the agents, who are player-shaped too):
 
-The soundtrack is mixed in by `edit.sh`, not recorded: it is the game's own music (`wet_hands` by default), found through the asset index in the local Minecraft asset cache that the dev client downloads (`~/.gradle/caches/fabric-loom/assets`), levelled to about -16 LUFS with a short fade in and a fade out under the end card. That music is Mojang's: it is read from the local game assets at export time and must never be committed to this repository. `T3CRAFT_DEMO_MUSIC=<track or audio file>` and `T3CRAFT_DEMO_MUSIC_START=<seconds>` choose another track or starting point; if the asset is missing `edit.sh` says which file it looked for and stops, and `--silent` (or `T3CRAFT_DEMO_SILENT=1`) exports without music. The GIF is always silent.
+- It moves through the game's own movement input: forward, sprint, jump and sneak are held and released as keys, so acceleration, sliding to a stop, view bobbing, the sprint field-of-view kick and the walk animation are the game's. A walk follows a route by looking a few blocks ahead along it, which cuts corners the way a person does; sprint is let go before forward, and the last stretch is a slide. Doors and agents are opened with the use key on whatever the crosshair is on; logs are mined by holding attack.
+- Its view is turned every frame by `DemoHand`, a model of a hand on a mouse: a turn is one fast movement whose length follows its size (about 0.3 s for 5°, 0.4 s for 90°; big turns are flicked), with a skewed bell-shaped speed (the peak comes early), landing a few percent short or over, then one or two small corrections that begin before the first movement has ended. A turn of more than 110° is two swipes with the mouse lifted for about a tenth of a second between them. Yaw and pitch are not in step, so the path curves. Between turns the view drifts by a fraction of a degree (smoothed noise). A moving target (the route ahead, an agent walking off) is followed in small catch-up movements every 0.1–0.3 s.
+- A walk that ends in front of something is finished looking at it: a few blocks out the head turns to it and the last steps are taken sideways or backwards as needed, so the player arrives facing it instead of stopping and then swivelling. A desk in the way of a sprint is jumped before reaching it; a door never is, and a take in which the player is held up in the doorway (under 3 blocks a second) fails.
+- While a card or the laptop is open the game shows a mouse pointer and holds the view still. A hidden window has no pointer, so the recorder draws one, on whole GUI pixels. It behaves like a mouse, not like a gaze: it appears in the middle of the screen and stays exactly there (a mouse at rest reports nothing) until the hand needs a control, then goes to it in one movement of the same hand model and clicks; it does not move while both hands type, and never rests on text. Its position is given to the game as the mouse position, so the button under it lights up and the click is a real one. The agent in front keeps moving: it waves before the click and talks with its hands while its card is read (the office's own poses, held through its dev hook). Keys that are pressed (Shift+Enter to send) pop up as a keycap.
+- Waits are human latencies drawn with spread (about 0.45 s to notice a toast, 2 s to read a request, 0.17 s between landing on a target and clicking), and keys and clicks happen on the frame they fall in, not on a tick grid. `ship it` is typed with per-key gaps that are shorter inside common letter pairs and longer at the start of a word.
 
-The captions are drawn by the game in its own font, because the stock Homebrew ffmpeg has no `drawtext`; they are a Minecraft screen, so they cannot show while the agent card is open. To change the shots or their timing, edit the `script` method in `DemoRecorder.java`; to change the cut or the mix, edit `scripts/demo/edit.sh`.
+**The camera is operated, not bolted on.** In the `camera` shots the player is an unseen spectator parked above the roof; in the third-person shots it stays the camera entity (the game's own F5, so the game draws and moves it), with view bobbing off (the game would apply it to the filmed view; it stays on through the player's own eyes), and `DemoCameraMixin` (inert without `-Dt3craft.demo`) places the camera where the shot's rig wants it, every frame. A rig follows where the player is on the ground through a damped spring, so it trails and settles like an operator and stays level: a jump or a crouch moves the player in the frame, not the camera, and a step up or down is taken slowly. No shot eases to a stop before a cut.
+
+**The text is drawn by the game** in its own font, over the HUD and over an open card (`DemoOverlay`), because the stock Homebrew ffmpeg has no `drawtext`: captions whose words pop in one after another with the key word in yellow, keycaps, the pointer, the toast and the title card. Captions never share the screen with a toast, a card or a speech bubble. The hotbar and hearts show only through the player's own eyes (and not while a card or the laptop is open, where the push-in would cut them in half), and the corner status line not at all. The Needs-you toast is the game's own, handed to the overlay to draw: it slides in at its corner as usual, grows 1.8× to the middle of the frame over dimmed gameplay while it is read, and returns to the corner as the player turns, as one object.
+
+Camera and stand positions come from the office itself, not from world coordinates: the door and footprint anchors, the seats the agents are actually at, where the waiting agent stands, and a line-of-sight test in the world for the spot the player clicks from. If a staged beat does not happen (the agent never reaches the whiteboard, the player ends a walk off its mark, the crosshair is not on the agent, a card does not open, the approval or the message does not go through, a toast never shows, there is no level ground outside the door) the client stops with `DEMO RESULT FAIL <reason>`, `record.sh` prints that reason and exits 1, and nothing is cut from the broken take.
+
+`edit.sh` joins the shots in story order (only `talk` is trimmed, from the helper walking in to its answer) and pushes in 1.5× on the small UI so it reads on a phone; the held part of a push-in is an exact crop scaled with nearest neighbour, so the pixel font stays crisp. A card is shown in a window that starts just under the agent's name tag (the recorder notes where the tag is), so the tag is out of frame rather than cut by it. The laptop fills the screen, so it gets two windows: first its list of every agent, then a move across to the thread and the reply box, and back out to the whole laptop once the message has been sent. `T3CRAFT_DEMO_DROP=<shots>` leaves shots out of the cut and `T3CRAFT_DEMO_TRIM=<shot>:<head>:<tail>` takes frames off one. The GIF is the `ping` shot and the approval from the `card` shot.
+
+The soundtrack is mixed in by `edit.sh`, not recorded: it is the game's own music (`wet_hands` by default, from 13.4 s in, because the track opens with ten seconds of near silence), found through the asset index in the local Minecraft asset cache that the dev client downloads (`~/.gradle/caches/fabric-loom/assets`), levelled to about -16 LUFS with a short fade in and a fade out under the title. That music is Mojang's: it is read from the local game assets at export time and must never be committed to this repository. `T3CRAFT_DEMO_MUSIC=<track or audio file>` and `T3CRAFT_DEMO_MUSIC_START=<seconds>` choose another track or starting point; if the asset is missing `edit.sh` says which file it looked for and stops, and `--silent` (or `T3CRAFT_DEMO_SILENT=1`) exports without music. The GIF is always silent.
+
+To change a shot, edit its method in `DemoRecorder.java` (framing numbers are in design coordinates and blocks, times in seconds); to reorder or drop shots, edit the list in `DemoRecorder.hooks()` and the one in `scripts/demo/edit.sh`; to change the cut, the push-ins or the mix, edit `edit.sh`.
 
 ### Fixture-backed checks
 
