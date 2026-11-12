@@ -1,6 +1,6 @@
 # Create T3 World: one click to your office
 
-> **Status:** shipped in [#9](https://github.com/alexandros-lekkas/t3craft/pull/9) · [full spec](../specs/t3-world-spec.md) · [seed report](../specs/seeds-report.md) · [office design A](office.md)
+> **Status:** shipped in #9 · [full spec](../specs/t3-world-spec.md) · [seed report](../specs/seeds-report.md) · [office design A](office.md)
 
 A T3 World is a Minecraft world made for working with your agents. You name it, pick a place and a game mode, and press one button. You load in on the plaza in front of your agents' office, looking at the door, with cheats on so agents can build, agent build on, and the gamerules you'd set yourself for a long coding session. The office is [design A, the Scandi Studio](office.md), turned so its glazing faces the view.
 

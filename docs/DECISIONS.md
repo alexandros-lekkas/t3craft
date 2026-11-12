@@ -41,7 +41,7 @@ One "+ New thread" row at the top of the laptop's list opens an empty composer; 
 
 ### 2026-11-05 · Office only and streamed T3 UI
 
-**Decision:** Focus on the office only. An arrival plaza belongs to the office; multi-building expansion is out of scope. Stream the real T3 web UI in-game: the laptop opens the full app, and clicking an agent opens its thread in a floating window. ([how it works](design/real-t3-ui.md), [#7](https://github.com/alexandros-lekkas/t3craft/pull/7)) **The UI part is superseded** by the [simple native UI](#2026-11-06--simple-native-minecraft-ui); the streamed app is opt-in.
+**Decision:** Focus on the office only. An arrival plaza belongs to the office; multi-building expansion is out of scope. Stream the real T3 web UI in-game: the laptop opens the full app, and clicking an agent opens its thread in a floating window. ([how it works](design/real-t3-ui.md), #7) **The UI part is superseded** by the [simple native UI](#2026-11-06--simple-native-minecraft-ui); the streamed app is opt-in.
 **Why:** Preserve the actual T3 experience without rebuilding it in Minecraft widgets.
 
 ### 2026-11-06 · Nothing to pick, nothing to confirm, one line in chat
@@ -66,7 +66,7 @@ One "+ New thread" row at the top of the laptop's list opens an empty composer; 
 
 ### 2026-11-05 · MCP first, legacy as a fallback
 
-**Decision:** Talk to T3 Code through its public MCP server for everything it supports. Keep T3's undocumented client protocol only for permission approvals, checkpoint diffs and live push updates. Each path has its own health, so one failing never takes down the other. ([#1](https://github.com/alexandros-lekkas/t3craft/pull/1), [architecture](ARCHITECTURE.md))
+**Decision:** Talk to T3 Code through its public MCP server for everything it supports. Keep T3's undocumented client protocol only for permission approvals, checkpoint diffs and live push updates. Each path has its own health, so one failing never takes down the other. (#1, [architecture](ARCHITECTURE.md))
 **Why:** A documented public API survives T3 updates, and the hybrid keeps features MCP doesn't have yet.
 
 ### 2026-11-05 · Thread visibility mirrors T3 Code

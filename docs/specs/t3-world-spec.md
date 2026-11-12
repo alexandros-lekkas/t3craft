@@ -1,8 +1,8 @@
-> **Status:** design spec, 2026-11-05; implemented in [PR #9](https://github.com/alexandros-lekkas/t3craft/pull/9). What shipped is described in [docs/design/world.md](../design/world.md), which wins where the two differ. Two later owner decisions supersede parts of it:
+> **Status:** design spec, 2026-11-05; implemented in PR #9. What shipped is described in [docs/design/world.md](../design/world.md), which wins where the two differ. Two later owner decisions supersede parts of it:
 > - **Office design A (Scandi Studio)** replaces the Glasshouse design assumed below. Same 24×20 footprint and 6-block floor pitch. See [office-design-a/spec.md](office-design-a/spec.md).
 > - **Zero setup:** the mod auto-connects to the local T3, so page 2 ("Connect your agents") and the pairing steps are dropped. The default seed list is in [seeds-report.md](seeds-report.md).
 > - **No villagers:** residents are player-like characters. Wherever this spec says "villagers", read "agent characters".
-> - **Since removed:** `T3Village` and `ServerVillage` are gone ([PR #13](https://github.com/alexandros-lekkas/t3craft/pull/13)); the office residents are `OfficeResidents` on the client and `ServerOffice` on a shared server.
+> - **Since removed:** `T3Village` and `ServerVillage` are gone (PR #13); the office residents are `OfficeResidents` on the client and `ServerOffice` on a shared server.
 >
 > Summary with pictures: [docs/design/world.md](../design/world.md).
 

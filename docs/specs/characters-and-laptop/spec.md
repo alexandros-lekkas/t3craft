@@ -2,7 +2,7 @@
 
 > **Current direction:** the [simple native UI](../../design/native-ui.md): the laptop is a plain Minecraft screen and clicking an agent opens a small card beside it. The streamed web UI is opt-in (`webUi: true`). The designs below are earlier explorations.
 
-> **Since removed:** `T3Village`, `ServerVillage` and `VillageLayout` (the free-standing village) were removed in [PR #13](https://github.com/alexandros-lekkas/t3craft/pull/13). The office residents now live in `OfficeResidents` (client) and `ServerOffice` (shared server). Read those names wherever this spec mentions the village classes.
+> **Since removed:** `T3Village`, `ServerVillage` and `VillageLayout` (the free-standing village) were removed in PR #13. The office residents now live in `OfficeResidents` (client) and `ServerOffice` (shared server). Read those names wherever this spec mentions the village classes.
 
 # T3 Craft: player-shaped agents and laptops (26.3 implementation spec)
 

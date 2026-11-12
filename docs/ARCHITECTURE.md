@@ -39,7 +39,7 @@ flowchart LR
 
 ## Minecraft → T3: MCP first, legacy as fallback
 
-Since [#1](https://github.com/alexandros-lekkas/t3craft/pull/1), every operation goes through a shared backend interface with two implementations:
+Since #1, every operation goes through a shared backend interface with two implementations:
 
 | | **Public MCP** (primary) | **Legacy client protocol** |
 |:--|:--|:--|
@@ -99,4 +99,4 @@ Working agents sit at their desk. Agents that need you walk to the whiteboard. F
 
 ## Build and checks
 
-JDK 25 compiles the mod (Gradle and the checks also run on 27 since [#2](https://github.com/alexandros-lekkas/t3craft/pull/2)). `./gradlew build` runs the fixture-free checks (`uiCheck`, `worldCheck`). CI runs `scripts/verify-ci.sh`, which starts both fixture pairs on free ports and runs `officeCheck`, `connectionCheck`, `featureCheck`, `reliabilityCheck`, `firstRunCheck` and `mcpCheck` against them. The full list is in the [reference](REFERENCE.md#build-and-develop).
+JDK 25 compiles the mod (Gradle and the checks also run on 27 since #2). `./gradlew build` runs the fixture-free checks (`uiCheck`, `worldCheck`). CI runs `scripts/verify-ci.sh`, which starts both fixture pairs on free ports and runs `officeCheck`, `connectionCheck`, `featureCheck`, `reliabilityCheck`, `firstRunCheck` and `mcpCheck` against them. The full list is in the [reference](REFERENCE.md#build-and-develop).

@@ -1,12 +1,12 @@
 # Native panel exploration (historical)
 
-> **Status:** historical. The in-game UI is [the simple native UI](native-ui.md); the streamed web app from [#7](https://github.com/alexandros-lekkas/t3craft/pull/7) is opt-in ([how it works](real-t3-ui.md)). The redesign below is an earlier exploration, kept for reference. It does not describe what ships.
+> **Status:** historical. The in-game UI is [the simple native UI](native-ui.md); the streamed web app from #7 is opt-in ([how it works](real-t3-ui.md)). The redesign below is an earlier exploration, kept for reference. It does not describe what ships.
 
 ## Earlier native-panel exploration
 
 # Native panel exploration
 
-> **Status:** designed 2026-11-05 · builds on [#3](https://github.com/alexandros-lekkas/t3craft/pull/3) · [full spec](../specs/ui-redesign/spec.md) · [interactive mockup](../specs/ui-redesign/mockup.html) (download and open locally)
+> **Status:** designed 2026-11-05 · builds on #3 · [full spec](../specs/ui-redesign/spec.md) · [interactive mockup](../specs/ui-redesign/mockup.html) (download and open locally)
 
 The owner found the current panel *"way too bold and dense, can't understand anything"*. The redesign makes it feel like the T3 Code desktop app: quiet, airy, and easy to read while you play.
 

@@ -1,6 +1,6 @@
 # Agents as people, and the T3 laptop
 
-> **Status:** designed 2026-11-05. Player-shaped agents and desk laptops shipped in [#8](https://github.com/alexandros-lekkas/t3craft/pull/8); the held, craftable laptop is still to come. · [full spec](../specs/characters-and-laptop/spec.md)
+> **Status:** designed 2026-11-05. Player-shaped agents and desk laptops shipped in #8; the held, craftable laptop is still to come. · [full spec](../specs/characters-and-laptop/spec.md)
 
 Two small changes make the office feel like a real place. Agents look like **players**, and you open T3 from a **laptop** on any desk (and, later, one you can hold).
 

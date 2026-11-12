@@ -68,7 +68,7 @@ Everything is in GUI pixels, so the layout follows the GUI scale like vanilla sc
     <td width="50%"><img src="../images/shots/native-laptop.png" alt="After: the simple native laptop at GUI scale 5"></td>
   </tr>
   <tr>
-    <td><b>Before.</b> The streamed web app ([#7](https://github.com/alexandros-lekkas/t3craft/pull/7)): T3's whole interface through a hidden Chrome.</td>
+    <td><b>Before.</b> The streamed web app (#7): T3's whole interface through a hidden Chrome.</td>
     <td><b>After.</b> The native laptop: the thread list, the thread, one input box.</td>
   </tr>
   <tr>

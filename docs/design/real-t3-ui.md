@@ -10,6 +10,8 @@ All screenshots below are real, unedited Minecraft screenshots (F2 equivalent). 
 
 Press **`** (the panel key). T3 Code fills the screen.
 
+> The laptop, agent card and ping-jump captures on this page were taken against a real T3 Code session, so they are blurred here. They show the layout, not the text.
+
 ![The laptop: T3 Code full screen at GUI scale 5](../images/shots/ui-real-laptop-scale5.png)
 
 It is fully interactive. In the capture below, `minecraft` was typed from Minecraft into T3's sidebar search (every character went through the mod's `charTyped` → `Input.insertText` path), and T3 filtered its own thread list. The showcase checks the page really holds the query before taking the shot.
