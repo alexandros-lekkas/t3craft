@@ -7,9 +7,11 @@
 A Fabric mod that turns your [T3 Code](https://t3.codes) agents into characters in an office at spawn.<br>
 Walk up to one, click it, and answer it. No alt-tab, no pairing, no settings screen.
 
-<a href="#-get-it">
-  <img src="docs/images/launch/demo.gif" alt="Playing survival when an agent pings that it needs you, then walking into the office, clicking the agent and approving its command" width="100%">
-</a>
+</div>
+
+https://github.com/user-attachments/assets/97e1234f-611f-4ae6-abfc-f16f5a159b59
+
+<div align="center">
 
 [![Minecraft 26.3](https://img.shields.io/badge/Minecraft-26.3-62B47A?style=flat-square&logo=minecraft&logoColor=white)](https://www.minecraft.net/)
 [![Fabric](https://img.shields.io/badge/loader-Fabric-DBD0B4?style=flat-square)](https://fabricmc.net/)
